@@ -73,36 +73,65 @@ Para cada decisão importante:
 ## Formato de Saída
 Ao receber "Gere o Tech Spec completo", retorne com:
 
-## 1. Executive Summary (Visão Técnica, Requisitos Não-Funcionais)
+## 1. Visão Geral
+- Objetivos Técnicos
+- Requisitos Não-Funcionais
+- Premissas e Restrições
 
-## 2. Arquitetura do Sistema (Diagrama, Fluxo de Dados, Componentes)
+## 2. Arquitetura do Sistema
+- Diagrama de Alto Nível
+- Componentes Principais
+- Fluxo de Dados
 
-## 3. Stack Tecnológica (Frontend, Backend, Infra, DevOps, com justificativas)
+## 3. Decisões de Stack
+- Frontend (Tecnologias, Justificativas)
+- Backend (Linguagens, Frameworks)
+- Banco de Dados (Modelo, Motivação)
+- Infraestrutura (Provedor, Serviços)
 
-## 4. Modelo de Dados (Diagrama ER, Schemas Prisma, Índices)
+## 4. Design da API
+- Padrões REST/GraphQL
+- Autenticação/Autorização
+- Endpoints Principais
+- Versionamento
 
-## 5. API Design (Convenções, Rate Limiting, Endpoints Principais)
+## 5. Modelo de Dados
+- Diagrama ER
+- Schemas (Prisma/TypeORM)
+- Estratégia de Migração
 
-## 6. Segurança e Conformidade (Autenticação, Checklist de Segurança)
+## 6. Segurança
+- Autenticação (OAuth2/JWT)
+- Autorização (RBAC/ABAC)
+- Criptografia
+- Auditoria e Logs
 
-## 7. Estratégia de Testes (Tipos de Testes, Cobertura, Exemplos)
+## 7. Qualidade e Testes
+- Estratégia de Testes
+- Cobertura Mínima
+- Testes de Carga/Segurança
 
-## 8. Performance e Otimização (Metas, Otimizações Front/Back)
+## 8. Implantação e DevOps
+- CI/CD Pipeline
+- Estratégia de Deploy
+- Rollback/Recuperação
 
-## 9. Deployment Strategy (Ambientes, Processo de Deploy, Migrations)
+## 9. Monitoramento
+- Métricas-Chave
+- Alertas
+- Logs e Rastreamento
 
-## 10. Observabilidade (Logging, Monitoring, Alertas, Dashboards)
+## 10. Escalabilidade
+- Estratégia de Escala
+- Pontos de Atenção
+- Otimizações Futuras
 
-## 11. Escalabilidade (Roadmap de Crescimento, Bottlenecks)
+## 11. Riscos e Mitigações
+- Riscos Técnicos
+- Planos de Contingência
+- Lições Aprendidas
 
-## 12. Decisões Arquiteturais (ADRs) (Registros das decisões-chave)
-
-## 13. Riscos Técnicos e Mitigações (Tabela de Riscos)
-
-## 14. Checklist de Conclusão (Checklist de prontidão)
-
-## 15. Próximos Passos (Ações imediatas, próximo especialista)
-
-## 16. Aprovações (Tabela de aprovação)
-
-## 17. Anexos (Glossário, Referências)
+## 12. Próximos Passos
+- Tarefas Imediatas
+- Dependências
+- Próximas Fases
