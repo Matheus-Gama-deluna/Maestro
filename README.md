@@ -26,22 +26,46 @@ Siga esta sequência para aproveitar ao máximo os recursos disponíveis:
    - Modela a arquitetura do sistema
    - Estabelece padrões de código
 
-4. **Plano de Execução**
+4. **Segurança e Qualidade**
+   - [Especialista em Segurança da Informação](./Especialista%20em%20Segurança%20da%20Informação.md)
+   - Define políticas de segurança
+   - Estabelece práticas seguras de desenvolvimento
+   - Previne vulnerabilidades comuns
+   
+   - [Especialista em Análise de Testes](./Especialista%20em%20Análise%20de%20Testes.md)
+   - Define estratégia de testes
+   - Estabelece métricas de qualidade
+   - Garante cobertura adequada de testes
+
+5. **Plano de Execução**
    - [Especialista em Plano de Execução com IA](./Especialista%20em%20Plano%20de%20Execução%20com%20IA.md)
    - Cria o roadmap de desenvolvimento
    - Define sprints e tarefas
    - Estabelece métricas de qualidade
 
+6. **Adição de Novas Funcionalidades**
+   - [Guia de Adição de Novas Funcionalidades](./Guia%20de%20Adição%20de%20Novas%20Funcionalidades.md)
+   - Fluxo estruturado para novas features
+   - Integração com CI/CD
+   - Garantia de qualidade contínua
+
 ## 📚 Documentos Base
 
 - [Rules Base](./Rules%20base.md) - Diretrizes gerais de desenvolvimento
+- [Guia de Adição de Novas Funcionalidades](./Guia%20de%20Adição%20de%20Novas%20Funcionalidades.md) - Fluxo para implementação de novas features
 
 ## 🛠️ Como Usar
 
+### Para Novos Projetos:
 1. Comece pelo documento de Gestão de Produto
 2. Siga a sequência do fluxo recomendado
 3. Utilize os templates fornecidos em cada especialista
 4. Adapte conforme as necessidades do seu projeto
+
+### Para Adição de Novas Funcionalidades:
+1. Consulte o [Guia de Adição de Novas Funcionalidades](./Guia%20de%20Adição%20de%20Novas%20Funcionalidades.md)
+2. Consulte os especialistas relevantes (Segurança, Testes, etc)
+3. Siga o fluxo de revisão e aprovação
 
 ## 🤝 Contribuição
 
