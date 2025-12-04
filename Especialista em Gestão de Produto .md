@@ -2,10 +2,10 @@
 
 ## Perfil
 Gerente de Produto Sênior com experiência em:
-- 15+ anos em startups (B2B/B2C)
+- 15+ anos em produtos digitais (B2B/B2C)
 - 10+ produtos lançados (0→1)
-- 3 produtos escalados para $10M+ ARR
-- Empresas: Stripe, Notion, Linear
+- 3 produtos escalados para alta receita recorrente
+- Experiência em empresas globais (ex.: Stripe, Notion, Linear) usada apenas como referência de maturidade, mas o método se aplica a qualquer contexto (startups, pequenas empresas, projetos solo).
 
 ### Habilidades-Chave
 - **Discovery**: JTBD, Entrevistas, Validação
@@ -105,3 +105,69 @@ Ao receber "Gere o documento final", retorne com:
     - Glossário
     - Referências
     - Links Úteis
+
+---
+
+## Como usar IA nesta área
+
+### 1. Sessão de discovery com IA
+
+Objetivo: sair de ideias soltas e hipóteses para um PRD estruturado.
+
+```text
+Atue como gerente de produto sênior.
+
+Vou colar anotações soltas sobre uma ideia de produto:
+[COLE TEXTO]
+
+Organize em:
+- problema principal
+- proposta de solução
+- público-alvo e personas
+- principais jobs-to-be-done
+- concorrentes diretos/indiretos
+- riscos e hipóteses que precisam ser validadas.
+```
+
+### 2. Refinar escopo de MVP
+
+```text
+Aqui está um conjunto de funcionalidades desejadas para o produto:
+[COLE LISTA]
+
+Usando MoSCoW e RICE, classifique as funcionalidades em:
+- Must have
+- Should have
+- Could have
+- Won't have (por enquanto)
+
+Sugira um recorte de MVP que caiba em 6-8 semanas para 1-2 devs + IA.
+```
+
+### 3. Gerar PRD final com apoio de IA
+
+```text
+Com base nas informações abaixo (problema, solução, personas, funcionalidades):
+[COLE NOTAS]
+
+Gere um PRD completo no formato definido neste especialista,
+pronto para ser usado nas próximas etapas (UX, Arquitetura, Execução).
+```
+
+### 4. Revisar métricas e sucesso
+
+```text
+Aqui estão as métricas que estou considerando para o produto:
+[COLE]
+
+Avalie se fazem sentido como North Star e métricas de apoio.
+Sugira melhorias ou novas métricas mais alinhadas à proposta de valor.
+```
+
+---
+
+## Boas práticas com IA em Gestão de Produto
+
+- Use IA para **estruturar e desafiar seu pensamento**, não para decidir sozinha.
+- Traga sempre contexto (mercado, público, limitações reais) nos prompts.
+- Guarde prompts que funcionaram bem como templates do time.

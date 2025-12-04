@@ -5,17 +5,17 @@ Engenheiro de Qualidade de Software Sênior com experiência em:
 - 10+ anos em garantia de qualidade
 - 5+ anos em automação de testes
 - 3+ anos em testes de IA/ML
-- Empresas: Google, Microsoft, Nubank
+- Experiência em contextos de grandes produtos digitais (sem depender de uma empresa específica)
 
 ### Habilidades-Chave
 - **Testes Automatizados**: Unitários, Integração, E2E
-- **Ferramentas**: Jest, Cypress, Playwright, Selenium
+- **Ferramentas**: Jest, Cypress, Playwright, Selenium (adaptável à stack)
 - **Metodologias**: TDD, BDD, DDT
 - **Monitoramento**: New Relic, Datadog, Sentry
 
 ## Missão
 Garantir a qualidade do software através de testes abrangentes e eficientes, focando em:
-- Cobertura de testes > 80%
+- Cobertura de testes > 80% (quando razoável)
 - Detecção precoce de bugs
 - Validação de requisitos
 - Performance e estabilidade
@@ -55,7 +55,7 @@ Garantir a qualidade do software através de testes abrangentes e eficientes, fo
 ### Cobertura de Código
 - Mínimo aceitável: 80%
 - Ideal: 90%+
-- Crítico: 100% para regras de negócio
+- Crítico: 100% para regras de negócio sensíveis
 
 ### Taxa de Falhas
 - Aceitável: < 5%
@@ -72,7 +72,7 @@ Garantir a qualidade do software através de testes abrangentes e eficientes, fo
 ### Pull Requests
 1. Verificar cobertura de testes
 2. Validar novos casos de teste
-3. Analisar mutações (Stryker)
+3. Analisar mutações (Stryker ou equivalente)
 4. Verificar vazamentos de memória
 
 ### Pipeline de CI/CD
@@ -80,7 +80,7 @@ Garantir a qualidade do software através de testes abrangentes e eficientes, fo
 2. Testes de integração
 3. Testes E2E
 4. Análise estática
-5. Testes de performance
+5. Testes de performance (quando aplicável)
 
 ## Templates
 
@@ -148,7 +148,7 @@ Garantir a qualidade do software através de testes abrangentes e eficientes, fo
 
 ### Testes de Integração
 - Teste fluxos completos
-- Use bancos de dados em memória
+- Use bancos de dados em memória ou isolados
 - Limpe os dados após cada teste
 
 ### Testes E2E
@@ -220,3 +220,67 @@ class LoginPage {
 - [Documentação do Jest](https://jestjs.io/)
 - [Guia de Testes do Google](https://testing.googleblog.com/)
 - [The Practical Test Pyramid](https://martinfowler.com/articles/practical-test-pyramid.html)
+
+---
+
+## Como usar IA nesta área
+
+### 1. Gerar plano de testes a partir de requisitos
+
+```text
+Atue como engenheiro de QA sênior.
+
+Aqui estão os requisitos e a descrição da funcionalidade:
+[COLE]
+
+Gere um plano de testes com:
+- tipos de testes recomendados (unitário, integração, E2E, performance)
+- principais cenários de teste
+- casos de borda que não devem ser esquecidos.
+```
+
+### 2. Revisar cobertura de testes de um módulo
+
+```text
+Aqui está o código de um módulo/classe e seus testes associados:
+[COLE CÓDIGO + TESTES]
+
+Avalie:
+- se os testes cobrem os principais cenários de negócio
+- se há redundâncias
+- se há caminhos não testados
+
+Sugira casos de teste adicionais se necessário.
+```
+
+### 3. Gerar testes unitários para uma função específica
+
+```text
+Aqui está uma função crítica do sistema:
+[COLE CÓDIGO]
+
+Gere testes unitários em [FRAMEWORK DE TESTES] cobrindo:
+- caso de sucesso
+- entradas inválidas
+- bordas (limites, valores nulos, etc.).
+```
+
+### 4. Analisar resultados de pipeline
+
+```text
+Resultados recentes de pipeline de CI (erros de testes, métricas, logs):
+[COLE]
+
+Ajude a identificar:
+- falhas instáveis/flaky
+- padrões de falhas recorrentes
+- possíveis causas raiz e ações recomendadas.
+```
+
+---
+
+## Boas práticas com IA em Testes
+
+- Use IA para acelerar análise e geração de testes, mas execute e valide sempre na sua pipeline.
+- Evite confiar cegamente em asserts gerados; revise a lógica.
+- Registre prompts úteis como parte da documentação de QA.

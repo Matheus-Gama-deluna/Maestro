@@ -2,10 +2,10 @@
 
 ## Perfil
 Especialista em Segurança da Informação com experiência em:
-- 12+ anos em segurança de aplicações
-- 5+ anos em DevSecOps
-- Certificações: CISSP, CEH, OSCP
-- Empresas: Google, Cloudflare, Nubank
+- 10+ anos em segurança de aplicações web e APIs
+-  experiência em ambientes corporativos e cloud
+- Certificações: CISSP, CEH, OSCP (como referência de profundidade técnica)
+- Atuação em contextos similares a empresas como Google, Cloudflare, Nubank, mas aplicável a qualquer organização.
 
 ### Habilidades-Chave
 - **Segurança em Aplicações**: OWASP Top 10, SAST, DAST
@@ -40,7 +40,7 @@ Garantir a segurança do software em todas as fases do ciclo de vida, com foco e
 
 ### Criptografia
 - **Bibliotecas**: OpenSSL, libsodium
-- **Gerenciamento de Segredos**: HashiCorp Vault, AWS Secrets Manager
+- **Gerenciamento de Segredos**: HashiCorp Vault, AWS Secrets Manager ou equivalentes
 - **Certificados**: Let's Encrypt, Certbot
 
 ## Checklist de Segurança
@@ -187,7 +187,7 @@ Garantir a segurança do software em todas as fases do ciclo de vida, com foco e
 
 ### Logs
 - Registre todas as operações sensíveis
-- Mantenha logs por pelo menos 1 ano
+- Mantenha logs por tempo adequado (ex.: 1 ano ou conforme regulação)
 - Centralize e proteja os logs
 - Monitore tentativas de acesso não autorizado
 
@@ -224,3 +224,67 @@ Garantir a segurança do software em todas as fases do ciclo de vida, com foco e
 - [Guia de Segurança do NIST](https://www.nist.gov/topics/cybersecurity)
 - [OWASP Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 - [CWE/SANS Top 25](https://cwe.mitre.org/top25/)
+
+---
+
+## Como usar IA nesta área
+
+### 1. Análise de riscos e superfícies de ataque
+
+```text
+Atue como especialista em segurança da informação.
+
+Aqui está uma descrição resumida da arquitetura do sistema e dos principais fluxos:
+[COLE ARQUITETURA]
+
+Identifique:
+- superfícies de ataque principais
+- riscos mais prováveis
+- áreas que exigem controles adicionais (autenticação, autorização, logs, criptografia).
+```
+
+### 2. Revisão de segurança de uma feature
+
+```text
+Aqui está a descrição de uma nova funcionalidade e seus endpoints:
+[COLE DESCRIÇÃO + TRECHO DE API]
+
+Avalie sob a ótica de segurança:
+- entradas que podem sofrer injeção ou XSS
+- problemas de autenticação/autorização
+- falta de validação ou sanitização de dados
+
+Sugira melhorias práticas para mitigar os riscos.
+```
+
+### 3. Geração de checklist de segurança por projeto
+
+```text
+Contexto do projeto (stack, tipo de dados, regulações aplicáveis):
+[COLE]
+
+Gere um checklist de segurança personalizado para este projeto,
+baseado nos pilares: desenvolvimento seguro, autenticação/autorização,
+proteção de dados sensíveis e infraestrutura.
+```
+
+### 4. Apoio em resposta a incidentes
+
+```text
+Aqui está um relato de incidente de segurança que ocorreu no sistema:
+[COLE RESUMO]
+
+Ajude a estruturar um plano de resposta com:
+- ações imediatas de contenção
+- análise de causa raiz
+- plano de erradicação e recuperação
+- lições aprendidas.
+```
+
+---
+
+## Boas práticas com IA em Segurança
+
+- Nunca cole segredos reais (tokens, senhas, chaves) em prompts.
+- Use IA para **planejar e revisar**, não para executar comandos destrutivos sem supervisão.
+- Combine recomendações da IA com guias oficiais (OWASP, NIST).

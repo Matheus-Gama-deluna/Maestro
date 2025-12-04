@@ -2,71 +2,140 @@
 
 ## 🚀 Visão Geral
 
-Este repositório contém um conjunto de guias e templates para desenvolvimento de software com IA, focando em boas práticas, arquitetura limpa e entrega eficiente. Os documentos foram projetados para serem usados em conjunto, seguindo um fluxo lógico de desenvolvimento.
+Este repositório contém um conjunto de guias e templates para **desenvolvimento de software com IA**, focando em:
 
-## 🔄 Fluxo Recomendado
+- boas práticas de engenharia de software
+- arquitetura e modelagem bem pensadas
+- uso estruturado de IA (ex.: GPT 5.1) do início ao fim do ciclo de vida
+- entrega eficiente, com qualidade e segurança.
+
+Os documentos foram projetados para serem usados em conjunto, seguindo um **fluxo lógico de desenvolvimento guiado por IA**.
+
+---
+
+## 📘 Playbook Central
+
+Antes de usar os especialistas individuais, recomenda-se ler:
+
+- [Playbook de Desenvolvimento com IA](./Playbook%20de%20Desenvolvimento%20com%20IA.md)
+
+Ele descreve o método em 8 etapas:
+
+1. Visão & problema
+2. Engenharia de requisitos com IA
+3. Modelagem & arquitetura com IA
+4. Planejamento / backlog
+5. Vibe Coding Estruturado (implementação)
+6. Testes com IA
+7. Documentação & revisão
+8. Feedback & evolução
+
+---
+
+## 🔄 Fluxo Recomendado de Uso dos Especialistas
 
 Siga esta sequência para aproveitar ao máximo os recursos disponíveis:
 
-1. **Definição do Produto**
-   - [Especialista em Gestão de Produto](./Especialista%20em%20Gestão%20de%20Produto%20.md)
-   - Define o "o quê" e "porquê" do produto
-   - Estabelece métricas de sucesso
-   - Prioriza funcionalidades do MVP
+1. **Definição do Produto**  
+   - [Especialista em Gestão de Produto](./Especialista%20em%20Gestão%20de%20Produto%20.md)  
+   - Define o "o quê" e "por quê" do produto.  
+   - Estabelece métricas de sucesso e visão de MVP.
 
-2. **Design da Experiência**
-   - [Especialista em UX Design](./Especialista%20em%20UX%20Design.md)
-   - Cria fluxos de usuário
-   - Define a arquitetura de informação
-   - Estabelece diretrizes de design
+2. **Engenharia de Requisitos com IA**  
+   - [Especialista em Engenharia de Requisitos com IA](./Especialista%20em%20Engenharia%20de%20Requisitos%20com%20IA.md)  
+   - Transforma visão e notas soltas em requisitos claros.  
+   - Gera critérios de aceitação e reduz ambiguidades.
 
-3. **Arquitetura do Sistema**
-   - [Especialista em Arquitetura de Software](./Especialista%20em%20Arquitetura%20de%20Software.md)
-   - Define a stack tecnológica
-   - Modela a arquitetura do sistema
-   - Estabelece padrões de código
+3. **Design da Experiência**  
+   - [Especialista em UX Design](./Especialista%20em%20UX%20Design.md)  
+   - Cria fluxos de usuário e jornada.  
+   - Define arquitetura de informação e diretrizes de design.
 
-4. **Segurança e Qualidade**
-   - [Especialista em Segurança da Informação](./Especialista%20em%20Segurança%20da%20Informação.md)
-   - Define políticas de segurança
-   - Estabelece práticas seguras de desenvolvimento
-   - Previne vulnerabilidades comuns
-   
-   - [Especialista em Análise de Testes](./Especialista%20em%20Análise%20de%20Testes.md)
-   - Define estratégia de testes
-   - Estabelece métricas de qualidade
-   - Garante cobertura adequada de testes
+4. **Modelagem de Domínio e Arquitetura Inicial**  
+   - [Especialista em Modelagem e Arquitetura de Domínio com IA](./Especialista%20em%20Modelagem%20e%20Arquitetura%20de%20Dom%C3%ADnio%20com%20IA.md)  
+   - Deriva casos de uso, entidades, relacionamentos.  
+   - Alimenta o trabalho do Arquiteto de Software.
 
-5. **Plano de Execução**
-   - [Especialista em Plano de Execução com IA](./Especialista%20em%20Plano%20de%20Execução%20com%20IA.md)
-   - Cria o roadmap de desenvolvimento
-   - Define sprints e tarefas
-   - Estabelece métricas de qualidade
+5. **Arquitetura do Sistema**  
+   - [Especialista em Arquitetura de Software](./Especialista%20em%20Arquitetura%20de%20Software.md)  
+   - Define a stack tecnológica.  
+   - Modela a arquitetura do sistema (ex.: C4).  
+   - Estabelece padrões de código e integrações.
 
-6. **Adição de Novas Funcionalidades**
-   - [Guia de Adição de Novas Funcionalidades](./Guia%20de%20Adição%20de%20Novas%20Funcionalidades.md)
-   - Fluxo estruturado para novas features
-   - Integração com CI/CD
-   - Garantia de qualidade contínua
+6. **Segurança e Qualidade**  
+   - [Especialista em Segurança da Informação](./Especialista%20em%20Seguran%C3%A7a%20da%20Informa%C3%A7%C3%A3o.md)  
+     - Define políticas de segurança e práticas seguras de desenvolvimento.  
+     - Prevê vulnerabilidades comuns e controles mínimos.
+   - [Especialista em Análise de Testes](./Especialista%20em%20An%C3%A1lise%20de%20Testes.md)  
+     - Define estratégia de testes.  
+     - Estabelece métricas de qualidade.  
+     - Garante cobertura adequada e plano de testes.
+
+7. **Plano de Execução e Vibe Coding Estruturado**  
+   - [Especialista em Plano de Execução com IA](./Especialista%20em%20Plano%20de%20Execu%C3%A7%C3%A3o%20com%20IA.md)  
+     - Cria o roadmap de desenvolvimento.  
+     - Define sprints, tarefas e priorização.
+   - [Especialista em Desenvolvimento e Vibe Coding Estruturado](./Especialista%20em%20Desenvolvimento%20e%20Vibe%20Coding%20Estruturado.md)  
+     - Estrutura o uso de IA na implementação (vibe coding com engenharia).  
+     - Garante que cada feature venha com testes e alinhamento arquitetural.
+
+8. **Adição de Novas Funcionalidades**  
+   - [Guia de Adição de Novas Funcionalidades](./Guia%20de%20Adi%C3%A7%C3%A3o%20de%20Novas%20Funcionalidades.md)  
+   - Fluxo estruturado para novas features.  
+   - Integração com CI/CD.  
+   - Garantia de qualidade contínua, com apoio de IA.
+
+---
 
 ## 📚 Documentos Base
 
-- [Rules Base](./Rules%20base.md) - Diretrizes gerais de desenvolvimento
-- [Guia de Adição de Novas Funcionalidades](./Guia%20de%20Adição%20de%20Novas%20Funcionalidades.md) - Fluxo para implementação de novas features
+- [Rules Base](./Rules%20base.md) – Diretrizes gerais de desenvolvimento orientadas a um assistente de código/IA.  
+- [Playbook de Desenvolvimento com IA](./Playbook%20de%20Desenvolvimento%20com%20IA.md) – Método completo de engenharia com IA.  
+- [Catálogo de Stacks para Hospedagem Compartilhada](./Cat%C3%A1logo%20de%20Stacks%20para%20Hospedagem%20Compartilhada.md) – Opções de stacks e planos para ambientes PHP/shared hosting.  
+- [Guia de Adição de Novas Funcionalidades](./Guia%20de%20Adi%C3%A7%C3%A3o%20de%20Novas%20Funcionalidades.md) – Fluxo para implementação de novas features.
+
+---
+
+## 🧪 Exemplos por Stack
+
+Para ver exemplos práticos de aplicação do Playbook em tecnologias específicas:
+
+- [Exemplo de Fluxo Completo com Node e NestJS](./Exemplo%20de%20Fluxo%20Completo%20com%20Node%20e%20NestJS.md)  
+- [Exemplo de Fluxo Completo com Java e Spring Boot](./Exemplo%20de%20Fluxo%20Completo%20com%20Java%20e%20Spring%20Boot.md)  
+- [Exemplo de Fluxo Completo com Laravel e Filament](./Exemplo%20de%20Fluxo%20Completo%20com%20Laravel%20e%20Filament.md)  
+- [Exemplo de Fluxo Completo com Laravel e Livewire](./Exemplo%20de%20Fluxo%20Completo%20com%20Laravel%20e%20Livewire.md)
+
+(Exemplos adicionais podem ser adicionados para outras stacks.)
+
+---
 
 ## 🛠️ Como Usar
 
-### Para Novos Projetos:
-1. Comece pelo documento de Gestão de Produto
-2. Siga a sequência do fluxo recomendado
-3. Utilize os templates fornecidos em cada especialista
-4. Adapte conforme as necessidades do seu projeto
+### Para Novos Projetos
 
-### Para Adição de Novas Funcionalidades:
-1. Consulte o [Guia de Adição de Novas Funcionalidades](./Guia%20de%20Adição%20de%20Novas%20Funcionalidades.md)
-2. Consulte os especialistas relevantes (Segurança, Testes, etc)
-3. Siga o fluxo de revisão e aprovação
+1. Leia o [Playbook de Desenvolvimento com IA](./Playbook%20de%20Desenvolvimento%20com%20IA.md) para entender o método.  
+2. Use o [Catálogo de Stacks para Hospedagem Compartilhada](./Cat%C3%A1logo%20de%20Stacks%20para%20Hospedagem%20Compartilhada.md) (se aplicável ao seu cenário) para escolher o plano/stack.  
+3. Comece pelo documento de Gestão de Produto.  
+4. Siga a sequência do fluxo recomendado (requisitos → UX → modelagem → arquitetura → execução).  
+5. Use os especialistas como **personas de IA** (cole o conteúdo deles como contexto no seu modelo).  
+6. Adapte conforme as necessidades do seu projeto.
+
+### Para Adição de Novas Funcionalidades
+
+1. Consulte o [Guia de Adição de Novas Funcionalidades](./Guia%20de%20Adi%C3%A7%C3%A3o%20de%20Novas%20Funcionalidades.md).  
+2. Consulte os especialistas relevantes (Segurança, Testes, Arquitetura, Desenvolvimento).  
+3. Use os prompts sugeridos para planejar, implementar e testar a nova feature.  
+4. Siga o fluxo de revisão e aprovação do seu time (PRs, code review, CI/CD).
+
+---
 
 ## 🤝 Contribuição
 
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar pull requests com melhorias.
+Contribuições são bem-vindas! 
+
+Sugestões de melhoria:
+- adicionar exemplos concretos por stack (ex.: PHP puro, outros frameworks)
+- novos especialistas (ex.: Data/Analytics com IA, MLOps, etc.)
+- mais templates de prompts para cenários específicos.
+
+Sinta-se à vontade para abrir issues ou enviar pull requests com melhorias.
