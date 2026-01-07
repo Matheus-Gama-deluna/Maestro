@@ -1,6 +1,6 @@
-# Especificação Técnica: MCP Guia-dev-IA
+# Especificação Técnica: MCP Maestro
 
-Documento detalhado para criação do MCP Server que automatiza o uso do Guia-dev-IA.
+Documento detalhado para criação do MCP Server que automatiza o uso do Maestro.
 
 **Versão:** 2.1  
 **Atualizado:** 2026-01-07  
@@ -14,7 +14,7 @@ Documento detalhado para criação do MCP Server que automatiza o uso do Guia-de
 
 **Model Context Protocol (MCP)** é um protocolo aberto que permite que LLMs acessem contexto externo (arquivos, APIs, ferramentas) de forma estruturada. É suportado nativamente pelo Claude Desktop e pode ser integrado a outras ferramentas.
 
-### Objetivo do MCP Guia-dev-IA
+### Objetivo do MCP Maestro
 
 Criar um servidor MCP que:
 1. **Guia o desenvolvedor** pelo fluxo correto de desenvolvimento
@@ -77,7 +77,7 @@ Criar um servidor MCP que:
 │  │                         │                                 │  │
 │  │  ┌──────────────────────┴────────────────────────────┐   │  │
 │  │  │              FILE SYSTEM                           │   │  │
-│  │  │  • Guia-dev-IA (especialistas, guias, templates)   │   │  │
+│  │  │  • Maestro (especialistas, guias, templates)   │   │  │
 │  │  │  • Projeto do usuário (docs/, src/)                │   │  │
 │  │  └───────────────────────────────────────────────────┘   │  │
 │  └───────────────────────────────────────────────────────────┘  │
@@ -89,7 +89,7 @@ Criar um servidor MCP que:
 ## 3. Estrutura do Projeto MCP
 
 ```
-mcp-guia-dev-ia/
+mcp-maestro/
 ├── src/
 │   ├── index.ts                 # Entry point do MCP Server
 │   ├── server.ts                # Configuração do servidor
@@ -170,7 +170,7 @@ mcp-guia-dev-ia/
 │       ├── markdown.ts          # Parser de markdown
 │       └── code-parser.ts       # Parser de código para análise
 │
-├── guia/                        # Symlink para Guia-dev-IA
+├── guia/                        # Symlink para Maestro
 │
 ├── tests/                       # Testes
 │   ├── tools.test.ts
@@ -363,6 +363,56 @@ Retorna conteúdo de um guia prático.
 "guia://guia/checklist-mestre"
 "guia://guia/metricas-eficiencia"
 ```
+
+### 4.7 guia://system-prompt
+
+Retorna instruções de comportamento para a IA (rules). Este resource é **automaticamente injetado** quando o MCP inicia, configurando a IA para usar o guia corretamente.
+
+```typescript
+interface SystemPromptOutput {
+  versao: string;
+  instrucoes: string;           // Markdown com regras completas
+  comportamentos_automaticos: {
+    gatilhos_avanco: string[];  // Palavras que acionam proximo()
+    validar_antes_avancar: boolean;
+    carregar_especialista: boolean;
+    manter_contexto: boolean;
+  };
+  fluxo: {
+    fases: FaseInfo[];
+    niveis_complexidade: NivelInfo[];
+  };
+  tools_disponiveis: ToolInfo[];
+  resources_disponiveis: ResourceInfo[];
+}
+```
+
+**Conteúdo retornado:**
+
+O resource retorna um system prompt completo que instrui a IA a:
+
+1. **Reconhecer gatilhos de avanço** - Quando usuário diz "próximo", "terminei", etc., chamar `proximo()` automaticamente
+2. **Validar gates** - Verificar checklist antes de avançar de fase
+3. **Carregar especialistas** - Usar o especialista correto para cada fase
+4. **Manter contexto** - Preservar informações entre fases e sessões
+5. **Seguir fluxo Frontend First** - Contrato → FE/BE paralelo → Integração
+
+**Exemplo de uso no Claude Desktop:**
+
+```json
+{
+  "mcpServers": {
+    "maestro": {
+      "autoLoadSystemPrompt": true,
+      "systemPromptResource": "maestro://system-prompt"
+    }
+  }
+}
+```
+
+**Integração com IDEs:**
+
+Para IDEs que suportam rules locais (Cursor, Copilot), o arquivo `RULES_TEMPLATE.md` no repositório contém o mesmo conteúdo formatado para cópia manual.
 
 ---
 
@@ -1989,7 +2039,7 @@ meu-projeto/
 
 ```json
 {
-  "name": "mcp-guia-dev-ia",
+  "name": "mcp-maestro",
   "version": "2.0.0",
   "type": "module",
   "dependencies": {
@@ -2017,7 +2067,7 @@ import { registerTools } from "./tools/index.js";
 import { registerPrompts } from "./prompts/index.js";
 
 const server = new Server(
-  { name: "guia-dev-ia", version: "2.0.0" },
+  { name: "maestro", version: "2.0.0" },
   { 
     capabilities: { 
       resources: { subscribe: true },
@@ -2036,7 +2086,7 @@ registerPrompts(server);
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-console.error("MCP Guia-dev-IA v2.0 started");
+console.error("MCP Maestro v2.0 started");
 ```
 
 ---
@@ -2048,11 +2098,11 @@ console.error("MCP Guia-dev-IA v2.0 started");
 ```json
 {
   "mcpServers": {
-    "guia-dev-ia": {
+    "maestro": {
       "command": "node",
-      "args": ["/caminho/para/mcp-guia-dev-ia/dist/index.js"],
+      "args": ["/caminho/para/mcp-maestro/dist/index.js"],
       "env": {
-        "GUIA_PATH": "/caminho/para/Guia-dev-IA",
+        "MAESTRO_PATH": "/caminho/para/Maestro",
         "LOG_LEVEL": "info"
       }
     }
@@ -2065,11 +2115,11 @@ console.error("MCP Guia-dev-IA v2.0 started");
 ```json
 {
   "mcp.servers": {
-    "guia-dev-ia": {
+    "maestro": {
       "command": "node",
-      "args": ["C:/caminho/para/mcp-guia-dev-ia/dist/index.js"],
+      "args": ["C:/caminho/para/mcp-maestro/dist/index.js"],
       "env": {
-        "GUIA_PATH": "C:/caminho/para/Guia-dev-IA"
+        "MAESTRO_PATH": "C:/caminho/para/Maestro"
       }
     }
   }
@@ -2080,7 +2130,7 @@ console.error("MCP Guia-dev-IA v2.0 started");
 
 | Variável | Descrição | Default |
 |---|---|---|
-| `GUIA_PATH` | Caminho para o Guia-dev-IA | `./guia` |
+| `MAESTRO_PATH` | Caminho para o Maestro | `./maestro` |
 | `PROJETO_PATH` | Caminho do projeto atual | `cwd()` |
 | `LOG_LEVEL` | Nível de log (debug, info, warn, error) | `info` |
 | `GATE_STRICT` | Se true, bloqueia avanço com gate incompleto | `true` |
@@ -2328,7 +2378,7 @@ WS /ws/projects/{id}
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  🏠 Guia-dev-IA Dashboard                           👤 user@email.com  🔔   │
+│  🏠 Maestro Dashboard                           👤 user@email.com  🔔   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
@@ -2561,7 +2611,7 @@ interface ResolverConflitoInput {
 | Variável | Descrição | Default |
 |---|---|---|
 | `SYNC_ENABLED` | Habilita sincronização | `false` |
-| `SYNC_API_URL` | URL da API (ex: https://api.guia-dev-ia.com) | - |
+| `SYNC_API_URL` | URL da API (ex: https://api.maestro.dev) | - |
 | `SYNC_API_KEY` | API Key para autenticação | - |
 | `SYNC_MODE` | Modo: `online`, `offline-first`, `offline-only` | `offline-first` |
 | `SYNC_INTERVAL` | Intervalo de sync em ms | `30000` |
@@ -2622,7 +2672,7 @@ interface ResolverConflitoInput {
 
 ## 14. Próximos Passos
 
-1. Criar repositório `mcp-guia-dev-ia`
+1. Criar repositório `mcp-maestro`
 2. Configurar projeto TypeScript
 3. Implementar Resources básicos (especialistas, templates)
 4. Implementar classificador de complexidade

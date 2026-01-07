@@ -1,4 +1,4 @@
-# Guia-dev-IA
+# Maestro
 
 ## 🚀 Visão Geral
 
@@ -116,6 +116,7 @@ Siga esta sequência para aproveitar ao máximo os recursos disponíveis:
 ## 📚 Documentos Base
 
 - [Rules Base](./03-guias/Rules%20base.md) – Diretrizes gerais de desenvolvimento orientadas a um assistente de código/IA.  
+- [RULES_TEMPLATE.md](./RULES_TEMPLATE.md) – 🆕 Template de rules para configurar IAs (Cursor, Claude, Copilot) para usar o guia.
 - [Playbook de Desenvolvimento com IA](./01-playbook/Playbook%20de%20Desenvolvimento%20com%20IA.md) – Método completo de engenharia com IA.  
 - [Catálogo de Stacks para Hospedagem Compartilhada](./03-guias/Catálogo%20de%20Stacks%20para%20Hospedagem%20Compartilhada.md) – Opções de stacks e planos para ambientes PHP/shared hosting.  
 - [Guia de Adição de Novas Funcionalidades](./03-guias/Guia%20de%20Adição%20de%20Novas%20Funcionalidades.md) – Fluxo para implementação de novas features.

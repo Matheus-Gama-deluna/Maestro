@@ -1,4 +1,4 @@
-# Contribuindo para o Guia-dev-IA
+# Contribuindo para o Maestro
 
 Obrigado por considerar contribuir! 🎉
 

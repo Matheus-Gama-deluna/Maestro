@@ -1,6 +1,6 @@
 # Guia de Uso - Instruções Completas
 
-Como utilizar o Guia-dev-IA em diferentes cenários de desenvolvimento.
+Como utilizar o Maestro em diferentes cenários de desenvolvimento.
 
 ---
 
@@ -40,6 +40,19 @@ Continuando da fase [X], preciso [TAREFA].
 ### 3. Use os Gates de Qualidade
 
 Antes de avançar entre fases, valide usando o [Guia de Gates](./03-guias/Gates%20de%20Qualidade.md).
+
+### 4. Configure as Rules da IA
+
+Para que a IA utilize o guia de forma otimizada, configure as rules na sua ferramenta:
+
+| Ferramenta | Como Configurar |
+|------------|-----------------|
+| **Cursor** | Copie o conteúdo de [RULES_TEMPLATE.md](./RULES_TEMPLATE.md) para `.cursor/rules` |
+| **Claude Projects** | Cole nas "Project Instructions" do projeto |
+| **MCP** | O resource `guia://system-prompt` é carregado automaticamente |
+
+> [!TIP]
+> As rules ensinam a IA a reconhecer comandos como "próximo" e "terminei" para avançar automaticamente entre fases.
 
 ---
 
@@ -220,7 +233,7 @@ flowchart LR
 ## Estrutura de Pastas
 
 ```
-Guia-dev-IA/
+Maestro/
 ├── 01-playbook/          → Método completo em 8 etapas
 ├── 02-especialistas/     → Personas de IA (12 especialistas)
 ├── 03-guias/             → Guias práticos e catálogos

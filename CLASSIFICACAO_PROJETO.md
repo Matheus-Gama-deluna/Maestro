@@ -1,6 +1,6 @@
 # Classificação de Projetos
 
-Guia para determinar o nível de complexidade do seu projeto e ajustar o fluxo do Guia-dev-IA adequadamente.
+Guia para determinar o nível de complexidade do seu projeto e ajustar o fluxo do Maestro adequadamente.
 
 ---
 

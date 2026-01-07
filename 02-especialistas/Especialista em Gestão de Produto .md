@@ -243,7 +243,7 @@ Sugira melhorias ou novas métricas mais alinhadas à proposta de valor.
 
 ## 🔄 Instrução de Avanço Automático (MCP)
 
-> **Para uso com MCP Guia-dev-IA v2.2+**
+> **Para uso com MCP Maestro v2.2+**
 
 Quando o usuário indicar que deseja avançar para a próxima fase usando expressões como:
 - "próximo", "próxima fase", "next"

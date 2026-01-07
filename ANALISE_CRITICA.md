@@ -1,4 +1,4 @@
-# Análise Crítica: Guia-dev-IA
+# Análise Crítica: Maestro
 
 **Objetivo da análise:** Verificar se a metodologia consegue guiar o desenvolvimento de software completo apenas com IA (ex: Claude Opus), aplicando boas práticas de engenharia de software e entregando produto final de alto nível.
 
@@ -351,7 +351,7 @@ O MCP especificado resolve as lacunas de:
 
 ### Veredicto
 
-O Guia-dev-IA é uma **base sólida** que:
+O Maestro é uma **base sólida** que:
 - ✅ Cobre o ciclo de vida completo
 - ✅ Fornece especialistas por fase
 - ✅ Define artefatos claros

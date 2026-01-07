@@ -1,4 +1,4 @@
-# ⚡ Quickstart - Guia-dev-IA
+# ⚡ Quickstart - Maestro
 
 Comece a desenvolver com IA em **5 minutos**.
 

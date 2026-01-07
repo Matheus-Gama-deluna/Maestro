@@ -1,6 +1,6 @@
 # Templates de Artefatos
 
-Esta pasta contém templates padronizados para cada entregável do Guia-dev-IA.
+Esta pasta contém templates padronizados para cada entregável do Maestro.
 
 ## Como Usar
 
