@@ -967,6 +967,202 @@ Gera um relatório completo em `docs/analises/relatorio-YYYY-MM-DD.md` contendo:
 
 ```
 
+### 5.10 executar_historia
+
+Automatiza o ciclo de desenvolvimento: analisa progresso, lê backlog, seleciona próxima história e guia implementação.
+
+```typescript
+interface ExecutarHistoriaInput {
+  historia_id?: string;           // Se vazio, seleciona próxima do backlog
+  modo?: "analisar" | "implementar" | "testar" | "revisar" | "completo";
+  confirmar_avancos?: boolean;    // Se true, pede confirmação a cada bloco
+}
+
+interface ExecutarHistoriaOutput {
+  // Análise do Progresso
+  progresso: {
+    historias_concluidas: number;
+    historias_pendentes: number;
+    sprint_atual: number;
+    velocidade_media: number;
+    ultima_historia_concluida?: string;
+  };
+  
+  // História Selecionada
+  historia: {
+    id: string;
+    titulo: string;
+    descricao: string;
+    criterios_aceite: CriterioAceite[];
+    regras_negocio: string[];
+    subtarefas: Subtarefa[];
+    dependencias_ok: boolean;
+    endpoints_afetados: Endpoint[];
+    impacto_modelo: ImpactoModelo;
+  };
+  
+  // Contexto Carregado
+  contexto: {
+    modelo_dominio: string;       // Resumo de docs/04-modelo/
+    arquitetura: string;          // Resumo de docs/05-arquitetura/
+    stack: string;
+    padroes_codigo: string[];
+  };
+  
+  // Plano de Execução
+  plano_execucao: BlocoExecucao[];
+  
+  // Prompt Gerado (para IA)
+  prompt_sugerido: string;
+}
+
+interface BlocoExecucao {
+  ordem: number;
+  tipo: "service" | "controller" | "repository" | "migration" | "dto" | "teste_unitario" | "teste_integracao";
+  descricao: string;
+  arquivos_afetados: string[];
+  prompt_bloco: string;           // Prompt específico para este bloco
+  status: "pendente" | "em_andamento" | "concluido";
+}
+
+interface CriterioAceite {
+  id: string;
+  cenario: string;
+  gherkin: string;
+  status: "pendente" | "implementado" | "testado";
+}
+
+interface Subtarefa {
+  id: string;
+  descricao: string;
+  status: "pendente" | "concluido";
+  bloco_relacionado?: number;
+}
+```
+
+**Fluxo de Execução:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    EXECUTAR_HISTORIA: FLUXO COMPLETO                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+     1. ANALISAR                2. PREPARAR                 3. IMPLEMENTAR
+     ═══════════               ═══════════                 ═══════════════
+          │                          │                           │
+          ▼                          ▼                           ▼
+   ┌─────────────┐           ┌─────────────┐            ┌─────────────┐
+   │ Ler backlog │           │ Carregar    │            │ Gerar bloco │
+   │ e progresso │           │ contexto    │            │ de código   │
+   └──────┬──────┘           └──────┬──────┘            └──────┬──────┘
+          │                          │                         │
+          ▼                          ▼                         ▼
+   ┌─────────────┐           ┌─────────────┐            ┌─────────────┐
+   │ Selecionar  │           │ Modelo +    │            │ Service →   │
+   │ próxima US  │           │ Arquitetura │            │ Controller →│
+   └──────┬──────┘           └──────┬──────┘            │ Repository  │
+          │                          │                  └──────┬──────┘
+          ▼                          ▼                         │
+   ┌─────────────┐           ┌─────────────┐                   │
+   │ Validar     │           │ Gerar plano │                   │
+   │ dependências│           │ de blocos   │                   │
+   └─────────────┘           └─────────────┘                   │
+                                                               │
+     4. TESTAR                  5. REVISAR                     │
+     ═════════                  ═════════                      │
+          │                          │                         │
+          ▼                          ▼                         │
+   ┌─────────────┐           ┌─────────────┐                   │
+   │ Gerar tests │           │ Code review │◄──────────────────┘
+   │ unitários   │           │ automático  │
+   └──────┬──────┘           └──────┬──────┘
+          │                          │
+          ▼                          ▼
+   ┌─────────────┐           ┌─────────────┐
+   │ Gerar tests │           │ Atualizar   │
+   │ integração  │           │ status US   │
+   └─────────────┘           └─────────────┘
+```
+
+**Uso:**
+
+```
+> executar_historia()
+
+📋 ANÁLISE DO PROGRESSO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sprint: 2 | Histórias: 5/8 concluídas | Velocidade: 13 pts/sprint
+
+📌 PRÓXIMA HISTÓRIA SELECIONADA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+US006 - Enviar notificação de confirmação de agendamento
+Épico: E001 - Agendamento Online
+Pontos: 3 | Prioridade: P0
+
+Como cliente,
+Quero receber confirmação por WhatsApp após agendar,
+Para ter certeza que meu horário está reservado.
+
+✅ DEPENDÊNCIAS OK
+- US002 (Cadastro de agendamento) ✓ Concluída
+- Integração WhatsApp ✓ Configurada
+
+📊 CONTEXTO CARREGADO
+- Modelo: Agendamento, Cliente, Notificacao
+- Arquitetura: NestJS + Bull Queue + WhatsApp API
+- Stack: TypeScript, PostgreSQL, Redis
+
+🔨 PLANO DE EXECUÇÃO (6 blocos)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 📦 [DTO] CreateNotificacaoDto, NotificacaoResponseDto
+2. 🏛️ [Service] NotificacaoService.enviarConfirmacao()
+3. 📮 [Queue] AgendamentoCreatedJob → dispara notificação
+4. 🔌 [Integration] WhatsAppService.sendMessage()
+5. 🧪 [Teste Unit] NotificacaoService.spec.ts
+6. 🧪 [Teste Integ] AgendamentoFlow.e2e.ts
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Deseja iniciar a implementação do bloco 1? (y/n)
+```
+
+**Execução por Bloco:**
+
+```
+> executar_historia(modo: "implementar")
+
+🔨 BLOCO 1/6: DTO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 PROMPT GERADO:
+
+Contexto:
+- Stack: NestJS + TypeScript
+- Entidade Notificacao: { id, agendamentoId, tipo, status, enviadoEm }
+- Padrão: class-validator para validação
+
+Crie os DTOs:
+1. CreateNotificacaoDto - para criação de notificação
+2. NotificacaoResponseDto - para resposta da API
+
+Inclua:
+- Decorators de validação (@IsString, @IsUUID, etc)
+- Documentação Swagger (@ApiProperty)
+- Transformações se necessário
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[Aguardando código do usuário/IA...]
+
+Após receber, validar:
+- [ ] DTOs criados corretamente
+- [ ] Validações adequadas
+- [ ] Tipos consistentes com modelo
+
+Próximo bloco: Service
+```
+
+---
+
 ### 5.8 nova_feature (atualizado)
 
 ```typescript

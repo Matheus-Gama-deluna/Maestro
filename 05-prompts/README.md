@@ -76,6 +76,7 @@ flowchart TD
 | [clean-architecture.md](./arquitetura/clean-architecture.md) | Arquitetura limpa para projetos médios | Médio |
 | [ddd-bounded-contexts.md](./arquitetura/ddd-bounded-contexts.md) | Definir contextos em DDD | Complexo |
 | [ddd-cqrs.md](./arquitetura/ddd-cqrs.md) | DDD + CQRS para sistemas complexos | Complexo |
+| [multi-tenancy.md](./arquitetura/multi-tenancy.md) | Arquitetura multi-tenant para SaaS | Complexo |
 
 ---
 
@@ -84,6 +85,8 @@ flowchart TD
 | Prompt | Quando Usar | Nível |
 |--------|-------------|-------|
 | [design-api-rest.md](./apis/design-api-rest.md) | Projetar API REST com OpenAPI | Médio |
+| [idempotencia.md](./apis/idempotencia.md) | Implementar idempotência em endpoints | Médio |
+| [versionamento.md](./apis/versionamento.md) | Estratégias de versionamento de API | Médio |
 
 ---
 
@@ -104,6 +107,7 @@ flowchart TD
 | [testes-integracao.md](./testes/testes-integracao.md) | Testes de integração com banco/APIs | Médio |
 | [testes-e2e.md](./testes/testes-e2e.md) | Testes end-to-end com Playwright | Médio |
 | [testes-performance.md](./testes/testes-performance.md) | Load testing com k6 | Médio |
+| [contract-testing.md](./testes/contract-testing.md) | Contract testing com Pact | Médio |
 
 ---
 
@@ -112,7 +116,16 @@ flowchart TD
 | Prompt | Quando Usar | Nível |
 |--------|-------------|-------|
 | [analise-performance.md](./escalabilidade/analise-performance.md) | Identificar e corrigir gargalos | Médio |
+| [caching.md](./escalabilidade/caching.md) | Estratégias de cache com Redis | Médio |
+
+---
+
+### 🗄️ Database
+
+| Prompt | Quando Usar | Nível |
+|--------|-------------|-------|
 | [otimizacao-queries.md](./database/otimizacao-queries.md) | Otimizar banco de dados e queries | Médio |
+| [migrations-zero-downtime.md](./database/migrations-zero-downtime.md) | Migrations sem downtime | Médio |
 
 ---
 
@@ -121,6 +134,8 @@ flowchart TD
 | Prompt | Quando Usar | Nível |
 |--------|-------------|-------|
 | [estrategia-observabilidade.md](./observabilidade/estrategia-observabilidade.md) | Configurar logs, métricas, traces | Médio |
+| [slos.md](./observabilidade/slos.md) | Definir SLOs, SLIs e Error Budgets | Médio |
+| [chaos-testing.md](./observabilidade/chaos-testing.md) | Experimentos de chaos engineering | Complexo |
 
 ---
 
@@ -132,6 +147,7 @@ flowchart TD
 | [threat-modeling.md](./seguranca/threat-modeling.md) | Modelagem de ameaças STRIDE | Médio |
 | [revisao-lgpd.md](./seguranca/revisao-lgpd.md) | Conformidade LGPD/GDPR | Médio |
 | [pentest-checklist.md](./seguranca/pentest-checklist.md) | Checklist de pentest para devs | Médio |
+| [rate-limiting.md](./seguranca/rate-limiting.md) | Rate limiting e throttling | Médio |
 
 ---
 
@@ -143,6 +159,7 @@ flowchart TD
 | [docker-compose.md](./devops/docker-compose.md) | Docker Compose multi-ambiente | Médio |
 | [kubernetes-deploy.md](./devops/kubernetes-deploy.md) | Deploy Kubernetes com manifests | Complexo |
 | [terraform-iac.md](./devops/terraform-iac.md) | Infrastructure as Code com Terraform | Complexo |
+| [feature-flags.md](./devops/feature-flags.md) | Feature flags e rollout gradual | Médio |
 
 ---
 
