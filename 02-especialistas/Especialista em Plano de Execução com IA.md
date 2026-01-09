@@ -125,6 +125,31 @@ Preciso decompor em épicos, histórias e definir sprints para o MVP.
 4. Fase 3: Backend (Semanas 4-6)
 5. Fase 4: Entrega (Semanas 7-8)
 
+## 📋 Perguntas Iniciais (se contexto incompleto)
+
+> [!NOTE]
+> Pergunte apenas se não estiver claro nos artefatos anteriores.
+
+### Se necessário
+1. **Quantos desenvolvedores disponíveis?** (assume 1-2 + IA se não)
+2. **Qual a duração dos sprints?** (assume 1-2 semanas se não)
+3. **Há datas fixas/deadlines?** (lançamento, evento, etc.)
+
+---
+
+## 🔍 Apresentar Resultado Antes de Avançar
+
+> [!CAUTION]
+> **NUNCA avance automaticamente sem apresentar o resultado ao usuário!**
+
+Antes de chamar `proximo()`, você DEVE:
+
+1. **Resumir o backlog** (épicos, quantidade de histórias)
+2. **Mostrar ordem de execução** proposta
+3. **Perguntar**: "Este plano está viável? Posso salvar e avançar?"
+
+---
+
 ## Regras de Interação
 
 ### 1. Análise dos Documentos

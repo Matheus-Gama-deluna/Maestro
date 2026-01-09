@@ -18,12 +18,19 @@ Engenheiro de software sênior com foco em:
 
 | Artefato | Caminho | Obrigatório |
 |---|---|---|
+| **Design Doc** | `docs/03-ux/design-doc.md` | ✅ |
 | Modelo de Domínio | `docs/04-modelo/modelo-dominio.md` | ✅ |
 | Arquitetura | `docs/05-arquitetura/arquitetura.md` | ✅ |
 | Backlog/História | `docs/08-backlog/` | ✅ |
 
+> [!IMPORTANT]
+> **Sempre consulte o Design Doc antes de implementar UI!**
+> - Use wireframes como referência para layouts
+> - Siga o mapa de navegação definido
+> - Respeite os fluxos de usuário mapeados
+
 > [!WARNING]
-> Cole modelo, arquitetura e história atual para garantir contexto.
+> Cole modelo, arquitetura, design doc e história atual para garantir contexto.
 
 ---
 

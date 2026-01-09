@@ -1,9 +1,9 @@
 import type { Fase, Fluxo } from "../types/index.js";
 
-// Fluxo para projetos simples (5 fases)
+// Fluxo para projetos simples (7 fases)
 export const FLUXO_SIMPLES: Fluxo = {
     nivel: "simples",
-    total_fases: 5,
+    total_fases: 7,
     fases: [
         {
             numero: 1,
@@ -31,6 +31,18 @@ export const FLUXO_SIMPLES: Fluxo = {
         },
         {
             numero: 3,
+            nome: "UX Design",
+            especialista: "UX Design",
+            template: "design-doc",
+            gate_checklist: [
+                "Wireframes ou protótipos criados",
+                "Jornadas do usuário mapeadas",
+                "Fluxos de navegação definidos",
+            ],
+            entregavel_esperado: "design-doc.md",
+        },
+        {
+            numero: 4,
             nome: "Arquitetura",
             especialista: "Arquitetura de Software",
             template: "arquitetura",
@@ -42,7 +54,7 @@ export const FLUXO_SIMPLES: Fluxo = {
             entregavel_esperado: "arquitetura.md",
         },
         {
-            numero: 4,
+            numero: 5,
             nome: "Backlog",
             especialista: "Plano de Execução",
             template: "backlog",
@@ -54,16 +66,28 @@ export const FLUXO_SIMPLES: Fluxo = {
             entregavel_esperado: "backlog.md",
         },
         {
-            numero: 5,
-            nome: "Desenvolvimento",
+            numero: 6,
+            nome: "Frontend",
+            especialista: "Desenvolvimento Frontend",
+            template: "historia-usuario",
+            gate_checklist: [
+                "Componentes seguindo design",
+                "Funcionando contra mock",
+                "Responsivo e acessível",
+            ],
+            entregavel_esperado: "frontend-code",
+        },
+        {
+            numero: 7,
+            nome: "Backend",
             especialista: "Desenvolvimento",
             template: "historia-usuario",
             gate_checklist: [
-                "Código implementado",
+                "API implementada",
                 "Testes passando",
-                "Revisão realizada",
+                "Integração com frontend",
             ],
-            entregavel_esperado: "codigo",
+            entregavel_esperado: "backend-code",
         },
     ],
 };

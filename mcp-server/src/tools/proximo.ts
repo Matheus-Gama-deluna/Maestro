@@ -6,6 +6,7 @@ import { carregarEstado, salvarEstado, registrarEntregavel } from "../state/stor
 import { getFase, getFluxo } from "../flows/types.js";
 import { classificarPRD, descreverNivel } from "../flows/classifier.js";
 import { validarGate, formatarResultadoGate } from "../gates/validator.js";
+import { validarEstrutura } from "../gates/estrutura.js";
 import { resolveDirectory } from "../state/context.js";
 import { carregarResumo, salvarResumo, extrairResumoEntregavel, criarResumoInicial } from "../state/memory.js";
 import type { EntregavelResumo } from "../types/memory.js";
@@ -13,8 +14,30 @@ import type { EntregavelResumo } from "../types/memory.js";
 interface ProximoArgs {
     entregavel: string;
     forcar?: boolean;
+    confirmar_usuario?: boolean;  // NOVO: Somente usuário pode definir
     nome_arquivo?: string;
     diretorio?: string;
+}
+
+/**
+ * Calcula score de qualidade
+ */
+function calcularQualityScore(
+    estruturaResult: ReturnType<typeof validarEstrutura>,
+    gateResult: ReturnType<typeof validarGate>
+): number {
+    const totalChecklist = gateResult.itens_validados.length + gateResult.itens_pendentes.length;
+    const checklistScore = totalChecklist > 0
+        ? (gateResult.itens_validados.length / totalChecklist) * 100
+        : 100;
+
+    const tamanhoScore = estruturaResult.tamanho_ok ? 100 : 50;
+
+    return Math.round(
+        (estruturaResult.score * 0.30) +
+        (checklistScore * 0.50) +
+        (tamanhoScore * 0.20)
+    );
 }
 
 /**
@@ -46,18 +69,82 @@ export async function proximo(args: ProximoArgs): Promise<ToolResult> {
         };
     }
 
-    // Validar gate
+    // Validar estrutura do entregável
+    const estruturaResult = validarEstrutura(estado.fase_atual, args.entregavel);
+
+    // Validar gate (checklist)
     const gateResultado = validarGate(faseAtual, args.entregavel);
 
-    if (!gateResultado.valido && !args.forcar) {
-        const gateFormatado = formatarResultadoGate(gateResultado);
+    // Calcular score de qualidade
+    const qualityScore = calcularQualityScore(estruturaResult, gateResultado);
+
+    // Score < 50: BLOQUEAR - não pode avançar de forma alguma
+    if (qualityScore < 50) {
         return {
             content: [{
                 type: "text",
-                text: `# ⚠️ Gate não aprovado\n\n${gateFormatado}\n\n**Opções:**\n1. Complete os itens pendentes e tente novamente\n2. Use \`proximo(entregavel, forcar: true)\` para forçar avanço`,
+                text: `# ❌ Entregável Bloqueado
+
+## Score: ${qualityScore}/100 - Abaixo do mínimo (50)
+
+O entregável não atende aos requisitos mínimos de qualidade.
+
+### Problemas Encontrados
+
+${estruturaResult.feedback.join("\n")}
+
+### Checklist Pendente
+${gateResultado.itens_pendentes.map((item, i) => `- ${item}\n  💡 ${gateResultado.sugestoes[i]}`).join("\n")}
+
+---
+
+**Não é possível avançar.** Corrija os itens acima e tente novamente.
+
+Use \`avaliar_entregavel(entregavel: "...")\` para ver a análise completa.`,
             }],
         };
     }
+
+    // Score 50-69: Requer confirmação EXPLÍCITA do usuário
+    if (qualityScore < 70 && !args.confirmar_usuario) {
+        return {
+            content: [{
+                type: "text",
+                text: `# ⚠️ Confirmação Necessária
+
+## Score: ${qualityScore}/100 - Requer aprovação do usuário
+
+O entregável tem qualidade abaixo do ideal (mínimo recomendado: 70).
+
+### Itens Pendentes
+
+${estruturaResult.secoes_faltando.length > 0 ? `**Seções faltando:**\n${estruturaResult.secoes_faltando.map(s => `- ${s}`).join("\n")}\n` : ""}
+${gateResultado.itens_pendentes.length > 0 ? `**Checklist pendente:**\n${gateResultado.itens_pendentes.map(item => `- ${item}`).join("\n")}` : ""}
+
+---
+
+## 🔐 Confirmação do Usuário Necessária
+
+Para avançar com pendências, o **usuário** deve confirmar explicitamente:
+
+\`\`\`
+proximo(entregavel: "...", confirmar_usuario: true)
+\`\`\`
+
+> ⚠️ **IMPORTANTE**: A IA NÃO pode definir \`confirmar_usuario\`. 
+> Apenas o usuário humano pode autorizar o avanço com pendências.
+
+---
+
+**Alternativas:**
+1. Corrigir os itens pendentes e tentar novamente
+2. Usuário confirmar avanço com \`confirmar_usuario: true\``,
+            }],
+        };
+    }
+
+    // Score >= 70 OU usuário confirmou: Pode avançar
+    // (forcar ainda funciona para casos extremos, mas não é anunciado)
 
     // Salvar entregável
     const nomeArquivo = args.nome_arquivo || faseAtual.entregavel_esperado;
@@ -226,9 +313,13 @@ export const proximoSchema = {
             type: "string",
             description: "Conteúdo do entregável da fase atual",
         },
+        confirmar_usuario: {
+            type: "boolean",
+            description: "APENAS O USUÁRIO pode definir. Confirma avanço com pendências (score 50-69). IA NÃO deve usar.",
+        },
         forcar: {
             type: "boolean",
-            description: "Forçar avanço mesmo se gate não aprovado",
+            description: "Forçar avanço (uso interno, não anunciado)",
         },
         nome_arquivo: {
             type: "string",
@@ -236,7 +327,7 @@ export const proximoSchema = {
         },
         diretorio: {
             type: "string",
-            description: "Diretório do projeto (opcional, usa o último se não informado)",
+            description: "Diretório do projeto (opcional)",
         },
     },
     required: ["entregavel"],

@@ -3,10 +3,12 @@ import { join } from "path";
 import type { ToolResult, TipoHistoria } from "../types/index.js";
 import { carregarEstado } from "../state/storage.js";
 import { lerEspecialista } from "../utils/files.js";
+import { resolveDirectory } from "../state/context.js";
 
 interface ImplementarHistoriaArgs {
     historia_id?: string;
     modo?: "analisar" | "iniciar" | "proximo_bloco";
+    diretorio?: string;
 }
 
 interface BlocoImplementacao {
@@ -23,7 +25,7 @@ interface BlocoImplementacao {
  * Orquestra a implementação de uma história de usuário em blocos
  */
 export async function implementarHistoria(args: ImplementarHistoriaArgs): Promise<ToolResult> {
-    const diretorio = process.cwd();
+    const diretorio = resolveDirectory(args.diretorio);
     const estado = await carregarEstado(diretorio);
 
     if (!estado) {
@@ -189,6 +191,10 @@ export const implementarHistoriaSchema = {
             type: "string",
             enum: ["analisar", "iniciar", "proximo_bloco"],
             description: "Modo de operação",
+        },
+        diretorio: {
+            type: "string",
+            description: "Diretório do projeto (opcional)",
         },
     },
 };

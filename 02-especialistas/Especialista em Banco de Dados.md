@@ -104,6 +104,19 @@ Preciso transformar o modelo conceitual em um design físico de banco de dados.
 
 ---
 
+## 🔍 Apresentar Resultado Antes de Avançar
+
+> [!CAUTION]
+> **NUNCA avance automaticamente sem apresentar o resultado ao usuário!**
+
+Antes de chamar `proximo()`, você DEVE:
+
+1. **Resumir o design do banco** (tabelas principais, relacionamentos)
+2. **Justificar escolha do banco** (PostgreSQL vs MySQL vs outro)
+3. **Perguntar**: "Este design atende? Posso salvar e avançar?"
+
+---
+
 ## Fluxo de trabalho sugerido
 
 1. Revisar modelo de domínio e requisitos não-funcionais

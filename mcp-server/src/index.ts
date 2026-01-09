@@ -292,13 +292,35 @@ async function getResourceContent(uri: string) {
         const conteudo = `# Maestro - Instruções para IA
 
 Você está usando o Maestro, um guia de desenvolvimento assistido por IA.
+Siga estas instruções cuidadosamente.
 
-## Comportamentos Automáticos
+## 🚫 REGRAS ABSOLUTAS (NÃO VIOLÁVEIS)
 
-Quando o usuário disser "próximo", "avançar", "terminei" ou "pronto":
-1. Identifique o entregável desenvolvido na conversa
-2. Chame a tool \`proximo\` passando o entregável
-3. Aguarde a resposta com a próxima fase
+1. **NUNCA defina \`confirmar_usuario: true\`** ao chamar \`proximo()\`
+   - Este parâmetro é EXCLUSIVO do usuário humano
+   - Se o score for 50-69, PEÇA ao usuário para confirmar
+   
+2. **NUNCA force avanço** sem pedido explícito do usuário
+   - Não use \`forcar: true\` por conta própria
+
+3. **SEMPRE siga o template** da fase atual
+   - Inclua todas as seções obrigatórias
+   - Não omita partes do template
+
+## 📋 Fluxo de Trabalho
+
+1. Ao iniciar, use \`carregar_projeto\` ou \`iniciar_projeto\`
+2. Desenvolva o entregável seguindo o template
+3. Use \`avaliar_entregavel\` para verificar qualidade
+4. Se score >= 70: pode usar \`proximo\`
+5. Se score 50-69: PEÇA confirmação do usuário
+6. Se score < 50: corrija antes de avançar
+
+## 🎯 Sistema de Qualidade
+
+- **Score >= 70**: Aprovado automaticamente
+- **Score 50-69**: Requer \`confirmar_usuario: true\` (só usuário)
+- **Score < 50**: Bloqueado, não pode avançar
 
 ## Tools Disponíveis
 
@@ -307,18 +329,23 @@ Quando o usuário disser "próximo", "avançar", "terminei" ou "pronto":
 - \`carregar_projeto\` - Carrega projeto existente
 - \`proximo\` - Salva entregável e avança fase
 - \`status\` - Retorna estado atual
-- \`validar_gate\` - Valida checklist da fase
+- \`avaliar_entregavel\` - Avalia qualidade (use antes de proximo)
 
 ### Auxiliares
 - \`classificar\` - Reclassifica complexidade
 - \`contexto\` - Retorna contexto acumulado
 - \`salvar\` - Salva rascunhos/anexos
-- \`implementar_historia\` - Orquestra implementação
 
-### Fluxos Alternativos
-- \`nova_feature\` - Inicia fluxo de feature
-- \`corrigir_bug\` - Inicia fluxo de bug fix
-- \`refatorar\` - Inicia fluxo de refatoração
+### Memória
+- \`atualizar_codebase\` - Atualiza mapa do código
+
+## Comportamentos Automáticos
+
+Quando o usuário disser "próximo", "avançar", "terminei":
+1. Compile o entregável da conversa
+2. Chame \`avaliar_entregavel\` primeiro
+3. Se score >= 70, chame \`proximo\`
+4. Se score < 70, mostre problemas e peça confirmação
 `;
         return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
     }

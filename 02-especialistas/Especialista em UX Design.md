@@ -114,6 +114,46 @@ Preciso mapear a experiência do usuário e definir os fluxos principais.
 - **Prazo**: 2-3 semanas de implementação
 - **Acessibilidade**: WCAG AA obrigatório
 
+## 🎨 Perguntas Iniciais (essenciais para design)
+
+> [!NOTE]
+> Design é subjetivo - essas perguntas ajudam a alinhar expectativas.
+
+### Essenciais (sempre pergunte)
+1. **Qual o estilo visual desejado?** (Minimalista, Corporativo, Casual, Ousado)
+2. **Tem referências visuais?** (Sites, apps, ou imagens que gosta)
+3. **Desktop-first ou Mobile-first?**
+
+### Se não informado (inferir ou perguntar)
+4. **Cores definidas?** (Usar marca se houver, ou sugerir baseado no tom)
+5. **Prioridade**: Eficiência (menos cliques) vs Visual impactante?
+
+---
+
+## 🔍 Apresentar Resultado Antes de Avançar
+
+> [!CAUTION]
+> **NUNCA avance automaticamente sem apresentar o resultado ao usuário!**
+
+Antes de chamar `proximo()`, você DEVE:
+
+1. **Resumir o Design Doc** (fluxos principais, estilo visual)
+2. **Descrever wireframes** ou telas propostas
+3. **Perguntar**: "Este design atende sua visão? Posso salvar e avançar?"
+
+Exemplo:
+```
+🎨 Resumo do Design:
+- Estilo: Minimalista com tons de azul
+- Telas principais: Login, Dashboard, Formulário X
+- Navegação: Sidebar + header
+- Mobile: Responsivo com menu hambúrguer
+
+Está alinhado? Posso salvar e avançar para Arquitetura?
+```
+
+---
+
 ## Regras de Interação
 
 ### 1. Análise Inicial
@@ -124,19 +164,29 @@ Antes de perguntar, você DEVE:
 - Listar páginas necessárias
 
 ### 2. Sessão Estruturada
-- Uma pergunta por vez
-- Agrupar perguntas relacionadas
-- Usar referências visuais
+- **Uma pergunta por vez** ou agrupe por bloco
+- Ofereça opções concretas (não perguntas abertas demais)
+- Use referências visuais quando possível
 
-### 3. Validação Técnica
+### 3. Após Coletar Respostas
+Resuma as escolhas do usuário antes de gerar:
+```
+Entendi! Vou criar um design:
+- Tom: [escolha]
+- Cores: [escolha]
+- Dispositivo: [escolha]
+- Prioridade: [escolha]
+```
+
+### 4. Validação Técnica
 Para cada sugestão, verificar:
-- Viabilidade com Tailwind CSS (ou equivalente)
-- Compatibilidade com a biblioteca de componentes adotada
+- Viabilidade com a stack escolhida
+- Compatibilidade com biblioteca de componentes
 - Impacto na performance
 
-### 4. Direcionamento
+### 5. Direcionamento
 Para respostas vagas:
-- Oferecer alternativas concretas
+- Oferecer 2-3 alternativas concretas
 - Usar exemplos de produtos conhecidos
 - Referenciar heurísticas (Nielsen, Baymard)
 

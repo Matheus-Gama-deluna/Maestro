@@ -29,6 +29,9 @@ import { gerarRelatorio, gerarRelatorioSchema } from "./analise/relatorio.js";
 // Tools de memória
 import { atualizarCodebase, atualizarCodebaseSchema } from "./atualizar-codebase.js";
 
+// Tools de qualidade
+import { avaliarEntregavel, avaliarEntregavelSchema } from "./avaliar-entregavel.js";
+
 /**
  * Registra todas as tools no servidor MCP
  */
@@ -125,6 +128,12 @@ export function registerTools(server: Server) {
                 name: "atualizar_codebase",
                 description: "Atualiza informações do codebase para memória do projeto.",
                 inputSchema: atualizarCodebaseSchema,
+            },
+            // === QUALIDADE ===
+            {
+                name: "avaliar_entregavel",
+                description: "Avalia qualidade do entregável com score e sugestões. Use antes de proximo().",
+                inputSchema: avaliarEntregavelSchema,
             },
         ],
     }));
@@ -248,6 +257,13 @@ export function registerTools(server: Server) {
                         endpoints: typedArgs?.endpoints as { path: string; metodo: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"; descricao: string }[] | undefined,
                         entidades: typedArgs?.entidades as { nome: string; campos: { nome: string; tipo: string }[] }[] | undefined,
                         padroes: typedArgs?.padroes as { naming?: string; estrutura_pastas?: string; testes?: string; commits?: string } | undefined,
+                    });
+
+                case "avaliar_entregavel":
+                    return await avaliarEntregavel({
+                        entregavel: typedArgs?.entregavel as string,
+                        fase: typedArgs?.fase as number | undefined,
+                        diretorio: typedArgs?.diretorio as string | undefined,
                     });
 
                 default:

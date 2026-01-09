@@ -16,6 +16,28 @@ interface SalvarArgs {
  * Salva conteúdo sem avançar de fase
  */
 export async function salvar(args: SalvarArgs): Promise<ToolResult> {
+    // Validar parâmetros obrigatórios
+    if (!args.conteudo || args.conteudo.trim().length === 0) {
+        return {
+            content: [{
+                type: "text",
+                text: "❌ **Erro**: Parâmetro `conteudo` é obrigatório e não pode estar vazio.",
+            }],
+            isError: true,
+        };
+    }
+
+    const tiposValidos = ["rascunho", "anexo", "entregavel"];
+    if (!args.tipo || !tiposValidos.includes(args.tipo)) {
+        return {
+            content: [{
+                type: "text",
+                text: `❌ **Erro**: Parâmetro \`tipo\` deve ser um de: ${tiposValidos.join(", ")}.\n\nRecebido: "${args.tipo || "undefined"}"`,
+            }],
+            isError: true,
+        };
+    }
+
     const diretorio = resolveDirectory(args.diretorio);
     const estado = await carregarEstado(diretorio);
 
@@ -23,7 +45,7 @@ export async function salvar(args: SalvarArgs): Promise<ToolResult> {
         return {
             content: [{
                 type: "text",
-                text: "❌ **Erro**: Nenhum projeto iniciado neste diretório.",
+                text: `❌ **Erro**: Nenhum projeto iniciado neste diretório.\n\nDiretório verificado: ${diretorio}\n\nUse \`iniciar_projeto\` ou \`carregar_projeto\` primeiro.`,
             }],
             isError: true,
         };

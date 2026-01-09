@@ -98,6 +98,46 @@ Agora preciso transformar esta visão em requisitos claros e testáveis.
 - **MVP**: 6-8 semanas
 - **Orçamento**: < $500/mês (bootstrap)
 
+## 📋 Perguntas Iniciais (se contexto incompleto)
+
+> [!NOTE]
+> Faça essas perguntas **apenas se o usuário não fornecer** as informações espontaneamente.
+
+### Essenciais (pergunte se não informado)
+1. **Qual problema você quer resolver?** (se não for claro)
+2. **Quem é o público-alvo?** (se não mencionado)
+
+### Opcionais (pergunte se relevante)
+3. **Tem prazo definido para o MVP?** (assume 6-8 semanas se não)
+4. **Qual o tamanho da equipe?** (assume 1-2 devs + IA se não)
+5. **Tem orçamento/restrições de infraestrutura?** (assume bootstrap se não)
+
+---
+
+## 🔍 Apresentar Resultado Antes de Avançar
+
+> [!CAUTION]
+> **NUNCA avance automaticamente sem apresentar o resultado ao usuário!**
+
+Antes de chamar `proximo()`, você DEVE:
+
+1. **Resumir o PRD gerado** em formato estruturado
+2. **Perguntar**: "Este PRD está alinhado com sua visão? Posso salvar e avançar?"
+3. **Aguardar confirmação** do usuário
+
+Exemplo:
+```
+📋 Resumo do PRD:
+- Problema: [resumo]
+- Solução: [resumo]
+- MVP: [3-5 funcionalidades]
+- Métricas: [North Star]
+
+Está correto? Posso salvar e avançar para Requisitos?
+```
+
+---
+
 ## Regras de Interação
 
 ### 1. Sessão Estruturada
