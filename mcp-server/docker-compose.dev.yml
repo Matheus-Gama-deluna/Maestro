@@ -1,0 +1,35 @@
+version: '3.8'
+
+# Development override - use with:
+# docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+services:
+  mcp-maestro:
+    build:
+      context: ..
+      dockerfile: mcp-server/Dockerfile
+      target: builder  # Use builder stage for dev
+    container_name: mcp-maestro-dev
+    ports:
+      - "${PORT:-3000}:3000"
+      - "9229:9229"  # Debug port
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    volumes:
+      # Mount source for hot reload
+      - ./src:/app/src:ro
+      - ../01-playbook:/app/01-playbook:ro
+      - ../02-especialistas:/app/02-especialistas:ro
+      - ../03-guias:/app/03-guias:ro
+      - ../05-prompts:/app/05-prompts:ro
+      - ../06-templates:/app/06-templates:ro
+    command: npx tsx watch src/index.ts
+    restart: unless-stopped
+    networks:
+      - maestro-network
+
+networks:
+  maestro-network:
+    name: maestro-network
+    driver: bridge

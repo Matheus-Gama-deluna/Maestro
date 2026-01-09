@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mcp-maestro:
+    build:
+      context: ..
+      dockerfile: mcp-server/Dockerfile
+    container_name: mcp-maestro
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      # Persist project data (maestro projects on host)
+      - maestro-data:/app/projects
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - maestro-network
+
+volumes:
+  maestro-data:
+    driver: local
+
+networks:
+  maestro-network:
+    name: maestro-network
+    driver: bridge
