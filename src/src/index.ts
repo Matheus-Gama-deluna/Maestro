@@ -128,10 +128,16 @@ app.get("/mcp", (req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no"); // Para Nginx/proxies
+    res.setHeader("Transfer-Encoding", "chunked"); // Força chunked encoding
     res.flushHeaders();
 
     // Criar sessão
     const sessionId = randomUUID();
+    
+    // Enviar padding inicial para forçar flush através de proxies (Cloudflare, etc.)
+    // Alguns proxies bufferam até receber ~1KB de dados
+    const padding = ": " + "x".repeat(2048) + "\n\n";
+    res.write(padding);
     
     // Heartbeat para manter conexão viva
     const heartbeatInterval = setInterval(() => {
