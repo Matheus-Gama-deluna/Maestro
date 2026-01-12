@@ -1,7 +1,6 @@
 import { join } from "path";
 import { v4 as uuid } from "uuid";
 import type { ToolResult } from "../types/index.js";
-import { lerEspecialista, lerTemplate } from "../utils/files.js";
 import { criarEstadoInicial, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { criarResumoInicial, serializarResumo } from "../state/memory.js";
@@ -16,7 +15,7 @@ interface IniciarProjetoArgs {
 /**
  * Tool: iniciar_projeto
  * Inicia um novo projeto com o Maestro (modo stateless)
- * Retorna arquivos para a IA salvar com conteúdo inline
+ * Retorna arquivos para a IA salvar - resposta compacta
  */
 export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResult> {
     // Validar diretório
@@ -26,7 +25,7 @@ export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResu
                 type: "text",
                 text: `# ❌ Erro: Diretório Obrigatório
 
-O parâmetro \`diretorio\` é obrigatório. Informe o caminho absoluto onde o projeto deve ser criado.
+O parâmetro \`diretorio\` é obrigatório.
 
 **Exemplo:**
 \`\`\`
@@ -39,101 +38,67 @@ iniciar_projeto(nome: "meu-projeto", diretorio: "C:/projetos/meu-projeto")
     }
 
     const diretorio = args.diretorio;
-    
-    // Set global directory context for subsequent tool calls
     setCurrentDirectory(diretorio);
 
     const projetoId = uuid();
-
-    // Estado inicial (médio por padrão, será reclassificado após PRD)
     const estado = criarEstadoInicial(projetoId, args.nome, diretorio);
-
-    // Criar resumo inicial do projeto
     const resumo = criarResumoInicial(projetoId, args.nome, "medio", 1, 10);
     resumo.descricao = args.descricao;
 
-    // Serializar arquivos
     const estadoFile = serializarEstado(estado);
     const resumoFiles = serializarResumo(resumo);
 
-    // Carregar especialista e template da fase 1
     const fase = getFase("medio", 1)!;
-    const especialista = await lerEspecialista(fase.especialista);
-    const template = await lerTemplate(fase.template);
-
-    // Conteúdos para incluir inline
-    const estadoContent = estadoFile.content;
-    const resumoJsonContent = resumoFiles[0].content;
-    const resumoMdContent = resumoFiles[1].content;
 
     const resposta = `# 🚀 Projeto Iniciado: ${args.nome}
 
-## Status
 | Campo | Valor |
 |-------|-------|
 | **ID** | \`${projetoId}\` |
 | **Fase** | 1/? (definido após PRD) |
-| **Especialista** | ${fase.especialista} |
 | **Diretório** | \`${diretorio}\` |
 
 ---
 
-## ⚡ AÇÃO OBRIGATÓRIA - Criar Arquivos do Projeto
+## ⚡ AÇÃO OBRIGATÓRIA - Criar Arquivos
 
-**A IA DEVE executar os comandos abaixo para criar os arquivos do projeto.**
-
-### 1. Criar diretório .maestro
-\`\`\`
-mkdir -p "${diretorio}/.maestro"
-\`\`\`
-
-### 2. Criar arquivo: estado.json
+### 1. Criar: estado.json
 **Caminho:** \`${diretorio}/.maestro/estado.json\`
 
 \`\`\`json
-${estadoContent}
+${estadoFile.content}
 \`\`\`
 
-### 3. Criar arquivo: resumo.json
+### 2. Criar: resumo.json
 **Caminho:** \`${diretorio}/.maestro/resumo.json\`
 
 \`\`\`json
-${resumoJsonContent}
+${resumoFiles[0].content}
 \`\`\`
 
-### 4. Criar arquivo: resumo.md
+### 3. Criar: resumo.md
 **Caminho:** \`${diretorio}/.maestro/resumo.md\`
 
 \`\`\`markdown
-${resumoMdContent}
+${resumoFiles[1].content}
 \`\`\`
 
 ---
 
 ## 📋 Próximo Passo
 
-Após criar os arquivos acima, desenvolva o **PRD (Product Requirements Document)** para definir:
-- Qual problema será resolvido
-- Quem são os usuários (personas)
-- Quais funcionalidades compõem o MVP
-- Métricas de sucesso
+Desenvolva o **PRD** definindo:
+- Problema a resolver
+- Personas
+- MVP
+- Métricas
 
-Quando terminar, diga **"próximo"** para avançar.
+Quando terminar, diga **"próximo"**.
 
----
-
-## 🎭 Especialista: ${fase.especialista}
-
-${especialista}
-
----
-
-## 📝 Template: PRD
-
-${template}
+> 💡 Use \`read_resource("maestro://especialista/${fase.especialista}")\` para ver o especialista.
+> 💡 Use \`read_resource("maestro://template/${fase.template}")\` para ver o template.
 `;
 
-    // Retornar com arquivos para salvar
     return {
         content: [{ type: "text", text: resposta }],
         files: [
@@ -144,9 +109,6 @@ ${template}
     };
 }
 
-/**
- * Input schema para iniciar_projeto
- */
 export const iniciarProjetoSchema = {
     type: "object",
     properties: {

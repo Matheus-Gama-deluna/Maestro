@@ -1,6 +1,5 @@
 import { join } from "path";
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
-import { lerEspecialista, lerTemplate } from "../utils/files.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { getFase, getFluxo } from "../flows/types.js";
 import { classificarPRD, descreverNivel } from "../flows/classifier.js";
@@ -311,10 +310,7 @@ A IA deve salvar os arquivos listados no campo \`files\`.
         };
     }
 
-    // Carregar próxima fase
-    const especialista = await lerEspecialista(proximaFase.especialista);
-    const template = await lerTemplate(proximaFase.template);
-
+    // Não precisa mais carregar especialista/template - resposta compacta
     const resposta = `# ✅ Fase ${faseAnterior} Concluída!
 
 ## 📁 Entregável
@@ -330,7 +326,6 @@ ${classificacaoInfo}
 | Campo | Valor |
 |-------|-------|
 | **Especialista** | ${proximaFase.especialista} |
-| **Template** | ${proximaFase.template} |
 | **Entregável** | ${proximaFase.entregavel_esperado} |
 
 ## Gate de Saída
@@ -340,45 +335,25 @@ ${proximaFase.gate_checklist.map(item => `- [ ] ${item}`).join("\n")}
 
 ## ⚡ AÇÃO OBRIGATÓRIA - Salvar Arquivos
 
-**A IA DEVE executar os comandos abaixo para criar os arquivos do projeto.**
-
-### 1. Criar diretório da fase
-\`\`\`
-mkdir -p "${diretorio}/docs/${faseDirName}"
-\`\`\`
-
-### 2. Salvar entregável
+### 1. Salvar entregável
 **Caminho:** \`${caminhoArquivo}\`
+(conteúdo no campo files)
 
-\`\`\`markdown
-${args.entregavel.slice(0, 500)}${args.entregavel.length > 500 ? "\n... [conteúdo completo no campo files]" : ""}
-\`\`\`
-
-### 3. Atualizar estado
+### 2. Atualizar estado
 **Caminho:** \`${diretorio}/.maestro/estado.json\`
 
 \`\`\`json
 ${estadoFile.content}
 \`\`\`
 
-### 4. Atualizar resumo
+### 3. Atualizar resumo
 **Caminho:** \`${diretorio}/.maestro/resumo.json\`
-
-\`\`\`json
-${resumoFiles[0].content.slice(0, 300)}...
-\`\`\`
+(conteúdo no campo files)
 
 ---
 
-## 🎭 Especialista: ${proximaFase.especialista}
-
-${especialista}
-
----
-
-## 📝 Template: ${proximaFase.template}
-
-${template}
+> 💡 Use \`read_resource("maestro://especialista/${proximaFase.especialista}")\` para ver o especialista.
+> 💡 Use \`read_resource("maestro://template/${proximaFase.template}")\` para ver o template.
 `;
 
     return {
