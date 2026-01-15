@@ -353,6 +353,7 @@ import { salvar } from "./tools/salvar.js";
 import { implementarHistoria } from "./tools/implementar-historia.js";
 import { novaFeature, corrigirBug, refatorar } from "./tools/fluxos-alternativos.js";
 import { aprovarGate } from "./tools/aprovar-gate.js";
+import { confirmarClassificacao } from "./tools/confirmar-classificacao.js";
 
 // Definição das tools para exibição como resources no seletor @mcp:maestro:
 const TOOLS_AS_RESOURCES = [
@@ -369,7 +370,9 @@ const TOOLS_AS_RESOURCES = [
     { name: "nova_feature", emoji: "✨", desc: "Inicia fluxo de nova feature", params: "descricao, [impacto_estimado]" },
     { name: "corrigir_bug", emoji: "🐛", desc: "Inicia fluxo de correção de bug", params: "descricao, [severidade], [ticket_id]" },
     { name: "refatorar", emoji: "♻️", desc: "Inicia fluxo de refatoração", params: "area, motivo" },
+    { name: "refatorar", emoji: "♻️", desc: "Inicia fluxo de refatoração", params: "area, motivo" },
     { name: "aprovar_gate", emoji: "🔐", desc: "USUÁRIO: Aprova/rejeita gate pendente", params: "acao, estado_json, diretorio" },
+    { name: "confirmar_classificacao", emoji: "🧐", desc: "Confirma reclassificação pós-PRD", params: "estado_json, diretorio, [nivel]" },
 ];
 
 // Gera instrução de execução para uma tool
@@ -430,6 +433,10 @@ Execute \`mcp_maestro_corrigir_bug\`.`,
 
         refatorar: `Pergunte a área e motivo da refatoração.
 Execute \`mcp_maestro_refatorar\`.`,
+
+        confirmar_classificacao: `Use quando o projeto estiver aguardando confirmação de classificação.
+Execute \`mcp_maestro_confirmar_classificacao\`.
+Mostre o resultado.`,
     };
 
     return `## 🎯 EXECUTE AGORA: ${tool.emoji} ${tool.name}
@@ -583,6 +590,7 @@ async function getToolsList() {
             { name: "nova_feature", description: "Inicia fluxo de nova feature", inputSchema: { type: "object", properties: { descricao: { type: "string" }, impacto_estimado: { type: "string", enum: ["baixo", "medio", "alto"] } }, required: ["descricao"] } },
             { name: "corrigir_bug", description: "Inicia fluxo de correção de bug", inputSchema: { type: "object", properties: { descricao: { type: "string" }, severidade: { type: "string", enum: ["critica", "alta", "media", "baixa"] }, ticket_id: { type: "string" } }, required: ["descricao"] } },
             { name: "refatorar", description: "Inicia fluxo de refatoração", inputSchema: { type: "object", properties: { area: { type: "string" }, motivo: { type: "string" } }, required: ["area", "motivo"] } },
+            { name: "confirmar_classificacao", description: "Confirma e efetiva a reclassificação após PRD", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" }, nivel: { type: "string", enum: ["simples", "medio", "complexo"] }, tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] } }, required: ["estado_json", "diretorio"] } },
         ],
     };
 }
@@ -619,6 +627,8 @@ async function callTool(name: string, args?: Record<string, unknown>) {
                 return await refatorar({ area: a.area as string, motivo: a.motivo as string });
             case "aprovar_gate":
                 return await aprovarGate({ acao: a.acao as "aprovar" | "rejeitar", estado_json: a.estado_json as string, diretorio: a.diretorio as string });
+            case "confirmar_classificacao":
+                return await confirmarClassificacao({ estado_json: a.estado_json as string, diretorio: a.diretorio as string, nivel: a.nivel as any, tipo_artefato: a.tipo_artefato as any });
             default:
                 return { content: [{ type: "text", text: `Tool não encontrada: ${name}` }], isError: true };
         }

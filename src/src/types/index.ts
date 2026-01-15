@@ -34,6 +34,16 @@ export interface EstadoProjeto {
     aguardando_aprovacao: boolean;      // Flag de bloqueio - requer aprovação do usuário
     motivo_bloqueio?: string;           // Razão do bloqueio
     score_bloqueado?: number;           // Score que causou o bloqueio
+
+    // Campos de confirmação de classificação
+    aguardando_classificacao: boolean;      // Flag de bloqueio - requer confirmação de classificação pós-PRD
+    classificacao_pos_prd_confirmada: boolean; // Flag indicando que checagem já foi feita
+    classificacao_sugerida?: {              // Sugestão da IA para o usuário confirmar
+        nivel: NivelComplexidade;
+        pontuacao: number;
+        criterios: string[];
+    };
+
     criado_em: string;
     atualizado_em: string;
 }

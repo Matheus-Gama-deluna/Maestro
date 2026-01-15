@@ -58,6 +58,15 @@ export function criarEstadoInicial(
         gates_validados: [],
         usar_stitch: false,
         stitch_confirmado: false, // Aguarda resposta do usuário sobre Stitch
+        // Novos campos de classificação
+        tipo_artefato: "product",
+        tier_gate: "base",
+        classificacao_confirmada: false,
+
+        // Campos de confirmação de classificação
+        aguardando_classificacao: false,
+        classificacao_pos_prd_confirmada: false,
+
         // Campos de proteção de gate
         aguardando_aprovacao: false,
         motivo_bloqueio: undefined,

@@ -97,7 +97,7 @@ proximo(
     const diretorio = args.diretorio;
     setCurrentDirectory(diretorio);
 
-    // Verificar se há bloqueio de aprovação pendente
+    // Verificar se há bloqueio de aprovação pendente (Gate)
     if (estado.aguardando_aprovacao) {
         return {
             content: [{
@@ -119,6 +119,45 @@ O **usuário humano** deve decidir:
 - **Rejeitar**: \`aprovar_gate(acao: "rejeitar", ...)\`
 
 > ⚠️ A IA NÃO pode aprovar automaticamente. Aguarde a decisão do usuário.
+`,
+            }],
+        };
+    }
+
+    // Verificar se há bloqueio de confirmação de classificação (Pós-PRD)
+    if (estado.aguardando_classificacao) {
+        let msgSugestao = "";
+        if (estado.classificacao_sugerida) {
+            msgSugestao = `
+## Sugestão da IA
+| Campo | Valor |
+|-------|-------|
+| **Nível** | ${estado.classificacao_sugerida.nivel.toUpperCase()} |
+| **Pontuação** | ${estado.classificacao_sugerida.pontuacao} |
+`;
+        }
+
+        return {
+            content: [{
+                type: "text",
+                text: `# ⛔ Confirmação de Classificação Necessária
+
+Antes de prosseguir, você precisa confirmar a classificação do projeto.
+
+${msgSugestao}
+
+## 🔐 Ação Necessária
+
+Use a tool \`confirmar_classificacao\` para validar ou ajustar a complexidade.
+
+\`\`\`
+confirmar_classificacao(
+    estado_json: "...",
+    diretorio: "${diretorio}"
+)
+\`\`\`
+
+> ⚠️ **IMPORTANTE**: Você DEVE chamar esta tool antes de continuar.
 `,
             }],
         };
@@ -302,6 +341,8 @@ ${classificacao.criterios.map(c => `- ${c}`).join("\n")}
         estado.gates_validados.push(faseAnterior);
     }
 
+    const proximaFase = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
+
     // Atualizar contexto no resumo
     const proximaFaseInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
     if (proximaFaseInfo) {
@@ -329,35 +370,81 @@ ${classificacao.criterios.map(c => `- ${c}`).join("\n")}
         content: f.content
     })));
 
-    const proximaFase = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
+    // Se estiver na Fase 1 (PRD) e ainda não confirmou classificação -> INTERROMPER
+    if (estado.fase_atual === 1 && !estado.classificacao_pos_prd_confirmada) {
+        const classificacao = classificarPRD(args.entregavel);
 
-    // Se projeto concluído
-    if (!proximaFase || estado.fase_atual > estado.total_fases) {
+        // Atualiza estado para aguardar confirmação
+        estado.aguardando_classificacao = true;
+        estado.classificacao_sugerida = {
+            nivel: classificacao.nivel,
+            pontuacao: classificacao.pontuacao,
+            criterios: classificacao.criterios
+        };
+
+        // Serializa estado bloqueado
+        const estadoBloqueado = serializarEstado(estado);
+
+        // Adiciona arquivo de estado à lista de salvamento (preservando o entregável já salvo)
+        const estadoFileIdx = filesToSave.findIndex(f => f.path.endsWith("estado.json"));
+        if (estadoFileIdx >= 0) {
+            filesToSave[estadoFileIdx].content = estadoBloqueado.content;
+        } else {
+            filesToSave.push({
+                path: `${diretorio}/${estadoBloqueado.path}`,
+                content: estadoBloqueado.content
+            });
+        }
+
         return {
             content: [{
                 type: "text",
-                text: `# 🎉 Projeto Concluído!
+                text: `# 🧐 Verificação de Complexidade Necessária
 
-## Resumo
+Analisei o PRD e tenho uma sugestão de classificação.
 
+## Resultado da Análise
 | Campo | Valor |
 |-------|-------|
-| **Projeto** | ${estado.nome} |
-| **Nível** | ${estado.nivel} |
-| **Fases completadas** | ${estado.total_fases} |
-| **Gates validados** | ${estado.gates_validados.length} |
+| **Nível Sugerido** | **${classificacao.nivel.toUpperCase()}** |
+| **Pontuação** | ${classificacao.pontuacao} |
 
-### Entregáveis gerados:
-${Object.entries(estado.entregaveis).map(([fase, caminho]) => `- ${fase}: \`${caminho}\``).join("\n")}
+### Critérios
+${classificacao.criterios.map(c => `- ${c}`).join("\n")}
 
-## 📁 Arquivos para Salvar
+---
 
-A IA deve salvar os arquivos listados no campo \`files\`.
+## 🔐 Próximo Passo: Confirmação
+
+O projeto foi **PAUSADO** para que você confirme essa classificação.
+A IA **NÃO** avançou para a próxima fase automaticamente.
+
+**Você deve chamar:**
+\`\`\`
+confirmar_classificacao(
+    estado_json: "...",
+    diretorio: "${diretorio}"
+)
+\`\`\`
+
+## 📁 Arquivos Salvos
+- O PRD foi salvo.
+- O estado foi atualizado marcando 'aguardando_classificacao'.
 `,
             }],
             files: filesToSave,
-            estado_atualizado: estadoFile.content,
+            estado_atualizado: estadoBloqueado.content,
         };
+    }
+
+    // Classificar complexidade após fase 1 (PRD) - (Lógica antiga removida/simplificada pois agora temos o bloco acima)
+    let classificacaoInfoAdicional = "";
+    if (estado.fase_atual === 1) {
+        // Se chegou aqui, é porque já confirmou (classificacao_pos_prd_confirmada == true)
+        // Ou na primeira passagem (se por algum motivo a flag já estivesse true, o que não deve ocorrer na fluxo padrão novo)
+        // Mantemos apenas informativo se necessário, ou removemos.
+        // Dado o fluxo novo, a reclassificação acontece no 'confirmar_classificacao'.
+        // Aqui apenas registramos que passou.
     }
 
     // Não precisa mais carregar especialista/template - resposta compacta
@@ -368,18 +455,19 @@ A IA deve salvar os arquivos listados no campo \`files\`.
 
 ${gateResultado.valido ? "✅ Gate aprovado" : "⚠️ Gate forçado"}
 ${classificacaoInfo}
+${classificacaoInfoAdicional}
 
 ---
 
-# 📍 Fase ${estado.fase_atual}/${estado.total_fases}: ${proximaFase.nome}
+# 📍 Fase ${estado.fase_atual}/${estado.total_fases}: ${proximaFase?.nome || "Concluído"}
 
 | Campo | Valor |
 |-------|-------|
-| **Especialista** | ${proximaFase.especialista} |
-| **Entregável** | ${proximaFase.entregavel_esperado} |
+| **Especialista** | ${proximaFase?.especialista || "-"} |
+| **Entregável** | ${proximaFase?.entregavel_esperado || "-"} |
 
 ## Gate de Saída
-${proximaFase.gate_checklist.map(item => `- [ ] ${item}`).join("\n")}
+${proximaFase?.gate_checklist.map(item => `- [ ] ${item}`).join("\n") || "Nenhum"}
 
 ---
 
@@ -402,8 +490,8 @@ ${estadoFile.content}
 
 ---
 
-> 💡 Use \`read_resource("maestro://especialista/${proximaFase.especialista}")\` para ver o especialista.
-> 💡 Use \`read_resource("maestro://template/${proximaFase.template}")\` para ver o template.
+> 💡 Use \`read_resource("maestro://especialista/${proximaFase?.especialista || "..."}")\` para ver o especialista.
+> 💡 Use \`read_resource("maestro://template/${proximaFase?.template || "..."}")\` para ver o template.
 `;
 
     return {
