@@ -352,6 +352,7 @@ import { contexto } from "./tools/contexto.js";
 import { salvar } from "./tools/salvar.js";
 import { implementarHistoria } from "./tools/implementar-historia.js";
 import { novaFeature, corrigirBug, refatorar } from "./tools/fluxos-alternativos.js";
+import { aprovarGate } from "./tools/aprovar-gate.js";
 
 // Definição das tools para exibição como resources no seletor @mcp:maestro:
 const TOOLS_AS_RESOURCES = [
@@ -367,6 +368,7 @@ const TOOLS_AS_RESOURCES = [
     { name: "nova_feature", emoji: "✨", desc: "Inicia fluxo de nova feature", params: "descricao, [impacto_estimado]" },
     { name: "corrigir_bug", emoji: "🐛", desc: "Inicia fluxo de correção de bug", params: "descricao, [severidade], [ticket_id]" },
     { name: "refatorar", emoji: "♻️", desc: "Inicia fluxo de refatoração", params: "area, motivo" },
+    { name: "aprovar_gate", emoji: "🔐", desc: "USUÁRIO: Aprova/rejeita gate pendente", params: "acao, estado_json, diretorio" },
 ];
 
 // Gera instrução de execução para uma tool
@@ -497,31 +499,31 @@ Siga estas instruções cuidadosamente.
 
 ## 🚫 REGRAS ABSOLUTAS (NÃO VIOLÁVEIS)
 
-1. **NUNCA defina \`confirmar_usuario: true\`** ao chamar \`proximo()\`
-   - Este parâmetro é EXCLUSIVO do usuário humano
-   - Se o score for 50-69, PEÇA ao usuário para confirmar
+1. **NUNCA chame \`aprovar_gate\` automaticamente**
+   - Esta tool é EXCLUSIVA do usuário humano
+   - Se o score for < 70, o projeto será BLOQUEADO
+   - Aguarde o usuário pedir explicitamente para aprovar ou rejeitar
    
 2. **NUNCA force avanço** sem pedido explícito do usuário
-   - Não use \`forcar: true\` por conta própria
+   - Quando o projeto está \`aguardando_aprovacao: true\`, NÃO tente avançar
+   - Informe ao usuário que está aguardando decisão dele
 
 3. **SEMPRE siga o template** da fase atual
    - Inclua todas as seções obrigatórias
    - Não omita partes do template
 
-## 📋 Fluxo de Trabalho
+## 🔐 Sistema de Proteção de Gates
 
-1. Ao iniciar, use \`carregar_projeto\` ou \`iniciar_projeto\`
-2. Desenvolva o entregável seguindo o template
-3. Use \`avaliar_entregavel\` para verificar qualidade
-4. Se score >= 70: pode usar \`proximo\`
-5. Se score 50-69: PEÇA confirmação do usuário
-6. Se score < 50: corrija antes de avançar
+O Maestro usa um sistema de bloqueio persistente:
 
-## 🎯 Sistema de Qualidade
+- **Score >= 70**: Aprovado automaticamente, pode avançar
+- **Score 50-69**: BLOQUEADO - estado salvo com \`aguardando_aprovacao: true\`
+- **Score < 50**: Bloqueado, não pode avançar de forma alguma
 
-- **Score >= 70**: Aprovado automaticamente
-- **Score 50-69**: Requer \`confirmar_usuario: true\` (só usuário)
-- **Score < 50**: Bloqueado, não pode avançar
+Quando bloqueado:
+1. O estado é salvo com \`aguardando_aprovacao: true\`
+2. Qualquer chamada a \`proximo()\` retorna erro até aprovação
+3. **Apenas o USUÁRIO** pode chamar \`aprovar_gate(acao: "aprovar")\`
 
 ## Tools Disponíveis
 
@@ -530,23 +532,24 @@ Siga estas instruções cuidadosamente.
 - \`carregar_projeto\` - Carrega projeto existente
 - \`proximo\` - Salva entregável e avança fase
 - \`status\` - Retorna estado atual
-- \`avaliar_entregavel\` - Avalia qualidade (use antes de proximo)
+- \`validar_gate\` - Valida checklist da fase
+
+### 🔐 Exclusivo do Usuário
+- \`aprovar_gate\` - Aprova ou rejeita avanço com pendências
+  ⚠️ IA NÃO deve chamar esta tool automaticamente!
 
 ### Auxiliares
 - \`classificar\` - Reclassifica complexidade
 - \`contexto\` - Retorna contexto acumulado
 - \`salvar\` - Salva rascunhos/anexos
 
-### Memória
-- \`atualizar_codebase\` - Atualiza mapa do código
-
 ## Comportamentos Automáticos
 
 Quando o usuário disser "próximo", "avançar", "terminei":
 1. Compile o entregável da conversa
-2. Chame \`avaliar_entregavel\` primeiro
-3. Se score >= 70, chame \`proximo\`
-4. Se score < 70, mostre problemas e peça confirmação
+2. Chame \`proximo\`
+3. Se score >= 70: avança automaticamente
+4. Se score < 70: projeto é BLOQUEADO, peça ao usuário para aprovar ou rejeitar
 `;
         return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
     }
@@ -563,6 +566,7 @@ async function getToolsList() {
             { name: "proximo", description: "Salva entregável e avança fase (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { entregavel: { type: "string" }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["entregavel", "estado_json", "diretorio"] } },
             { name: "status", description: "Retorna status do projeto (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
             { name: "validar_gate", description: "Valida checklist de saída (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { fase: { type: "number" }, entregavel: { type: "string" }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
+            { name: "aprovar_gate", description: "🔐 EXCLUSIVO DO USUÁRIO. Aprova ou rejeita avanço com pendências. IA NÃO deve chamar automaticamente.", inputSchema: { type: "object", properties: { acao: { type: "string", enum: ["aprovar", "rejeitar"] }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["acao", "estado_json", "diretorio"] } },
             // V1.0 (Stateless)
             { name: "classificar", description: "Reclassifica complexidade (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { prd: { type: "string" }, nivel: { type: "string", enum: ["simples", "medio", "complexo"] }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
             { name: "contexto", description: "Retorna contexto do projeto (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
@@ -604,6 +608,8 @@ async function callTool(name: string, args?: Record<string, unknown>) {
                 return await corrigirBug({ descricao: a.descricao as string, severidade: a.severidade as "critica" | "alta" | "media" | "baixa" | undefined, ticket_id: a.ticket_id as string | undefined });
             case "refatorar":
                 return await refatorar({ area: a.area as string, motivo: a.motivo as string });
+            case "aprovar_gate":
+                return await aprovarGate({ acao: a.acao as "aprovar" | "rejeitar", estado_json: a.estado_json as string, diretorio: a.diretorio as string });
             default:
                 return { content: [{ type: "text", text: `Tool não encontrada: ${name}` }], isError: true };
         }

@@ -20,6 +20,10 @@ export interface EstadoProjeto {
     gates_validados: number[];
     usar_stitch: boolean;
     stitch_confirmado: boolean;  // Indica se usuário já respondeu sobre usar Stitch
+    // Campos de proteção de gate
+    aguardando_aprovacao: boolean;      // Flag de bloqueio - requer aprovação do usuário
+    motivo_bloqueio?: string;           // Razão do bloqueio
+    score_bloqueado?: number;           // Score que causou o bloqueio
     criado_em: string;
     atualizado_em: string;
 }

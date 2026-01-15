@@ -97,6 +97,33 @@ proximo(
     const diretorio = args.diretorio;
     setCurrentDirectory(diretorio);
 
+    // Verificar se há bloqueio de aprovação pendente
+    if (estado.aguardando_aprovacao) {
+        return {
+            content: [{
+                type: "text",
+                text: `# ⛔ Projeto Aguardando Aprovação
+
+O projeto está bloqueado aguardando aprovação do usuário.
+
+| Campo | Valor |
+|-------|-------|
+| **Motivo** | ${estado.motivo_bloqueio || "Score abaixo do ideal"} |
+| **Score** | ${estado.score_bloqueado}/100 |
+
+## 🔐 Ação Necessária
+
+O **usuário humano** deve decidir:
+
+- **Aprovar**: \`aprovar_gate(acao: "aprovar", ...)\`
+- **Rejeitar**: \`aprovar_gate(acao: "rejeitar", ...)\`
+
+> ⚠️ A IA NÃO pode aprovar automaticamente. Aguarde a decisão do usuário.
+`,
+            }],
+        };
+    }
+
     const faseAtual = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
     if (!faseAtual) {
         return {
@@ -142,16 +169,24 @@ ${gateResultado.itens_pendentes.map((item, i) => `- ${item}\n  💡 ${gateResult
         };
     }
 
-    // Score 50-69: Requer confirmação do usuário
-    if (qualityScore < 70 && !args.confirmar_usuario) {
+    // Score 50-69: Bloquear e aguardar aprovação do usuário
+    if (qualityScore < 70) {
+        // Setar flag de bloqueio no estado
+        estado.aguardando_aprovacao = true;
+        estado.motivo_bloqueio = "Score abaixo de 70 - requer aprovação do usuário";
+        estado.score_bloqueado = qualityScore;
+
+        // Serializar estado bloqueado
+        const estadoBloqueado = serializarEstado(estado);
+
         return {
             content: [{
                 type: "text",
-                text: `# ⚠️ Confirmação Necessária
+                text: `# ⚠️ Aprovação do Usuário Necessária
 
-## Score: ${qualityScore}/100 - Requer aprovação do usuário
+## Score: ${qualityScore}/100 - Abaixo do mínimo recomendado (70)
 
-O entregável tem qualidade abaixo do ideal (mínimo recomendado: 70).
+O entregável tem qualidade abaixo do ideal.
 
 ### Itens Pendentes
 
@@ -160,17 +195,32 @@ ${gateResultado.itens_pendentes.length > 0 ? `**Checklist pendente:**\n${gateRes
 
 ---
 
-## 🔐 Confirmação do Usuário Necessária
+## 🔐 Ação do Usuário Necessária
 
-Para avançar com pendências, o **usuário** deve confirmar explicitamente:
+O projeto foi **bloqueado** aguardando decisão do usuário:
 
+- **Para aprovar**: O usuário deve pedir para executar \`aprovar_gate(acao: "aprovar", ...)\`
+- **Para corrigir**: O usuário deve pedir para executar \`aprovar_gate(acao: "rejeitar", ...)\` e depois corrigir o entregável
+
+> ⚠️ **CRÍTICO**: A IA NÃO pode chamar \`aprovar_gate\` automaticamente.
+> Aguarde a decisão explícita do usuário humano.
+
+---
+
+## 📁 Salvar Estado Bloqueado
+
+**Caminho:** \`${diretorio}/.maestro/estado.json\`
+
+\`\`\`json
+${estadoBloqueado.content}
 \`\`\`
-proximo(entregavel: "...", estado_json: "...", confirmar_usuario: true)
-\`\`\`
-
-> ⚠️ **IMPORTANTE**: A IA NÃO pode definir \`confirmar_usuario\`. 
-> Apenas o usuário humano pode autorizar o avanço com pendências.`,
+`,
             }],
+            files: [{
+                path: `${diretorio}/${estadoBloqueado.path}`,
+                content: estadoBloqueado.content
+            }],
+            estado_atualizado: estadoBloqueado.content,
         };
     }
 
@@ -380,14 +430,6 @@ export const proximoSchema = {
         resumo_json: {
             type: "string",
             description: "Conteúdo do arquivo .maestro/resumo.json (opcional)",
-        },
-        confirmar_usuario: {
-            type: "boolean",
-            description: "APENAS O USUÁRIO pode definir. Confirma avanço com pendências (score 50-69). IA NÃO deve usar.",
-        },
-        forcar: {
-            type: "boolean",
-            description: "Forçar avanço (uso interno, não anunciado)",
         },
         nome_arquivo: {
             type: "string",
