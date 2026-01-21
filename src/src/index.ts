@@ -504,58 +504,70 @@ async function getResourceContent(uri: string) {
     }
 
     if (uri === "maestro://system-prompt") {
-        const conteudo = `# Maestro - Instruções para IA
+        const conteudo = `# Maestro - Instruções OBRIGATÓRIAS para IA
 
-Você está usando o Maestro, um guia de desenvolvimento assistido por IA.
-Siga estas instruções cuidadosamente.
+## 🚫 REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA)
 
-## 🚫 REGRAS ABSOLUTAS (NÃO VIOLÁVEIS)
+1. **NUNCA chame \`aprovar_gate\`** - Esta tool é EXCLUSIVA do usuário humano
+2. **NUNCA gere entregáveis SEM LER o especialista e template ANTES**
+3. **NUNCA avance sem confirmação EXPLÍCITA do usuário** ("sim", "pode", "avançar")
+4. **NUNCA passe entregáveis vazios ou incompletos** para \`proximo()\`
+5. **NUNCA pule a leitura de recursos** - é OBRIGATÓRIO para cada fase
 
-1. **NUNCA chame \`aprovar_gate\` automaticamente**
-   - Esta tool é EXCLUSIVA do usuário humano
-   - Se o score for < 70, o projeto será BLOQUEADO
-   - Aguarde o usuário pedir explicitamente para aprovar ou rejeitar
-   
-2. **NUNCA force avanço** sem pedido explícito do usuário
-   - Quando o projeto está \`aguardando_aprovacao: true\`, NÃO tente avançar
-   - Informe ao usuário que está aguardando decisão dele
+---
 
-3. **SEMPRE siga o template** da fase atual
-   - Inclua todas as seções obrigatórias
-   - Não omita partes do template
+## 📚 LEITURA OBRIGATÓRIA DE RECURSOS
 
-## 📚 ACESSANDO RECURSOS (OBRIGATÓRIO)
+Para CADA fase, você DEVE executar estes comandos ANTES de gerar qualquer conteúdo:
 
-Para cada fase, você DEVE ler o especialista e template antes de gerar entregáveis:
-
-### Como usar recursos
 \`\`\`
-read_resource("maestro://especialista/{nome}")  // Ler especialista
-read_resource("maestro://template/{nome}")      // Ler template
+// 1. Ler o especialista da fase
+read_resource("maestro://especialista/{nome}")
+
+// 2. Ler o template do entregável
+read_resource("maestro://template/{nome}")
 \`\`\`
 
 ### Recursos Disponíveis
 
 | Tipo | URI | Exemplo |
 |------|-----|---------|
-| Especialista | \`maestro://especialista/{nome}\` | \`maestro://especialista/UX Design\` |
-| Template | \`maestro://template/{nome}\` | \`maestro://template/design-doc\` |
+| Especialista | \`maestro://especialista/{nome}\` | \`maestro://especialista/Gestão de Produto\` |
+| Template | \`maestro://template/{nome}\` | \`maestro://template/PRD\` |
 | Guia | \`maestro://guia/{nome}\` | \`maestro://guia/Gates de Qualidade\` |
 
-> ⚠️ **SEMPRE** leia o especialista e template da fase atual antes de gerar qualquer entregável!
+> ⛔ **GERAR ENTREGÁVEL SEM LER RECURSOS = ERRO GRAVE**
+
+---
+
+## 🔄 FLUXO OBRIGATÓRIO DE AVANÇO
+
+1. Chamar \`status()\` para ver fase atual
+2. **LER especialista** da fase → OBRIGATÓRIO
+3. **LER template** da fase → OBRIGATÓRIO
+4. Fazer as perguntas obrigatórias do especialista ao usuário
+5. Gerar entregável seguindo TODAS as seções do template
+6. **Apresentar ao usuário** e perguntar: "Posso salvar e avançar?"
+7. **Aguardar confirmação EXPLÍCITA** ("sim", "pode", "avançar")
+8. Chamar \`proximo(entregavel)\`
+9. Se bloqueado (score < 70): PARAR e informar ao usuário
+10. Repetir para próxima fase
+
+---
 
 ## 🔐 Sistema de Proteção de Gates
 
-O Maestro usa um sistema de bloqueio persistente:
-
-- **Score >= 70**: Aprovado automaticamente, pode avançar
-- **Score 50-69**: BLOQUEADO - estado salvo com \`aguardando_aprovacao: true\`
-- **Score < 50**: Bloqueado, não pode avançar de forma alguma
+- **Score >= 70**: Aprovado automaticamente
+- **Score 50-69**: BLOQUEADO → Aguardar decisão do usuário
+- **Score < 50**: Rejeitado → Corrigir e tentar novamente
+- **Entregável < 200 chars**: BLOQUEADO → Desenvolver conteúdo
 
 Quando bloqueado:
-1. O estado é salvo com \`aguardando_aprovacao: true\`
-2. Qualquer chamada a \`proximo()\` retorna erro até aprovação
-3. **Apenas o USUÁRIO** pode chamar \`aprovar_gate(acao: "aprovar")\`
+- A IA deve INFORMAR o usuário sobre o bloqueio
+- A IA deve AGUARDAR o usuário decidir
+- A IA NÃO pode chamar \`aprovar_gate\` por conta própria
+
+---
 
 ## Tools Disponíveis
 
@@ -567,21 +579,12 @@ Quando bloqueado:
 - \`validar_gate\` - Valida checklist da fase
 
 ### 🔐 Exclusivo do Usuário
-- \`aprovar_gate\` - Aprova ou rejeita avanço com pendências
-  ⚠️ IA NÃO deve chamar esta tool automaticamente!
+- \`aprovar_gate\` - ⛔ IA NÃO PODE USAR
 
 ### Auxiliares
 - \`classificar\` - Reclassifica complexidade
 - \`contexto\` - Retorna contexto acumulado
 - \`salvar\` - Salva rascunhos/anexos
-
-## Comportamentos Automáticos
-
-Quando o usuário disser "próximo", "avançar", "terminei":
-1. Compile o entregável da conversa
-2. Chame \`proximo\`
-3. Se score >= 70: avança automaticamente
-4. Se score < 70: projeto é BLOQUEADO, peça ao usuário para aprovar ou rejeitar
 `;
         return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
     }
@@ -625,7 +628,7 @@ async function callTool(name: string, args?: Record<string, unknown>) {
             case "carregar_projeto":
                 return await carregarProjeto({ estado_json: a.estado_json as string, diretorio: a.diretorio as string });
             case "proximo":
-                return await proximo({ entregavel: a.entregavel as string, estado_json: a.estado_json as string, forcar: a.forcar as boolean | undefined, nome_arquivo: a.nome_arquivo as string | undefined, diretorio: a.diretorio as string });
+                return await proximo({ entregavel: a.entregavel as string, estado_json: a.estado_json as string, nome_arquivo: a.nome_arquivo as string | undefined, diretorio: a.diretorio as string });
             case "status":
                 return await status({ estado_json: a.estado_json as string, diretorio: a.diretorio as string });
             case "validar_gate":

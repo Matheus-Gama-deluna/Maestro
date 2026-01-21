@@ -2,6 +2,7 @@ import type { ToolResult } from "../types/index.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { getFluxoComStitch, getFaseComStitch } from "../flows/types.js";
+import { gerarInstrucaoRecursos } from "../utils/instructions.js";
 
 interface ConfirmarStitchArgs {
     estado_json: string;
@@ -163,8 +164,7 @@ Desenvolva o **PRD** definindo:
 
 Quando terminar, diga **"próximo"**.
 
-> 💡 Use \`read_resource("maestro://especialista/${fase1.especialista}")\` para ver o especialista.
-> 💡 Use \`read_resource("maestro://template/${fase1.template}")\` para ver o template.
+${gerarInstrucaoRecursos(fase1.especialista, fase1.template, "AÇÃO OBRIGATÓRIA - Carregar Recursos da Fase 1")}
 `;
 
     return {

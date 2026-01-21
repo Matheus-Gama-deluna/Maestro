@@ -89,8 +89,32 @@ O projeto não está aguardando aprovação de gate.
 **Estado atual:**
 - Fase: ${estado.fase_atual}/${estado.total_fases}
 - Nível: ${estado.nivel}
+
+> ⚠️ Para usar esta tool, o projeto deve primeiro passar por \`proximo()\`
+> e ser bloqueado com score < 70.
 `,
             }],
+        };
+    }
+
+    // Verificar se há score registrado (garante que passou por validação real)
+    if (args.acao === "aprovar" && estado.score_bloqueado === undefined) {
+        return {
+            content: [{
+                type: "text",
+                text: `# ⚠️ Aprovação Inválida
+
+Não há score registrado para aprovar.
+
+O projeto deve primeiro:
+1. Passar por \`proximo()\` com um entregável
+2. Ser bloqueado com score < 70
+3. Então o usuário pode aprovar
+
+**Use \`proximo()\` primeiro com o entregável completo.**
+`,
+            }],
+            isError: true,
         };
     }
 

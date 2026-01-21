@@ -7,14 +7,13 @@ import { validarGate, formatarResultadoGate } from "../gates/validator.js";
 import { validarEstrutura } from "../gates/estrutura.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { parsearResumo, serializarResumo, criarResumoInicial, extrairResumoEntregavel } from "../state/memory.js";
+import { gerarInstrucaoProximaFase } from "../utils/instructions.js";
 import type { EntregavelResumo, ProjectSummary } from "../types/memory.js";
 
 interface ProximoArgs {
     entregavel: string;
     estado_json: string;         // Estado atual do projeto (obrigatório)
     resumo_json?: string;        // Resumo atual (opcional, cria novo se não informado)
-    forcar?: boolean;
-    confirmar_usuario?: boolean;
     nome_arquivo?: string;
     diretorio: string;           // Diretório do projeto (obrigatório)
 }
@@ -96,6 +95,52 @@ proximo(
 
     const diretorio = args.diretorio;
     setCurrentDirectory(diretorio);
+
+    // Obter fase atual para mensagens de erro
+    const faseAtualInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
+
+    // Validar tamanho mínimo do entregável
+    const TAMANHO_MINIMO_ENTREGAVEL = 200;
+    if (!args.entregavel || args.entregavel.trim().length < TAMANHO_MINIMO_ENTREGAVEL) {
+        return {
+            content: [{
+                type: "text",
+                text: `# ❌ Entregável Inválido
+
+O entregável está vazio ou muito curto.
+
+| Métrica | Valor |
+|---------|-------|
+| **Tamanho recebido** | ${args.entregavel?.trim().length || 0} caracteres |
+| **Tamanho mínimo** | ${TAMANHO_MINIMO_ENTREGAVEL} caracteres |
+
+---
+
+## ⚡ AÇÃO OBRIGATÓRIA
+
+Você **DEVE** desenvolver o entregável corretamente:
+
+1. **Ler especialista:**
+   \`\`\`
+   read_resource("maestro://especialista/${faseAtualInfo?.especialista || "..."}")
+   \`\`\`
+
+2. **Ler template:**
+   \`\`\`
+   read_resource("maestro://template/${faseAtualInfo?.template || "..."}")
+   \`\`\`
+
+3. Fazer as perguntas do especialista ao usuário
+4. Gerar entregável seguindo TODAS as seções do template
+5. Apresentar ao usuário para aprovação
+6. Só então chamar \`proximo()\`
+
+> ⛔ **NÃO TENTE AVANÇAR** com entregáveis vazios ou incompletos!
+`,
+            }],
+            isError: true,
+        };
+    }
 
     // Verificar se há bloqueio de aprovação pendente (Gate)
     if (estado.aguardando_aprovacao) {

@@ -116,9 +116,9 @@ function verificarItem(item: string, entregavel: string): boolean {
 
     const conteudoLower = entregavel.toLowerCase();
 
-    // Verifica se pelo menos 50% das keywords estão presentes
+    // Verifica se pelo menos 70% das keywords estão presentes (mais rigoroso)
     const encontradas = keywords.filter((kw) => conteudoLower.includes(kw));
-    return encontradas.length >= Math.ceil(keywords.length * 0.5);
+    return encontradas.length >= Math.ceil(keywords.length * 0.7);
 }
 
 /**

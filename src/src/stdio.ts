@@ -183,7 +183,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
                     entregavel: { type: "string", description: "Conteúdo do entregável" },
                     estado_json: { type: "string", description: "Conteúdo de .maestro/estado.json" },
                     diretorio: { type: "string", description: "Diretório do projeto" },
-                    forcar: { type: "boolean", description: "Forçar avanço" },
                     nome_arquivo: { type: "string", description: "Nome do arquivo" },
                 },
                 required: ["entregavel", "estado_json", "diretorio"],
@@ -192,8 +191,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         {
             name: "status",
             description: "Retorna status do projeto (stateless). Requer estado_json.",
-            inputSchema: { 
-                type: "object" as const, 
+            inputSchema: {
+                type: "object" as const,
                 properties: {
                     estado_json: { type: "string", description: "Conteúdo de .maestro/estado.json" },
                     diretorio: { type: "string", description: "Diretório do projeto" },
@@ -281,7 +280,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     entregavel: typedArgs.entregavel as string,
                     estado_json: typedArgs.estado_json as string,
                     diretorio: typedArgs.diretorio as string,
-                    forcar: typedArgs.forcar as boolean | undefined,
                     nome_arquivo: typedArgs.nome_arquivo as string | undefined,
                 });
             case "status":

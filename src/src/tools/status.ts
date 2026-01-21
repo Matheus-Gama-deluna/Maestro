@@ -3,6 +3,7 @@ import { parsearEstado } from "../state/storage.js";
 import { getFase, getFluxo } from "../flows/types.js";
 import { descreverNivel } from "../flows/classifier.js";
 import { setCurrentDirectory } from "../state/context.js";
+import { gerarInstrucaoRecursosCompacta } from "../utils/instructions.js";
 
 interface StatusArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -123,6 +124,8 @@ ${Object.keys(estado.entregaveis).length > 0
 ---
 
 **Última atualização:** ${new Date(estado.atualizado_em).toLocaleString("pt-BR")}
+
+${faseAtual ? gerarInstrucaoRecursosCompacta(faseAtual.especialista, faseAtual.template) : ""}
 `;
 
     return {

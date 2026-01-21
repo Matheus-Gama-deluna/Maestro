@@ -4,6 +4,7 @@ import { parsearEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { getFase } from "../flows/types.js";
 import { lerEspecialista, lerTemplate } from "../utils/files.js";
+import { gerarInstrucaoRecursos } from "../utils/instructions.js";
 import type { EstadoProjeto } from "../types/index.js";
 
 interface CarregarProjetoArgs {
@@ -157,6 +158,8 @@ ${templateInfo}
 **Próximos passos:**
 - Para ver status completo: \`status(estado_json: "...")\`
 - Para avançar: \`proximo(entregavel: "...", estado_json: "...")\`
+
+${faseAtual ? gerarInstrucaoRecursos(faseAtual.especialista, faseAtual.template, "AÇÃO OBRIGATÓRIA - Carregar Recursos") : ""}
 `;
 
     return {

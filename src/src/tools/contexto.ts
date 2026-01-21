@@ -2,6 +2,7 @@ import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado } from "../state/storage.js";
 import { getFase, getFluxo } from "../flows/types.js";
 import { setCurrentDirectory } from "../state/context.js";
+import { gerarInstrucaoRecursosCompacta } from "../utils/instructions.js";
 
 interface ContextoArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -120,6 +121,8 @@ ${fluxo.fases.map(f => {
 ---
 
 *Use este contexto para manter consistência entre as fases do projeto.*
+
+${faseAtual ? gerarInstrucaoRecursosCompacta(faseAtual.especialista, faseAtual.template) : ""}
 `;
 
     return {

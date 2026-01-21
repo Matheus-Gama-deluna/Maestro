@@ -179,8 +179,6 @@ export function registerTools(server: Server) {
                         entregavel: typedArgs?.entregavel as string,
                         estado_json: typedArgs?.estado_json as string,
                         resumo_json: typedArgs?.resumo_json as string | undefined,
-                        forcar: typedArgs?.forcar as boolean | undefined,
-                        confirmar_usuario: typedArgs?.confirmar_usuario as boolean | undefined,
                         nome_arquivo: typedArgs?.nome_arquivo as string | undefined,
                         diretorio: typedArgs?.diretorio as string,
                     });
