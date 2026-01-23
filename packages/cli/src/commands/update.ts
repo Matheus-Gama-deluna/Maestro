@@ -22,7 +22,7 @@ export async function update(options: UpdateOptions = {}) {
         return;
     }
 
-    const packageRoot = join(__dirname, '..');
+    const packageRoot = join(__dirname, '..', '..');
     const contentSource = join(packageRoot, 'content');
 
     try {
