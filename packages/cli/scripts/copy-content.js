@@ -18,7 +18,7 @@ const contentDest = join(packageRoot, 'content');
 console.log('📦 Copiando content para o pacote...');
 
 // Diretórios a copiar
-const dirs = ['specialists', 'templates', 'guides', 'prompts', 'skills', 'workflows'];
+const dirs = ['specialists', 'templates', 'guides', 'prompts', 'skills', 'workflows', 'rules'];
 
 ensureDirSync(contentDest);
 

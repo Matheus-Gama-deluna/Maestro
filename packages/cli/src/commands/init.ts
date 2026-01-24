@@ -10,7 +10,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 interface InitOptions {
     force?: boolean;
     minimal?: boolean;
+    ide?: 'gemini' | 'cursor' | 'copilot' | 'windsurf' | 'all';
 }
+
+const IDE_CONFIGS = {
+    gemini: {
+        path: '.gemini/GEMINI.md',
+        header: '---\ntrigger: always_on\nsystem: maestro\nversion: 1.0.0\n---\n\n'
+    },
+    cursor: {
+        path: '.cursorrules',
+        header: ''
+    },
+    copilot: {
+        path: '.github/copilot-instructions.md',
+        header: ''
+    },
+    windsurf: {
+        path: '.windsurfrules',
+        header: ''
+    }
+} as const;
 
 export async function init(options: InitOptions = {}) {
     const cwd = process.cwd();
@@ -78,11 +98,31 @@ export async function init(options: InitOptions = {}) {
         }
         spinner.succeed('Workflows copiados para .agent/workflows/');
 
-        // 5. Gerar GEMINI.md
-        spinner.start('Gerando GEMINI.md...');
-        const geminiContent = generateGeminiMd();
-        await fse.writeFile(join(cwd, 'GEMINI.md'), geminiContent);
-        spinner.succeed('GEMINI.md gerado');
+        // 5. Gerar arquivos de regras por IDE
+        const targetIdes = options.ide === 'all' 
+            ? Object.keys(IDE_CONFIGS) as (keyof typeof IDE_CONFIGS)[]
+            : [options.ide || 'gemini'] as (keyof typeof IDE_CONFIGS)[];
+
+        spinner.start(`Gerando regras para IDE(s): ${targetIdes.join(', ')}...`);
+        
+        // Ler RULES.md base
+        const rulesPath = join(contentSource, 'rules', 'RULES.md');
+        let rulesContent = '';
+        if (await fse.pathExists(rulesPath)) {
+            rulesContent = await fse.readFile(rulesPath, 'utf-8');
+        } else {
+            rulesContent = generateDefaultRules();
+        }
+
+        // Gerar arquivo para cada IDE alvo
+        for (const ide of targetIdes) {
+            const config = IDE_CONFIGS[ide];
+            const targetPath = join(cwd, config.path);
+            await fse.ensureDir(dirname(targetPath));
+            const content = config.header + rulesContent;
+            await fse.writeFile(targetPath, content);
+        }
+        spinner.succeed(`Regras geradas para: ${targetIdes.join(', ')}`);
 
         // Resumo
         console.log(chalk.green.bold('\n✅ Maestro inicializado com sucesso!\n'));
@@ -100,7 +140,9 @@ export async function init(options: InitOptions = {}) {
         console.log(chalk.dim('  .agent/'));
         console.log(chalk.dim('    ├── skills/'));
         console.log(chalk.dim('    └── workflows/'));
-        console.log(chalk.dim('  GEMINI.md'));
+        for (const ide of targetIdes) {
+            console.log(chalk.dim(`  ${IDE_CONFIGS[ide].path}`));
+        }
 
         console.log(chalk.blue('\n📋 Próximos passos:'));
         console.log('  1. Configure o MCP na sua IDE:');
@@ -115,16 +157,10 @@ export async function init(options: InitOptions = {}) {
     }
 }
 
-function generateGeminiMd(): string {
-    return `---
-trigger: always_on
-system: maestro
-version: 1.0.0
----
+function generateDefaultRules(): string {
+    return `# MCP Maestro Development Kit - AI Rules
 
-# Maestro - Desenvolvimento Assistido por IA
-
-> Este projeto utiliza o sistema Maestro para desenvolvimento estruturado.
+> Este arquivo define como a IA deve se comportar ao trabalhar com o sistema MCP Maestro.
 
 ## Configuração MCP
 

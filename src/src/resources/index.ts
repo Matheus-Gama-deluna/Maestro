@@ -24,6 +24,19 @@ import {
 async function gerarSystemPrompt(): Promise<string> {
     return `# Maestro - Instruções OBRIGATÓRIAS para IA
 
+## 📦 PRÉ-REQUISITO: Configuração Local
+
+Antes de usar qualquer tool do Maestro, verifique se o projeto foi configurado:
+
+\`\`\`bash
+npx @maestro-ai/cli
+\`\`\`
+
+Este comando injeta especialistas, templates e prompts localmente no projeto.
+**Se a pasta \`.maestro/content/\` não existir, ORIENTE O USUÁRIO a executar o npx acima.**
+
+---
+
 ## 🚫 REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA)
 
 1. **NUNCA chame \`aprovar_gate\`** - Esta tool é EXCLUSIVA do usuário humano

@@ -5,6 +5,7 @@ import { descreverNivel } from "../flows/classifier.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { gerarInstrucaoRecursosCompacta } from "../utils/instructions.js";
 import { gerarSecaoPrompts } from "../utils/prompt-mapper.js";
+import { temContentLocal } from "../utils/files.js";
 
 interface StatusArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -63,6 +64,21 @@ status(
 
     setCurrentDirectory(args.diretorio);
 
+    // Verifica se CLI foi executada (content local existe)
+    const contentLocalExiste = temContentLocal(args.diretorio);
+    const avisoContentLocal = !contentLocalExiste ? `
+> ⚠️ **ATENÇÃO**: Content local não encontrado!
+>
+> Execute no terminal:
+> \`\`\`bash
+> npx @maestro-ai/cli
+> \`\`\`
+> Isso irá injetar especialistas, templates e prompts no projeto.
+
+---
+
+` : "";
+
     const fluxo = getFluxo(estado.nivel);
     const faseAtual = getFase(estado.nivel, estado.fase_atual);
 
@@ -79,7 +95,7 @@ status(
         .map(f => `⬜ Fase ${f.numero}: ${f.nome}`);
 
     const resposta = `# 📊 Status do Projeto
-
+${avisoContentLocal}
 ## Informações Gerais
 
 | Campo | Valor |
