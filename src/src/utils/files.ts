@@ -249,6 +249,10 @@ export async function lerExemplo(nome: string, diretorio?: string): Promise<stri
 /**
  * Lista exemplos disponíveis
  */
+export async function listarExemplos(diretorio?: string): Promise<string[]> {
+    const files = await listarArquivos("examples", diretorio);
+    return files.map(f => f.replace(".md", ""));
+}
 
 /**
  * Normaliza o caminho do projeto, removendo prefixos de container (ex: /app/c:)
