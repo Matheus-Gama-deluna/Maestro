@@ -5,6 +5,8 @@ import { criarEstadoInicial, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { criarResumoInicial, serializarResumo } from "../state/memory.js";
 import { determinarTierGate, descreverTier } from "../gates/tiers.js";
+import { logEvent, EventTypes } from "../utils/history.js";
+import { gerarSystemMd } from "../utils/system-md.js";
 
 interface IniciarProjetoArgs {
     nome: string;
@@ -145,6 +147,30 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
     const estadoFile = serializarEstado(estado);
     const resumoFiles = serializarResumo(resumo);
+
+    // Logar evento de projeto confirmado
+    try {
+        await logEvent(diretorio, {
+            type: EventTypes.PROJECT_CONFIRMED,
+            fase: 1,
+            data: {
+                projetoId,
+                nome: args.nome,
+                tipo: args.tipo_artefato,
+                nivel: args.nivel_complexidade,
+                tier
+            }
+        });
+
+        // Gerar SYSTEM.md inicial
+        await gerarSystemMd(diretorio, estado, 'Produto', 'Gestão de Produto', [
+            'Definir visão do produto',
+            'Identificar personas',
+            'Criar PRD com problema e MVP'
+        ]);
+    } catch (error) {
+        console.warn('Aviso: Não foi possível criar histórico/SYSTEM.md:', error);
+    }
 
     const resposta = `# 🚀 Projeto Iniciado: ${args.nome}
 

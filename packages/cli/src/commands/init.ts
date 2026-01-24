@@ -25,8 +25,6 @@ export async function init(options: InitOptions = {}) {
     }
 
     // Paths do content embarcado no pacote
-    // __dirname quando compilado: dist/commands/
-    // Precisamos subir para: packages/cli/content/
     const packageRoot = join(__dirname, '..', '..');
     const contentSource = join(packageRoot, 'content');
 
@@ -34,6 +32,7 @@ export async function init(options: InitOptions = {}) {
         // 1. Criar estrutura .maestro
         spinner.start('Criando estrutura .maestro/');
         await fse.ensureDir(join(cwd, '.maestro'));
+        await fse.ensureDir(join(cwd, '.maestro', 'history'));
         await fse.writeJSON(join(cwd, '.maestro', 'config.json'), {
             version: '1.0.0',
             initialized: new Date().toISOString(),
@@ -41,34 +40,45 @@ export async function init(options: InitOptions = {}) {
         }, { spaces: 2 });
         spinner.succeed('Estrutura .maestro/ criada');
 
-        // 2. Copiar content (se não minimal)
+        // 2. Copiar content para .maestro/content/ (se não minimal)
         if (!options.minimal) {
-            spinner.start('Copiando especialistas e templates...');
+            spinner.start('Copiando especialistas e templates para .maestro/content/...');
 
-            const contentDirs = ['specialists', 'templates', 'guides', 'prompts', 'skills'];
+            // Content vai para .maestro/content/
+            const contentDirs = ['specialists', 'templates', 'guides', 'prompts'];
 
             for (const dir of contentDirs) {
                 const src = join(contentSource, dir);
-                const dest = join(cwd, 'content', dir);
+                const dest = join(cwd, '.maestro', 'content', dir);
 
                 if (await fse.pathExists(src)) {
                     await fse.copy(src, dest, { overwrite: options.force });
                 }
             }
-            spinner.succeed('Content copiado');
+            spinner.succeed('Content copiado para .maestro/content/');
         }
 
-        // 3. Copiar workflows
-        spinner.start('Copiando workflows...');
+        // 3. Copiar skills para .agent/skills/
+        spinner.start('Copiando skills para .agent/skills/...');
+        const skillsSrc = join(contentSource, 'skills');
+        const skillsDest = join(cwd, '.agent', 'skills');
+
+        if (await fse.pathExists(skillsSrc)) {
+            await fse.copy(skillsSrc, skillsDest, { overwrite: options.force });
+        }
+        spinner.succeed('Skills copiados para .agent/skills/');
+
+        // 4. Copiar workflows para .agent/workflows/
+        spinner.start('Copiando workflows para .agent/workflows/...');
         const workflowsSrc = join(contentSource, 'workflows');
         const workflowsDest = join(cwd, '.agent', 'workflows');
 
         if (await fse.pathExists(workflowsSrc)) {
             await fse.copy(workflowsSrc, workflowsDest, { overwrite: options.force });
         }
-        spinner.succeed('Workflows copiados');
+        spinner.succeed('Workflows copiados para .agent/workflows/');
 
-        // 4. Gerar GEMINI.md
+        // 5. Gerar GEMINI.md
         spinner.start('Gerando GEMINI.md...');
         const geminiContent = generateGeminiMd();
         await fse.writeFile(join(cwd, 'GEMINI.md'), geminiContent);
@@ -76,12 +86,20 @@ export async function init(options: InitOptions = {}) {
 
         // Resumo
         console.log(chalk.green.bold('\n✅ Maestro inicializado com sucesso!\n'));
-        console.log(chalk.dim('Arquivos criados:'));
-        console.log(chalk.dim('  .maestro/config.json'));
+        console.log(chalk.dim('Estrutura criada:'));
+        console.log(chalk.dim('  .maestro/'));
+        console.log(chalk.dim('    ├── config.json'));
+        console.log(chalk.dim('    ├── history/'));
         if (!options.minimal) {
-            console.log(chalk.dim('  content/'));
+            console.log(chalk.dim('    └── content/'));
+            console.log(chalk.dim('        ├── specialists/'));
+            console.log(chalk.dim('        ├── templates/'));
+            console.log(chalk.dim('        ├── guides/'));
+            console.log(chalk.dim('        └── prompts/'));
         }
-        console.log(chalk.dim('  .agent/workflows/'));
+        console.log(chalk.dim('  .agent/'));
+        console.log(chalk.dim('    ├── skills/'));
+        console.log(chalk.dim('    └── workflows/'));
         console.log(chalk.dim('  GEMINI.md'));
 
         console.log(chalk.blue('\n📋 Próximos passos:'));
@@ -126,12 +144,15 @@ version: 1.0.0
 2. **Avançar fases**: Use \`proximo\` para salvar e avançar
 3. **Ver status**: Use \`status\` para ver onde está
 
-## Resources Locais
+## Estrutura Local
 
-Os especialistas, templates e workflows estão em:
-- \`content/specialists/\` - Personas de IA por fase
-- \`content/templates/\` - Templates de documentos
-- \`.agent/workflows/\` - Workflows automatizados
+| Pasta | Conteúdo |
+|-------|----------|
+| \`.maestro/estado.json\` | Estado do projeto (fonte da verdade) |
+| \`.maestro/SYSTEM.md\` | Contexto atual para IA |
+| \`.maestro/content/\` | Especialistas, templates, prompts |
+| \`.agent/skills/\` | Skills disponíveis |
+| \`.agent/workflows/\` | Workflows automatizados |
 
 ## Estado do Projeto
 

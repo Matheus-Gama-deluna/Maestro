@@ -9,6 +9,8 @@ import { setCurrentDirectory } from "../state/context.js";
 import { parsearResumo, serializarResumo, criarResumoInicial, extrairResumoEntregavel } from "../state/memory.js";
 import { gerarInstrucaoProximaFase } from "../utils/instructions.js";
 import type { EntregavelResumo, ProjectSummary } from "../types/memory.js";
+import { logEvent, EventTypes } from "../utils/history.js";
+import { gerarSystemMd } from "../utils/system-md.js";
 
 interface ProximoArgs {
     entregavel: string;
@@ -414,6 +416,32 @@ ${classificacao.criterios.map(c => `- ${c}`).join("\n")}
         path: `${diretorio}/${f.path}`,
         content: f.content
     })));
+
+    // Logar transição de fase e atualizar SYSTEM.md
+    try {
+        await logEvent(diretorio, {
+            type: EventTypes.PHASE_TRANSITION,
+            fase: estado.fase_atual,
+            data: {
+                de: faseAnterior,
+                para: estado.fase_atual,
+                entregavel: caminhoArquivo,
+                score: qualityScore
+            }
+        });
+
+        if (proximaFase) {
+            await gerarSystemMd(
+                diretorio, 
+                estado, 
+                proximaFase.nome, 
+                proximaFase.especialista, 
+                proximaFase.gate_checklist
+            );
+        }
+    } catch (error) {
+        console.warn('Aviso: Não foi possível atualizar histórico/SYSTEM.md:', error);
+    }
 
     // Se estiver na Fase 1 (PRD) e ainda não confirmou classificação -> INTERROMPER
     if (estado.fase_atual === 1 && !estado.classificacao_pos_prd_confirmada) {
