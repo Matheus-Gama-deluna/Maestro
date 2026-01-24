@@ -1,4 +1,4 @@
-import { join } from "path";
+import { join, resolve } from "path";
 import { existsSync } from "fs";
 import type { ToolResult } from "../types/index.js";
 import { parsearEstado } from "../state/storage.js";
@@ -90,10 +90,11 @@ ${args.estado_json.slice(0, 200)}...
     }
 
     // Define o diretório global
-    setCurrentDirectory(args.diretorio);
+    const diretorio = resolve(args.diretorio);
+    setCurrentDirectory(diretorio);
 
     // Verificar se o CLI foi executado
-    const configPath = join(args.diretorio, '.maestro', 'config.json');
+    const configPath = join(diretorio, '.maestro', 'config.json');
     if (!existsSync(configPath)) {
         return {
             content: [{ 
@@ -105,7 +106,7 @@ O Maestro CLI precisa ser executado primeiro para configurar o projeto.
 ## 📦 Execute o comando:
 
 \`\`\`bash
-cd ${args.diretorio}
+cd ${diretorio}
 npx @maestro-ai/cli
 \`\`\`
 

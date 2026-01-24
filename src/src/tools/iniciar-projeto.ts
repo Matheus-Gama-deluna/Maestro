@@ -1,4 +1,4 @@
-import { join } from "path";
+import { join, resolve } from "path";
 import { existsSync } from "fs";
 import { v4 as uuid } from "uuid";
 import type { ToolResult, TipoArtefato, NivelComplexidade, TierGate } from "../types/index.js";
@@ -73,9 +73,27 @@ export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResu
         };
     }
 
+    // Normalizar diretório
+    const diretorio = resolve(args.diretorio);
+
     // Verificar se o CLI foi executado
-    const configPath = join(args.diretorio, '.maestro', 'config.json');
+    const configPath = join(diretorio, '.maestro', 'config.json');
+    
     if (!existsSync(configPath)) {
+        // Tentar listar o diretório para debug (se existir)
+        try {
+            if (require('fs').existsSync(diretorio)) {
+                console.log('[DEBUG] Conteúdo do diretório:', require('fs').readdirSync(diretorio));
+                if (require('fs').existsSync(join(diretorio, '.maestro'))) {
+                    console.log('[DEBUG] Conteúdo de .maestro:', require('fs').readdirSync(join(diretorio, '.maestro')));
+                }
+            } else {
+                console.log('[DEBUG] Diretório raiz não existe');
+            }
+        } catch (e) {
+            console.log('[DEBUG] Erro ao listar diretório:', e);
+        }
+
         return {
             content: [{ 
                 type: "text", 
@@ -86,9 +104,12 @@ O Maestro CLI precisa ser executado primeiro para configurar o projeto.
 ## 📦 Execute o comando:
 
 \`\`\`bash
-cd ${args.diretorio}
+cd ${diretorio}
 npx @maestro-ai/cli
 \`\`\`
+
+## Caminho verificado:
+\`${configPath}\`
 
 ## O que o CLI faz:
 - Cria a estrutura \`.maestro/\` com config.json
@@ -100,7 +121,7 @@ npx @maestro-ai/cli
 
 **Após executar o CLI, tente novamente:**
 \`\`\`
-iniciar_projeto(nome: "${args.nome}", diretorio: "${args.diretorio}")
+iniciar_projeto(nome: "${args.nome}", diretorio: "${diretorio.replace(/\\/g, '/')}")
 \`\`\`
 `
             }],
@@ -163,7 +184,7 @@ confirmar_projeto(
  * Cria efetivamente os arquivos do projeto com os tipos confirmados
  */
 export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<ToolResult> {
-    const diretorio = args.diretorio;
+    const diretorio = resolve(args.diretorio);
     setCurrentDirectory(diretorio);
 
     // Verificar se o CLI foi executado

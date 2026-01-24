@@ -1,4 +1,4 @@
-import { join } from "path";
+import { join, resolve } from "path";
 import { existsSync } from "fs";
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
@@ -97,7 +97,7 @@ proximo(
         };
     }
 
-    const diretorio = args.diretorio;
+    const diretorio = resolve(args.diretorio);
     setCurrentDirectory(diretorio);
 
     // Verificar se o CLI foi executado
