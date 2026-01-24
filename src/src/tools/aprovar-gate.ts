@@ -2,7 +2,7 @@ import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { logEvent, EventTypes } from "../utils/history.js";
-import { normalizeProjectPath } from "../utils/files.js";
+import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
 import { resolve } from "path";
 
 interface AprovarGateArgs {
@@ -56,7 +56,7 @@ aprovar_gate(
         };
     }
 
-    const diretorio = resolve(normalizeProjectPath(args.diretorio));
+    const diretorio = resolveProjectPath(args.diretorio);
 
     if (!args.acao || !["aprovar", "rejeitar"].includes(args.acao)) {
         return {

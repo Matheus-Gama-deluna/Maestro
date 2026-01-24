@@ -2,7 +2,7 @@ import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado } from "../state/storage.js";
 import { getFase } from "../flows/types.js";
 import { validarGate as validarGateCore, formatarResultadoGate } from "../gates/validator.js";
-import { normalizeProjectPath } from "../utils/files.js";
+import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { resolve } from "path";
 
@@ -64,7 +64,7 @@ validar_gate(
         };
     }
 
-    const diretorio = resolve(normalizeProjectPath(args.diretorio));
+    const diretorio = resolveProjectPath(args.diretorio);
     setCurrentDirectory(diretorio);
 
     const numeroFase = args.fase || estado.fase_atual;

@@ -13,7 +13,7 @@ import type { EntregavelResumo, ProjectSummary } from "../types/memory.js";
 import { logEvent, EventTypes } from "../utils/history.js";
 import { gerarSystemMd } from "../utils/system-md.js";
 import { gerarSecaoPrompts } from "../utils/prompt-mapper.js";
-import { normalizeProjectPath } from "../utils/files.js";
+import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
 
 interface ProximoArgs {
     entregavel: string;
@@ -98,7 +98,7 @@ proximo(
         };
     }
 
-    const diretorio = resolve(normalizeProjectPath(args.diretorio));
+    const diretorio = resolveProjectPath(args.diretorio);
     setCurrentDirectory(diretorio);
 
     // Verificar se o CLI foi executado

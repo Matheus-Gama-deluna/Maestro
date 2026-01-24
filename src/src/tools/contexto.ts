@@ -4,7 +4,7 @@ import { parsearEstado } from "../state/storage.js";
 import { getFase, getFluxo } from "../flows/types.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { gerarInstrucaoRecursosCompacta } from "../utils/instructions.js";
-import { normalizeProjectPath } from "../utils/files.js";
+import { normalizeProjectPath, resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { resolve } from "path";
 
 interface ContextoArgs {
