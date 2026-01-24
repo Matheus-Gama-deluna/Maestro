@@ -1,5 +1,5 @@
 import { readFile, readdir, stat } from "fs/promises";
-import { join, dirname } from "path";
+import { join, dirname, resolve, win32 } from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
 
@@ -276,3 +276,21 @@ export function normalizeProjectPath(path: string): string {
     return path;
 }
 
+
+/**
+ * Resolve o caminho do projeto lidando com ambientes mistos (Docker Linux -> Windows Host)
+ */
+export function resolveProjectPath(path: string): string {
+    const normalized = normalizeProjectPath(path);
+    
+    // Se parece um caminho Windows (tem drive letter), força resolução win32
+    // Isso evita que o container Linux trate 'c:' como uma pasta relativa
+    if (normalized.match(/^[a-zA-Z]:/)) {
+        // Normaliza barras para evitar confusão no win32.resolve
+        const safePath = normalized.replace(/\//g, '\\');
+        return win32.resolve(safePath);
+    }
+
+    // Caso contrário, usa resolve padrão do sistema
+    return resolve(normalized);
+}

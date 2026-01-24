@@ -9,7 +9,7 @@ import { determinarTierGate, descreverTier } from "../gates/tiers.js";
 import { logEvent, EventTypes } from "../utils/history.js";
 import { gerarSystemMd } from "../utils/system-md.js";
 import { detectarStack, gerarSecaoPrompts, gerarSecaoExemplo } from "../utils/prompt-mapper.js";
-import { normalizeProjectPath } from "../utils/files.js";
+import { resolveProjectPath } from "../utils/files.js";
 
 interface IniciarProjetoArgs {
     nome: string;
@@ -74,8 +74,8 @@ export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResu
         };
     }
 
-    // Normalizar diretório
-    const diretorio = resolve(normalizeProjectPath(args.diretorio));
+    // Normalizar e resolver diretório
+    const diretorio = resolveProjectPath(args.diretorio);
 
     // Verificar se o CLI foi executado
     const configPath = join(diretorio, '.maestro', 'config.json');
@@ -118,11 +118,20 @@ npx @maestro-ai/cli
 - Configura skills e workflows
 - Gera arquivos de regras para sua IDE
 
+## 🐛 Debug Info (Path Resolution)
+- **OS Platform**: ${require('os').platform()}
+- **Process CWD**: ${process.cwd()}
+- **Raw Args Directory**: ${args.diretorio}
+- **Resolved Directory**: ${diretorio}
+- **Config Path Checked**: ${configPath}
+- **FS Exists (Resolved)**: ${require('fs').existsSync(diretorio)}
+- **FS Exists (Config)**: ${require('fs').existsSync(configPath)}
+
 ---
 
 **Após executar o CLI, tente novamente:**
 \`\`\`
-iniciar_projeto(nome: "${args.nome}", diretorio: "${diretorio.replace(/\\/g, '/')}")
+iniciar_projeto(nome: "${args.nome}", diretorio: "${args.diretorio}")
 \`\`\`
 `
             }],
@@ -185,7 +194,7 @@ confirmar_projeto(
  * Cria efetivamente os arquivos do projeto com os tipos confirmados
  */
 export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<ToolResult> {
-    const diretorio = resolve(normalizeProjectPath(args.diretorio));
+    const diretorio = resolveProjectPath(args.diretorio);
     setCurrentDirectory(diretorio);
 
     // Verificar se o CLI foi executado
