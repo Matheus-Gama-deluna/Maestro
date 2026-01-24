@@ -1,4 +1,5 @@
 import { join } from "path";
+import { existsSync } from "fs";
 import { v4 as uuid } from "uuid";
 import type { ToolResult, TipoArtefato, NivelComplexidade, TierGate } from "../types/index.js";
 import { criarEstadoInicial, serializarEstado } from "../state/storage.js";
@@ -72,6 +73,41 @@ export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResu
         };
     }
 
+    // Verificar se o CLI foi executado
+    const configPath = join(args.diretorio, '.maestro', 'config.json');
+    if (!existsSync(configPath)) {
+        return {
+            content: [{ 
+                type: "text", 
+                text: `# ⚠️ Pré-requisito: CLI não inicializado
+
+O Maestro CLI precisa ser executado primeiro para configurar o projeto.
+
+## 📦 Execute o comando:
+
+\`\`\`bash
+cd ${args.diretorio}
+npx @maestro-ai/cli
+\`\`\`
+
+## O que o CLI faz:
+- Cria a estrutura \`.maestro/\` com config.json
+- Injeta especialistas, templates e prompts locais
+- Configura skills e workflows
+- Gera arquivos de regras para sua IDE
+
+---
+
+**Após executar o CLI, tente novamente:**
+\`\`\`
+iniciar_projeto(nome: "${args.nome}", diretorio: "${args.diretorio}")
+\`\`\`
+`
+            }],
+            isError: true,
+        };
+    }
+
     // Inferir Classificação
     const inferenciaTipo = inferirTipoArtefato(args.nome, args.descricao);
     const inferenciaNivel = inferirComplexidade(inferenciaTipo.tipo, args.descricao);
@@ -129,6 +165,41 @@ confirmar_projeto(
 export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<ToolResult> {
     const diretorio = args.diretorio;
     setCurrentDirectory(diretorio);
+
+    // Verificar se o CLI foi executado
+    const configPath = join(diretorio, '.maestro', 'config.json');
+    if (!existsSync(configPath)) {
+        return {
+            content: [{ 
+                type: "text", 
+                text: `# ⚠️ Pré-requisito: CLI não inicializado
+
+O Maestro CLI precisa ser executado primeiro para configurar o projeto.
+
+## 📦 Execute o comando:
+
+\`\`\`bash
+cd ${diretorio}
+npx @maestro-ai/cli
+\`\`\`
+
+---
+
+**Após executar o CLI, tente novamente:**
+\`\`\`
+confirmar_projeto(
+    nome: "${args.nome}",
+    descricao: "${args.descricao || ''}",
+    diretorio: "${diretorio}",
+    tipo_artefato: "${args.tipo_artefato}",
+    nivel_complexidade: "${args.nivel_complexidade}"
+)
+\`\`\`
+`
+            }],
+            isError: true,
+        };
+    }
 
     // Recalcula tier baseado no confirmado
     const tier = determinarTierGate(args.tipo_artefato, args.nivel_complexidade);

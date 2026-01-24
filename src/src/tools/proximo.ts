@@ -1,4 +1,5 @@
 import { join } from "path";
+import { existsSync } from "fs";
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { getFase, getFluxo, getFaseComStitch, getFluxoComStitch } from "../flows/types.js";
@@ -98,6 +99,35 @@ proximo(
 
     const diretorio = args.diretorio;
     setCurrentDirectory(diretorio);
+
+    // Verificar se o CLI foi executado
+    const configPath = join(diretorio, '.maestro', 'config.json');
+    if (!existsSync(configPath)) {
+        return {
+            content: [{ 
+                type: "text", 
+                text: `# ⚠️ Pré-requisito: CLI não inicializado
+
+O Maestro CLI precisa ser executado primeiro para configurar o projeto.
+
+## 📦 Execute o comando:
+
+\`\`\`bash
+cd ${diretorio}
+npx @maestro-ai/cli
+\`\`\`
+
+---
+
+**Após executar o CLI, tente novamente:**
+\`\`\`
+proximo(...)
+\`\`\`
+`
+            }],
+            isError: true,
+        };
+    }
 
     // Obter fase atual para mensagens de erro
     const faseAtualInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);

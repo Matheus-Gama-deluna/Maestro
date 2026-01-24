@@ -1,5 +1,7 @@
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado } from "../state/storage.js";
+import { existsSync } from "fs";
+import { join } from "path";
 import { getFase, getFluxo } from "../flows/types.js";
 import { descreverNivel } from "../flows/classifier.js";
 import { setCurrentDirectory } from "../state/context.js";
@@ -65,19 +67,34 @@ status(
     setCurrentDirectory(args.diretorio);
 
     // Verifica se CLI foi executada (content local existe)
-    const contentLocalExiste = temContentLocal(args.diretorio);
-    const avisoContentLocal = !contentLocalExiste ? `
-> ⚠️ **ATENÇÃO**: Content local não encontrado!
->
-> Execute no terminal:
-> \`\`\`bash
-> npx @maestro-ai/cli
-> \`\`\`
-> Isso irá injetar especialistas, templates e prompts no projeto.
+    // Verifica se CLI foi executada (config.json existe)
+    const configPath = join(args.diretorio, '.maestro', 'config.json');
+    if (!existsSync(configPath)) {
+        return {
+            content: [{ 
+                type: "text", 
+                text: `# ⚠️ Pré-requisito: CLI não inicializado
 
----
+O Maestro CLI precisa ser executado primeiro para configurar o projeto.
 
-` : "";
+## 📦 Execute o comando:
+
+\`\`\`bash
+cd ${args.diretorio}
+npx @maestro-ai/cli
+\`\`\`
+
+## O que o CLI faz:
+- Cria a estrutura \`.maestro/\` com config.json
+- Injeta especialistas, templates e prompts locais
+- Configura skills e workflows
+- Gera arquivos de regras para sua IDE
+`
+            }],
+            isError: true,
+        };
+    }
+    const avisoContentLocal = "";
 
     const fluxo = getFluxo(estado.nivel);
     const faseAtual = getFase(estado.nivel, estado.fase_atual);

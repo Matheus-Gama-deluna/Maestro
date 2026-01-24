@@ -1,4 +1,5 @@
 import { join } from "path";
+import { existsSync } from "fs";
 import type { ToolResult } from "../types/index.js";
 import { parsearEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
@@ -90,6 +91,35 @@ ${args.estado_json.slice(0, 200)}...
 
     // Define o diretório global
     setCurrentDirectory(args.diretorio);
+
+    // Verificar se o CLI foi executado
+    const configPath = join(args.diretorio, '.maestro', 'config.json');
+    if (!existsSync(configPath)) {
+        return {
+            content: [{ 
+                type: "text", 
+                text: `# ⚠️ Pré-requisito: CLI não inicializado
+
+O Maestro CLI precisa ser executado primeiro para configurar o projeto.
+
+## 📦 Execute o comando:
+
+\`\`\`bash
+cd ${args.diretorio}
+npx @maestro-ai/cli
+\`\`\`
+
+---
+
+**Após executar o CLI, tente novamente:**
+\`\`\`
+carregar_projeto(...)
+\`\`\`
+`
+            }],
+            isError: true,
+        };
+    }
 
     // Carregar info da fase atual
     const faseAtual = getFase(estado.nivel, estado.fase_atual);
