@@ -21,7 +21,7 @@ Antes de qualquer decisão:
 1. **Ler estado** em `.maestro/estado.json` (se não existir, classificar como `novo_projeto`).
 2. **Validar consistência** comparando `estado.fases` com o fluxo MCP adequado.
 3. **Classificar estado** usando a função mental abaixo.
-4. **Mapear ação** (`/iniciar-projeto`, `/continuar-fase`, `/avancar-fase`).
+4. **Mapear ação** (`/01-iniciar-projeto`, `/03-continuar-fase`, `/02-avancar-fase`).
 5. **Responder** com resumo e próxima ação sugerida.
 
 ```javascript
@@ -31,14 +31,14 @@ const fluxo = estado?.projeto
   : null;
 
 if (!estado || !estado.projeto?.nome) {
-  return { status: 'novo_projeto', proximaAcao: '/iniciar-projeto' };
+  return { status: 'novo_projeto', proximaAcao: '/01-iniciar-projeto' };
 }
 
 const faseAtual = estado.fases[estado.faseAtual];
 if (!faseAtual || faseAtual.status !== 'concluida') {
   return {
     status: 'fase_incompleta',
-    proximaAcao: '/continuar-fase',
+    proximaAcao: '/03-continuar-fase',
     fase: estado.faseAtual,
     arquivoFoco: faseAtual?.artefatos?.slice(-1)[0] || fluxo?.fases?.find(f => f.numero === estado.faseAtual)?.entregavel_esperado,
     divergenciasFluxo: compararComFluxo(estado.fases, fluxo?.fases)
@@ -47,7 +47,7 @@ if (!faseAtual || faseAtual.status !== 'concluida') {
 
 return {
   status: 'pronto_para_avancar',
-  proximaAcao: '/avancar-fase',
+  proximaAcao: '/02-avancar-fase',
   fase: estado.faseAtual,
   proximaFase: estado.faseAtual + 1,
   divergenciasFluxo: compararComFluxo(estado.fases, fluxo?.fases)
@@ -59,8 +59,9 @@ return {
 ```
 📋 **Status Detectado:** {status}
 - Projeto: {estado.projeto.nome}
-- Fase atual: {estado.faseAtual}/{totalFases} - {faseAtual.nome}
-- Especialista: {faseAtual.especialista}
+- Fase atual: {estado.faseAtual}/{totalFases} - {faseAtual.nome} (Status: {faseAtual.status})
+- Tier: {estado.projeto.tier} | Nível: {estado.projeto.nivel}
+- Última atualização: {estado.updated_at}
 - Arquivo foco: {arquivoFoco}
 
 🎯 **Próxima ação sugerida:** {proximaAcao}

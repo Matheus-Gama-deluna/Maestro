@@ -1,97 +1,56 @@
-# 🛡️ Regras de Validação por Fase
+# 📏 Regras de Classificação e Score
 
-## Fase 1 - Produto
-- Problema central definido
-- Público-alvo/personas
-- MVP listado e priorizado
-- Métricas de sucesso (North Star + KPIs)
-- Score mínimo: **75/100**
+> Definição dos critérios de aprovação baseados na complexidade do projeto.
 
-## Fase 2 - Requisitos
-- Cobertura 100% do MVP
-- Requisitos funcionais em formato testável
-- Requisitos não funcionais (performance, segurança)
-- Critérios de aceite (Given-When-Then)
-- Score mínimo: **70/100**
+## Tiers de Projeto (Nível de Rigor)
 
-## Fase 3 - UX Design
-- Wireframes para todas as telas principais
-- Jornadas/fluxos de usuário descritos
-- Navegação coerente
-- Consistência visual e de componentes
-- Score mínimo: **70/100**
+Consulte `.maestro/estado.json` para saber o nível do seu projeto.
 
-## Fase 4 - Prototipagem / Stitch (quando aplicável)
-- Protótipo navegável validado com stakeholders
-- Feedback registrado e aplicado
-- Export pronto para handoff ou Stitch output salvo
-- Score mínimo: **75/100**
+### 🥉 Tier Essencial (POC, Script)
+*   **Foco**: Funciona?
+*   **Critérios de Check**:
+    1.  Código executa sem erro fatal?
+    2.  Objetivo principal foi atingido?
+    3.  Existe um README.md básico?
 
-## Fase 5 - Arquitetura
-- Stack definida
-- Diagrama C4 nível 2 ou 3
-- ADRs para decisões críticas
-- Requisitos não funcionais endereçados
-- Score mínimo: **80/100**
+### 🥈 Tier Base (Produto Interno, MVP)
+*   **Foco**: Qualidade Mínima
+*   **Critérios de Check (acumulativo)**:
+    1.  Critérios do Tier Essencial ✅
+    2.  Testes unitários existem (mesmo que poucos)?
+    3.  Não há erros visíveis de Lint/Typescript?
+    4.  Documentação técnica existe (`docs/`)?
+    5.  Validação de dados (ex: Zod) implementada?
 
-## Fase 6 - Modelo de Domínio
-- Entidades e relacionamentos definidos
-- Regras de negócio documentadas
-- Eventos e agregados identificados (quando necessário)
-- Score mínimo: **75/100**
+### 🥇 Tier Avançado (SaaS, Fintech, Alta Escala)
+*   **Foco**: Robustez e Segurança
+*   **Critérios de Check (acumulativo)**:
+    1.  Critérios do Tier Base ✅
+    2.  Segurança: Tratamento de erros e dados sensíveis?
+    3.  Observabilidade: Logs estruturados previstos?
+    4.  Testes de Integração/E2E previstos?
+    5.  Arquitetura desacoplada (SOLID/Clean Arch)?
 
-## Fase 7 - Banco de Dados
-- Modelo relacional ou NoSQL definido
-- Índices/partições planejados
-- Estratégia de migração descrita
-- Score mínimo: **75/100**
+---
 
-## Fase 8 - Segurança
-- OWASP Top 10 avaliado
-- Autenticação/autorização descritas
-- Dados sensíveis mapeados e protegidos
-- Score mínimo: **80/100**
+## 🧮 Como Calcular o Score (Manual)
 
-## Fase 9 - Testes
-- Estratégia (pirâmide) definida
-- Casos de teste críticos descritos
-- Ferramentas e ambientes definidos
-- Score mínimo: **75/100**
+Ao realizar o checklist do Tier correspondente:
 
-## Fase 10 - Backlog
-- Épicos e features priorizados
-- Histórias com critérios de aceite claros
-- Dependências mapeadas
-- Score mínimo: **75/100**
+1.  Conte o número total de perguntas do checklist (ex: 5 critérios).
+2.  Conte quantas foram respondidas com "SIM" (ex: 4).
+3.  Aplique a fórmula:
+    ```
+    Score = (Itens OK / Total) * 100
+    ```
+    *Exemplo: (4 / 5) * 100 = 80*
 
-## Fase 11 - Contrato de API
-- Esquema OpenAPI completo
-- Versionamento/documentação definidas
-- Mocks ou client SDK disponíveis
-- Score mínimo: **80/100**
+## 🚦 Tabela de Decisão
 
-## Fase 12 - Frontend
-- Componentes implementados conforme design
-- Testes de componente ou integração passando
-- Responsividade e acessibilidade verificadas
-- Score mínimo: **80/100**
+| Score Calculado | Ação Recomendada | Comando |
+| :--- | :--- | :--- |
+| **100** | Aprovado | ✅ Pode executar `/02-avancar-fase` |
+| **70 a 99** | Aprovado com Ressalvas | ⚠️ Pode avançar, mas liste as pendências |
+| **0 a 69** | **BLOQUEADO** | 🛑 NÃO avance. Solicite correções. |
 
-## Fase 13 - Backend
-- Endpoints implementados conforme contrato
-- Testes unitários e de integração passando
-- Migrações e jobs documentados
-- Score mínimo: **80/100**
-
-## Fase 14 - Performance / Observabilidade (fluxo complexo)
-- Métricas e alertas configurados
-- Estratégia de cache/performance definida
-- Testes de carga planejados
-- Score mínimo: **80/100**
-
-## Fase 15 - Integração / Deploy
-- Pipeline CI/CD verde
-- Testes E2E executados
-- Plano de rollback/documentação de release
-- Score mínimo: **85/100**
-
-> Use essas regras para preencher `fase.validacoes` e justificar o `score` atribuído no estado.
+> **Nota**: Se houver um bloqueio (Score < 70) mas o usuário EXIGIR avançar, trate como "Aprovação Manual" e peça uma justificativa.

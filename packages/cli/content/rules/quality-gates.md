@@ -1,43 +1,55 @@
-# 🔐 Quality Gates por Transição
+# 🔐 Quality Gates e Estruturas
 
-| De → Para | Checklist Obrigatória | Validadores sugeridos |
-|-----------|----------------------|------------------------|
-| Produto → Requisitos | MVP 100% coberto nos requisitos; personas refletidas | `validarCoberturaMVP(PRD, requisitos)` |
-| Requisitos → UX Design | Fluxos/jornadas definidos; critérios de aceite aprovados | `analisarFluxosUsuarios(requisitos)` |
-| UX Design → Prototipagem (Stitch) | Wireframes completos; estilo aprovado | `validarWireframes(designDoc)` |
-| Prototipagem → Arquitetura | Feedback aplicado; requisitos atualizados | `verificarConsistencia(designDoc, requisitos)` |
-| Arquitetura → Modelo de Domínio | Stack confirmada; contexto alinhado | `compararModelagem(arquitetura, modeloDominio)` |
-| Modelo de Domínio → Banco de Dados | Entidades → tabelas; regras documentadas | `validarModeloDominio(modeloDominio, designBanco)` |
-| Banco → Segurança | Dados sensíveis catalogados; políticas definidas | `analisarSensibilidade(designBanco)` |
-| Segurança → Testes | Controles críticos definidos; riscos registrados | `validarChecklistSeguranca(checklist)` |
-| Testes → Backlog | Estratégia de testes aprovada; cobertura planejada | `verificarPlanoTestes(plano)` |
-| Backlog → Contrato API | Stories/radar de integrações aprovados | `compararBacklogContrato(backlog, openapi)` |
-| Contrato API → Frontend | OpenAPI completo; mocks disponíveis | `validarContrato(openapi)` |
-| Frontend → Backend | Componentes integrados a mocks; testes passando | `executarSuite('frontend-tests')` |
-| Backend → Integração/Deploy | Testes unitários/integração/contrato passando | `executarSuite('backend-tests')` |
-| Integração → Observabilidade (fluxo complexo) | Pipelines verdes; monitoração básica configurada | `validarPipeline(ciCdConfig)` |
-| Observabilidade → Performance | Dashboards + alertas definidos | `validarObservabilidade(config)` |
-| Performance → Deploy Final | Testes de carga concluídos; tuning aplicado | `executarLoadTest(plan)` |
+> Este arquivo é a fonte da verdade para validar a qualidade e estrutura dos entregáveis.
 
-## Exemplo de validação cruzada (Produto → Requisitos)
+---
 
-```javascript
-function validarCoberturaMVP(prdPath, requisitosPath) {
-  const prd = lerArquivo(prdPath);
-  const requisitos = lerArquivo(requisitosPath);
-  const mvpItems = extrairItens('MVP', prd);
-  const faltantes = mvpItems.filter(item => !requisitos.includes(item));
+## 🏗️ 1. Validação Estrutural (Obrigatória)
 
-  return {
-    percentual: ((mvpItems.length - faltantes.length) / mvpItems.length) * 100,
-    faltantes
-  };
-}
-```
+**Instrução:** Para cada fase, consulte o arquivo `rules/structure-rules.md`. Ele contém a tabela exata de regexes obrigatórias.
 
-## Uso no /avancar-fase
+| Fase | Arquivo Alvo | Referência |
+|------|--------------|------------|
+| **Todas as Fases** | `docs/XX-nome/arquivo.md` | Consulte `rules/structure-rules.md` |
 
-1. Determine a transição atual (fase `N` → `N+1`).
-2. Carregue o checklist correspondente na tabela acima.
-3. Execute as funções auxiliares indicadas (ou use lógica equivalente).
-4. Só permita avanço quando **todos** os itens estiverem `true` e o score da fase atingir o mínimo definido em `validation-rules.md`.
+---
+
+## 🧠 2. Validação Lógica (Semântica)
+
+**Instrução:** Leia o conteúdo e aplique a lógica de verificação da transição atual.
+
+### Transição: Produto → Requisitos
+*   **Contexto:** Comparar `PRD.md` vs `requisitos.md`.
+*   **Regra Lógica:**
+    *   `PARA CADA` funcionalidade no MVP do PRD:
+        *   `VERIFIQUE SE` existe um requisito funcional correspondente em `requisitos.md`.
+    *   `SE` cobertura < 100%:
+        *   ❌ Falha: Cite as funcionalidades faltantes.
+
+### Transição: Requisitos → UX Design
+*   **Contexto:** Ler `requisitos.md` vs `design-doc.md`.
+*   **Regra Lógica:**
+    *   `PARA CADA` requisito funcional crítico:
+        *   `VERIFIQUE SE` existe um fluxo de usuário ou tela descrita no Design Doc.
+
+### Transição: Arquitetura → Banco de Dados
+*   **Contexto:** Ler `arquitetura.md` e `modelo-dominio.md`.
+*   **Regra Lógica:**
+    *   `VERIFIQUE SE` todas as entidades listadas no Modelo de Domínio possuem tabelas/coleções correspondentes no Design de Banco.
+
+### Transição: Contrato API → Implementação (Backend/Frontend)
+*   **Contexto:** Ler `openapi.yaml` vs Código.
+*   **Regra Lógica:**
+    *   `VERIFIQUE SE` todos os endpoints definidos no contrato existem no código.
+
+---
+
+## 🚦 3. Tabela de Decisão (Score)
+
+Use em conjunto com `validation-rules.md` para determinar o Tier.
+
+| Score Calculado | Ação do Agente |
+| :--- | :--- |
+| **100%** | ✅ **APROVAR**: Executar o avanço de fase. |
+| **70% - 99%** | ⚠️ **ALERTA**: Listar pendências, mas permitir avanço (pergunte ao usuário). |
+| **< 70%** | 🛑 **BLOQUEAR**: Não avance. Liste erros e pare. |

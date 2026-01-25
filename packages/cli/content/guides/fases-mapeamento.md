@@ -1,35 +1,34 @@
+# 🗺️ Mapeamento de Fases e Recursos
+
+> Guia para selecionar os Especialistas, Templates e Prompts corretos para cada fase do projeto.
+
 ---
-description: Mapeamento fase ↔ especialista, prompts, templates e skills
+
+## 📋 Tabela Mestra
+
+| Fase | Especialista (Persona) | Template (Doc) | Prompts Recomendados |
+| :--- | :--- | :--- | :--- |
+| **1. Produto** | Gestão de Produto | `PRD.md` | `produto/prd-completo`<br>`produto/north-star` |
+| **2. Requisitos** | Engenharia de Requisitos | `requisitos` | `requisitos/analise-requisitos`<br>`requisitos/gherkin` |
+| **3. UX Design** | UX Design | `design-doc` | `ux/design-system` |
+| **4. Prototipagem** | Prototipagem Stitch | `prototipo-stitch` | `ux/stitch-prompts` (se disponível) |
+| **Modelo de Domínio** | Modelagem de Domínio | `modelo-dominio` | `arquitetura/modelo-dominio`<br>`arquitetura/ddd-bounded-contexts` |
+| **Banco de Dados** | Banco de Dados | `design-banco` | `database/modelagem-postgres`<br>`database/otimizacao-queries` |
+| **Arquitetura** | Arquitetura de Software | `arquitetura` | `arquitetura/clean-architecture`<br>`arquitetura/arquitetura-c4-completo` |
+| **Segurança** | Segurança da Informação | `checklist-seguranca` | `seguranca/security-review`<br>`seguranca/auth-patterns` |
+| **Testes** | Análise de Testes | `plano-testes` | `testes/plano-testes`<br>`testes/tdd-workflow` |
+| **Contrato API** | Contrato de API | `contrato-api` | `apis/openapi-design`<br>`apis/rest-best-practices` |
+| **Frontend** | Desenv. Frontend | `historia-usuario` | `desenvolvimento/code-review`<br>`acessibilidade/wcag-checklist` |
+| **Backend** | Desenvolvimento | `historia-usuario` | `desenvolvimento/code-review` |
+| **Integração** | DevOps e Infra | `arquitetura` | `devops/ci-cd-pipeline` |
+
 ---
 
-# 📚 Mapa de Fases MCP → Recursos do Conteúdo
+## 🔍 Como Usar
 
-| Fase | Especialista | Prompt principal | Template(s) | Skills/Notas |
-|------|--------------|------------------|-------------|--------------|
-| 1. Produto | specialists/Especialista em Gestão de Produto.md | prompts/produto.md | templates/PRD.md | Skills: Produto, Discovery; carregar PRD existente antes de iniciar. |
-| 2. Requisitos | specialists/Especialista em Engenharia de Requisitos com IA.md | prompts/requisitos.md | templates/requisitos.md, templates/matriz-rastreabilidade.md | Skills: Requirements, QA; referenciar MVP da fase 1. |
-| 3. UX Design | specialists/Especialista em UX Design.md | prompts/ux.md | templates/design-doc.md, templates/mapa-navegacao.md | Skills: UX, Acessibilidade. |
-| 4. Modelo de Domínio | specialists/Especialista em Modelagem e Arquitetura de Domínio com IA.md | prompts/modelo-dominio.md | templates/modelo-dominio.md | Skills: Architecture, Domain-driven. |
-| 5. Banco de Dados | specialists/Especialista em Banco de Dados.md | prompts/banco.md | templates/design-banco.md | Skills: Database, Performance. |
-| 6. Arquitetura | specialists/Especialista em Arquitetura de Software.md | prompts/arquitetura.md | templates/arquitetura.md, templates/adr.md | Skills: Architecture, Security. |
-| 7. Segurança | specialists/Especialista em Segurança da Informação.md | prompts/seguranca.md | templates/checklist-seguranca.md | Skills: Security. |
-| 8. Testes | specialists/Especialista em Análise de Testes.md | prompts/testes.md | templates/plano-testes.md, templates/criterios-aceite.md | Skills: Testing. |
-| 9. Backlog | specialists/Especialista em Plano de Execução com IA.md | prompts/backlog.md | templates/backlog.md, templates/historia-usuario.md | Skills: Agile/Execution. |
-| 10. Contrato API | specialists/Especialista em Contrato de API.md | prompts/api.md | templates/contrato-api.md | Skills: API, Integration. |
-| 11. Frontend | specialists/Especialista em Desenvolvimento Frontend.md | prompts/frontend.md | templates/historia-frontend.md | Skills: Frontend, UI. |
-| 12. Backend | specialists/Especialista em Desenvolvimento e Vibe Coding Estruturado.md | prompts/backend.md | templates/historia-backend.md | Skills: Backend, Clean Code. |
-| 13. Integração/Deploy | specialists/Especialista em DevOps e Infraestrutura.md | prompts/devops.md | templates/arquitetura.md, templates/slo-sli.md | Skills: DevOps, Observabilidade. |
+Ao iniciar uma nova fase (via `/avancar-fase`):
 
-> Para fluxos simples (7 fases), considere apenas as linhas 1–7. Para fluxos complexos (17 fases), acrescente especialistas adicionais conforme `src/src/flows/types.ts` (Arquitetura Avançada, Performance, Observabilidade, etc.).
-
-## Como usar nos workflows
-
-1. **/continuar-fase**: após identificar a fase, abra o especialista e prompt correspondentes (ver tabela). Mencione explicitamente na resposta quais templates serão atualizados.
-2. **/avancar-fase**: use `entregavel_esperado` da tabela para verificar arquivos e validações antes de avançar.
-3. **/status-projeto**: liste os especialistas por fase concluída/parcial para ajudar o usuário a saber quem está ativo.
-
-## Manutenção
-
-- Sempre que um novo especialista ou template for adicionado, atualize esta tabela.
-- Se um prompt for renomeado, ajuste o nome aqui e nos workflows.
-- Skills podem ser expandidas mencionando diretórios específicos em `content/skills/`.
+1.  Identifique a **Fase** na tabela acima.
+2.  Carregue o **Especialista**: `read_file('content/specialists/...')`.
+3.  Carregue o **Template**: `read_file('content/templates/...')`.
+4.  Sugira ao usuário carregar os **Prompts Recomendados**: `read_file('content/prompts/[CATEGORIA]/[NOME].md')`.

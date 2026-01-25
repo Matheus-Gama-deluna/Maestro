@@ -157,37 +157,38 @@ function generateDefaultRules(): string {
 
 ## Como Usar
 
-1. **Iniciar projeto**: Use \`/iniciar-projeto\` para começar
-2. **Avançar fases**: Use \`/avancar-fase\` para avançar
-3. **Ver status**: Use \`/status-projeto\` para ver progresso
-4. **Continuar**: Use \`/continuar\` para retomar trabalho
+1. **Ver status**: Use \`/00-maestro\` para ver progresso
+2. **Iniciar projeto**: Use \`/01-iniciar-projeto\` para começar
+3. **Avançar fases**: Use \`/02-avancar-fase\` para avançar
+4. **Continuar**: Use \`/03-continuar-fase\` para retomar trabalho
 
 ## Estrutura Local
 
 | Pasta | Conteúdo |
 |-------|----------|
 | \`.maestro/estado.json\` | Estado do projeto (fonte da verdade) |
-| \`.maestro/content/\` | Especialistas, templates, prompts |
+| \`.maestro/content/\` | Especialistas, templates, guides |
 | \`.windsurf/workflows/\` | Workflows para Windsurf |
 | \`.windsurf/skills/\` | Skills especializadas |
 | \`.cursor/commands/\` | Commands para Cursor |
 | \`.cursor/skills/\` | Skills especializadas |
-| \`.agent/workflows/\` | Workflows para Antigravity |
+| \`.agent/workflows/\` | Workflows Principais (00-08) |
 | \`.agent/skills/\` | Skills especializadas |
 
 ## Comandos Disponíveis
 
-### Gerenciamento de Projeto
-- \`/maestro\` - Comando universal inteligente
-- \`/iniciar-projeto\` - Iniciar novo projeto
-- \`/avancar-fase\` - Avançar para próxima fase
-- \`/status-projeto\` - Ver status e progresso
-- \`/continuar\` - Continuar fase atual
+### Gestão de Projeto
+- \`/00-maestro\` - Router Inteligente (Status)
+- \`/01-iniciar-projeto\` - Setup Inicial
+- \`/02-avancar-fase\` - Transição de Fase (com automações)
+- \`/03-continuar-fase\` - Retomada de Trabalho
+- \`/08-deploy-projeto\` - Deploy e Encerramento
 
 ### Desenvolvimento
-- \`/nova-feature\` - Criar nova funcionalidade
-- \`/corrigir-bug\` - Debugging estruturado
-- \`/refatorar-codigo\` - Refatoração segura
+- \`/04-implementar-historia\` - Frontend-First Dev
+- \`/05-nova-feature\` - Grandes Funcionalidades
+- \`/06-corrigir-bug\` - Fix com análise de causa
+- \`/07-refatorar-codigo\` - Melhoria técnica segura
 
 ## Especialistas IA
 
