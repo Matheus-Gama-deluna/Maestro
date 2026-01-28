@@ -1,38 +1,67 @@
 {
-  "name": "mcp-maestro",
+  "name": "@maestro/mcp-server",
   "version": "1.0.0",
-  "description": "MCP Server for Maestro - AI-assisted development guide",
+  "description": "MCP Server do Maestro - execução local via npx com acesso completo ao filesystem",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/stdio.js",
   "bin": {
-    "mcp-maestro": "./dist/index.js"
+    "maestro-mcp": "./dist/stdio.js"
   },
+  "files": [
+    "dist/**/*",
+    "content/**/*",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
-    "stdio": "tsx src/stdio.ts",
-    "start:stdio": "node dist/stdio.js",
+    "dev": "tsx watch src/stdio.ts",
+    "dev:http": "tsx watch src/index.ts",
+    "start": "node dist/stdio.js",
+    "start:http": "node dist/index.js",
     "test": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run test",
+    "pack": "npm pack"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "maestro",
+    "ai",
+    "cli",
+    "npx"
+  ],
+  "author": "Maestro IA",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Matheus-Gama-deluna/Guia-dev-IA.git",
+    "directory": "src"
+  },
+  "homepage": "https://github.com/Matheus-Gama-deluna/Guia-dev-IA#readme",
+  "bugs": {
+    "url": "https://github.com/Matheus-Gama-deluna/Guia-dev-IA/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "express": "^4.21.0",
-    "cors": "^2.8.5",
-    "zod": "^3.23.0",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "@types/node": "^22.0.0",
-    "@types/express": "^4.17.21",
     "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
     "@types/uuid": "^10.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
     "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
     "vitest": "^2.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

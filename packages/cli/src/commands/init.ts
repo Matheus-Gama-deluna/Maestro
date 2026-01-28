@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import fse from 'fs-extra';
 import chalk from 'chalk';
 import ora from 'ora';
+import { SkillAdapter } from '../adapters/skill-adapter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -106,11 +107,14 @@ export async function init(options: InitOptions) {
             await fse.copy(workflowsSrc, workflowsDest, { overwrite: options.force });
         }
 
-        // Copiar skills para diretório específico da IDE
+        // Copiar e adaptar skills para IDE específica usando o adaptador
+        spinner.start(`Adaptando skills para ${options.ide}...`);
         const skillsSrc = join(contentSource, 'skills');
         const skillsDest = join(cwd, ideConfig.skillsDir);
+        
         if (await fse.pathExists(skillsSrc)) {
-            await fse.copy(skillsSrc, skillsDest, { overwrite: options.force });
+            const skillAdapter = new SkillAdapter();
+            await skillAdapter.adaptSkills(skillsSrc, skillsDest, options.ide!, options.force);
         }
 
         // Gerar arquivo de regras
