@@ -24,7 +24,7 @@ import {
     lerPrompt,
 } from "./utils/files.js";
 
-import { iniciarProjeto } from "./tools/iniciar-projeto.js";
+import { iniciarProjeto, confirmarProjeto } from "./tools/iniciar-projeto.js";
 import { carregarProjeto } from "./tools/carregar-projeto.js";
 import { proximo } from "./tools/proximo.js";
 import { status } from "./tools/status.js";
@@ -32,6 +32,7 @@ import { validarGate } from "./tools/validar-gate.js";
 import { contexto } from "./tools/contexto.js";
 import { classificar } from "./tools/classificar.js";
 import { salvar } from "./tools/salvar.js";
+import { injetar_conteudo } from "./tools/injetar-conteudo.js";
 
 // Criar servidor MCP
 const server = new Server(
@@ -163,6 +164,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             },
         },
         {
+            name: "confirmar_projeto",
+            description: "Confirma criação do projeto com tipo e complexidade. Injeta conteúdo automaticamente.",
+            inputSchema: {
+                type: "object" as const,
+                properties: {
+                    nome: { type: "string", description: "Nome do projeto" },
+                    descricao: { type: "string", description: "Descrição opcional" },
+                    diretorio: { type: "string", description: "Diretório absoluto do projeto" },
+                    tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"], description: "Tipo de artefato" },
+                    nivel_complexidade: { type: "string", enum: ["simples", "medio", "complexo"], description: "Nível de complexidade" },
+                },
+                required: ["nome", "diretorio", "tipo_artefato", "nivel_complexidade"],
+            },
+        },
+        {
             name: "carregar_projeto",
             description: "Carrega projeto existente (stateless). Requer estado_json.",
             inputSchema: {
@@ -254,6 +270,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
                 required: ["conteudo", "tipo", "estado_json", "diretorio"],
             },
         },
+        {
+            name: "injetar_conteudo",
+            description: "Injeta conteúdo base (especialistas, templates, guias) no projeto. Use force:true para sobrescrever.",
+            inputSchema: {
+                type: "object" as const,
+                properties: {
+                    diretorio: { type: "string", description: "Diretório absoluto do projeto" },
+                    source: { type: "string", enum: ["builtin", "custom"], description: "Fonte do conteúdo (padrão: builtin)" },
+                    custom_path: { type: "string", description: "Caminho customizado se source=custom" },
+                    force: { type: "boolean", description: "Sobrescrever se já existe (padrão: false)" },
+                },
+                required: ["diretorio"],
+            },
+        },
     ],
 }));
 
@@ -269,6 +299,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     nome: typedArgs.nome as string,
                     descricao: typedArgs.descricao as string | undefined,
                     diretorio: typedArgs.diretorio as string,
+                });
+            case "confirmar_projeto":
+                return await confirmarProjeto({
+                    nome: typedArgs.nome as string,
+                    descricao: typedArgs.descricao as string | undefined,
+                    diretorio: typedArgs.diretorio as string,
+                    tipo_artefato: typedArgs.tipo_artefato as "poc" | "script" | "internal" | "product",
+                    nivel_complexidade: typedArgs.nivel_complexidade as "simples" | "medio" | "complexo",
                 });
             case "carregar_projeto":
                 return await carregarProjeto({
@@ -313,6 +351,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     estado_json: typedArgs.estado_json as string,
                     diretorio: typedArgs.diretorio as string,
                     nome_arquivo: typedArgs.nome_arquivo as string | undefined,
+                });
+            case "injetar_conteudo":
+                return await injetar_conteudo({
+                    diretorio: typedArgs.diretorio as string,
+                    source: typedArgs.source as "builtin" | "custom" | undefined,
+                    custom_path: typedArgs.custom_path as string | undefined,
+                    force: typedArgs.force as boolean | undefined,
                 });
             default:
                 return {

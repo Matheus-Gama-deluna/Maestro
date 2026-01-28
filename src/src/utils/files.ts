@@ -3,6 +3,7 @@ import { join, dirname, resolve, win32 } from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
 import { platform } from "os";
+import { getBuiltinContentDir } from "./content-injector.js";
 
 // Resolve path to content folder (server fallback)
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -48,8 +49,13 @@ function getContentRoot(diretorio?: string): string {
         }
     }
     
-    // Fallback para servidor
-    return SERVER_CONTENT_ROOT;
+    // Fallback para servidor (usa o content-injector para encontrar)
+    try {
+        return getBuiltinContentDir();
+    } catch {
+        // Último fallback - caminho relativo
+        return join(__dirname, "..", "..", "..", "content");
+    }
 }
 
 /**

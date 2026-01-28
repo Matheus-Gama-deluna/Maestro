@@ -11,6 +11,7 @@ import { logEvent, EventTypes } from "../utils/history.js";
 import { gerarSystemMd } from "../utils/system-md.js";
 import { detectarStack, gerarSecaoPrompts, gerarSecaoExemplo } from "../utils/prompt-mapper.js";
 import { resolveProjectPath, joinProjectPath } from "../utils/files.js";
+import { ensureContentInstalled } from "../utils/content-injector.js";
 
 interface IniciarProjetoArgs {
     nome: string;
@@ -272,6 +273,18 @@ confirmar_projeto(
             'Identificar personas',
             'Criar PRD com problema e MVP'
         ]);
+
+        // 🚀 INJETAR CONTEÚDO AUTOMATICAMENTE
+        try {
+            const injResult = await ensureContentInstalled(diretorio);
+            if (injResult.installed) {
+                console.log(`[INFO] Conteúdo injetado em: ${injResult.targetDir} (${injResult.filesCopied} arquivos)`);
+            } else {
+                console.log(`[INFO] Conteúdo já existe em: ${injResult.targetDir}`);
+            }
+        } catch (error) {
+            console.warn('[WARN] Não foi possível injetar conteúdo:', error);
+        }
     } catch (error) {
         console.warn('Aviso: Não foi possível criar histórico/SYSTEM.md:', error);
     }

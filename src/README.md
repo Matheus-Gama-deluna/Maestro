@@ -2,13 +2,91 @@
 
 Servidor MCP (Model Context Protocol) para o Maestro - Guia de Desenvolvimento Assistido por IA.
 
-## 🌐 Servidor Público
+## 🚀 Uso via npx (Recomendado)
 
-O MCP Maestro está disponível publicamente em:
+O Maestro agora é distribuído como pacote npm e executado localmente via `npx`, garantindo acesso direto aos arquivos do seu projeto.
+
+### Instalação e Configuração
+
+1. **Configure seu cliente MCP** (ex: Gemini, VS Code, Cline):
+
+```json
+{
+  "mcpServers": {
+    "maestro": {
+      "command": "npx",
+      "args": ["-y", "@maestro/mcp-server", "D:\\SEU\\DIRETÓRIO\\DE\\PROJETOS"],
+      "disabled": false,
+      "env": {}
+    }
+  }
+}
+```
+
+2. **Substitua `D:\\SEU\\DIRETÓRIO\\DE\\PROJETOS`** pelo caminho onde você cria projetos Maestro.
+
+### Fluxo de Uso
+
+```bash
+# 1. Iniciar novo projeto (analisa e sugere classificação)
+iniciar_projeto(
+    nome: "Meu App",
+    descricao: "Sistema de gestão de tarefas",
+    diretorio: "D:\\Projetos\\meu-app"
+)
+
+# 2. Confirmar criação (injeta conteúdo automaticamente)
+confirmar_projeto(
+    nome: "Meu App",
+    diretorio: "D:\\Projetos\\meu-app",
+    tipo_artefato: "product",
+    nivel_complexidade: "medio"
+)
+
+# 3. Trabalhar nas fases
+proximo()      # Avança para próxima fase
+status()       # Ver status completo
+salvar()       # Salva entregáveis
+```
+
+### Injeção Automática de Conteúdo
+
+Ao confirmar um projeto, o Maestro injeta automaticamente:
+
+```
+meu-app/
+├── .maestro/
+│   ├── content/          ← Conteúdo injetado aqui
+│   │   ├── specialists/  # Especialistas de cada fase
+│   │   ├── templates/    # Modelos de entregáveis
+│   │   ├── guides/       # Guias de apoio
+│   │   └── prompts/      # Prompts por categoria
+│   ├── estado.json       # Estado do projeto
+│   └── resumo.json       # Memória do projeto
+```
+
+### Comandos Principais
+
+| Comando | Descrição |
+|---------|-----------|
+| `iniciar_projeto` | Analisa e sugere classificação |
+| `confirmar_projeto` | Cria projeto e injeta conteúdo |
+| `carregar_projeto` | Carrega projeto existente |
+| `proximo` | Salva entregável e avança fase |
+| `status` | Retorna status completo |
+| `injetar_conteudo` | Reinjeta conteúdo (use `force:true`) |
+
+---
+
+## 🌐 Servidor Público (Legado)
+
+O servidor HTTP público continua disponível para compatibilidade:
 
 ```
 https://maestro.deluna.dev.br
 ```
+
+> **Nota**: Recomendamos usar o modo npx para acesso completo aos arquivos locais.
 
 ### Verificar Status
 
@@ -19,97 +97,24 @@ curl https://maestro.deluna.dev.br/health
 
 ---
 
-## 🔧 Configuração para IDEs e Clientes MCP
-
-### Gemini / Antigravity (SSE Transport)
-
-Adicione ao seu `mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "maestro": {
-      "serverUrl": "https://maestro.deluna.dev.br/mcp"
-    }
-  }
-}
-```
-
-> **Nota:** Este servidor suporta Streamable HTTP (SSE) para clientes que requerem conexão persistente.
-
-### VS Code / Cursor / Windsurf
-
-Adicione ao seu arquivo de configuração MCP (`mcp_config.json` ou equivalente):
-
-```json
-{
-  "mcpServers": {
-    "maestro": {
-      "url": "https://maestro.deluna.dev.br/mcp",
-      "transport": "http"
-    }
-  }
-}
-```
-
-### Cline / Claude Desktop
-
-Adicione ao seu `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "maestro": {
-      "command": "curl",
-      "args": ["-X", "POST", "https://maestro.deluna.dev.br/mcp"]
-    }
-  }
-}
-```
-
-### Chamada HTTP Direta
-
-```bash
-curl -X POST https://maestro.deluna.dev.br/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": "1",
-    "method": "tools/call",
-    "params": {
-      "name": "status",
-      "arguments": {}
-    }
-  }'
-```
-
----
-
-## 📡 Endpoints Disponíveis
-
-| Endpoint | Método | Descrição |
-|----------|--------|-----------|
-| `/` | GET | Informações do servidor |
-| `/health` | GET | Health check |
-| `/mcp` | POST | Endpoint MCP JSON-RPC |
-| `/resources` | GET | Lista resources disponíveis |
-| `/tools` | GET | Lista tools disponíveis |
-
----
-
-## 🛠️ Tools Disponíveis
+## �️ Tools Disponíveis
 
 | Tool | Descrição |
 |------|-----------|
 | `iniciar_projeto` | Inicia um novo projeto com classificação |
+| `confirmar_projeto` | Confirma criação e injeta conteúdo |
+| `carregar_projeto` | Carrega projeto existente |
 | `proximo` | Salva entregável e avança para próxima fase |
 | `status` | Retorna status atual do projeto |
 | `validar_gate` | Valida checklist antes de avançar fase |
 | `contexto` | Obtém contexto completo do projeto |
 | `salvar` | Salva artefatos do projeto |
+| `injetar_conteudo` | Injeta conteúdo base no projeto |
 | `nova_feature` | Fluxo para adicionar nova feature |
 | `corrigir_bug` | Fluxo para correção de bugs |
 | `refatorar` | Fluxo para refatoração de código |
+| `classificar` | Classifica entregáveis |
+| `avaliar_entregavel` | Avalia qualidade com score |
 
 ---
 
@@ -130,24 +135,82 @@ curl -X POST https://maestro.deluna.dev.br/mcp \
 ### Instalação
 
 ```bash
-cd mcp-server
+cd src
 npm install
 ```
 
 ### Desenvolvimento
 
 ```bash
+# Modo npx (STDIO) - principal
 npm run dev
+
+# Modo HTTP - apenas para testes
+npm run dev:http
 ```
 
 ### Build e Produção
 
 ```bash
 npm run build
-npm start
+npm run start:stdio    # Modo npx
+npm run start          # Modo HTTP
 ```
 
-### Docker
+### Teste Local do Pacote
+
+```bash
+# Gerar pacote
+npm run pack
+
+# Testar antes de publicar
+npx ./maestro-mcp-server-1.0.0.tgz D:\Projetos\teste
+```
+
+### Publicação
+
+```bash
+# Publicar no npm (requer login)
+npm publish --access public
+```
+
+---
+
+## 📋 Exemplo de Fluxo Completo (Modo npx)
+
+```bash
+# 1. Iniciar projeto
+iniciar_projeto(
+    nome: "meu-app",
+    descricao: "Sistema de gestão de tarefas",
+    diretorio: "D:\\Projetos\\meu-app"
+)
+
+# 2. Confirmar criação (injeta conteúdo automaticamente)
+confirmar_projeto(
+    nome: "meu-app",
+    diretorio: "D:\\Projetos\\meu-app",
+    tipo_artefato: "product",
+    nivel_complexidade: "medio"
+)
+
+# 3. Verificar status
+status(
+    diretorio: "D:\\Projetos\\meu-app"
+)
+
+# 4. Avançar fase
+proximo(
+    entregavel: "# PRD - Produto\n\n## Problema\n...",
+    diretorio: "D:\\Projetos\\meu-app"
+)
+```
+
+---
+
+## 🐳 Docker (Legado)
+
+A imagem Docker continua disponível para o modo HTTP:
 
 ```bash
 # Produção
@@ -159,28 +222,6 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 ---
 
-## 📋 Exemplo de Fluxo Completo
+## 📄 Licença
 
-```bash
-# 1. Iniciar projeto
-curl -X POST https://maestro.deluna.dev.br/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": "1",
-    "method": "tools/call",
-    "params": {
-      "name": "iniciar_projeto",
-      "arguments": {
-        "nome": "meu-projeto",
-        "classificacao": "mvp"
-      }
-    }
-  }'
-
-# 2. Ver status
-curl https://maestro.deluna.dev.br/tools
-
-# 3. Listar especialistas disponíveis
-curl https://maestro.deluna.dev.br/resources
-```
+MIT License - veja arquivo LICENSE para detalhes.

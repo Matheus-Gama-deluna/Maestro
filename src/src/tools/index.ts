@@ -33,6 +33,9 @@ import { atualizarCodebase, atualizarCodebaseSchema } from "./atualizar-codebase
 // Tools de qualidade
 import { avaliarEntregavel, avaliarEntregavelSchema } from "./avaliar-entregavel.js";
 
+// Tools de injeção de conteúdo
+import { injetar_conteudo, injetarConteudoSchema } from "./injetar-conteudo.js";
+
 /**
  * Registra todas as tools no servidor MCP
  */
@@ -140,6 +143,12 @@ export function registerTools(server: Server) {
                 name: "avaliar_entregavel",
                 description: "Avalia qualidade do entregável com score e sugestões. Use antes de proximo().",
                 inputSchema: avaliarEntregavelSchema,
+            },
+            // === INJEÇÃO DE CONTEÚDO ===
+            {
+                name: "injetar_conteudo",
+                description: "Injeta conteúdo base (especialistas, templates, guias) no projeto. Use force:true para sobrescrever.",
+                inputSchema: injetarConteudoSchema,
             },
         ],
     }));
@@ -289,6 +298,14 @@ export function registerTools(server: Server) {
                         entregavel: typedArgs?.entregavel as string,
                         fase: typedArgs?.fase as number | undefined,
                         diretorio: typedArgs?.diretorio as string | undefined,
+                    });
+
+                case "injetar_conteudo":
+                    return await injetar_conteudo({
+                        diretorio: typedArgs?.diretorio as string,
+                        source: typedArgs?.source as "builtin" | "custom" | undefined,
+                        custom_path: typedArgs?.custom_path as string | undefined,
+                        force: typedArgs?.force as boolean | undefined,
                     });
 
                 default:
