@@ -2,6 +2,8 @@
 
 Servidor MCP (Model Context Protocol) para o Maestro - Guia de Desenvolvimento Assistido por IA.
 
+**Pacote**: `@maestro-ai/mcp-server@1.0.0`
+
 ## 🚀 Uso via npx (Recomendado)
 
 O Maestro agora é distribuído como pacote npm e executado localmente via `npx`, garantindo acesso direto aos arquivos do seu projeto.
@@ -10,20 +12,41 @@ O Maestro agora é distribuído como pacote npm e executado localmente via `npx`
 
 1. **Configure seu cliente MCP** (ex: Gemini, VS Code, Cline):
 
-```json
-{
-  "mcpServers": {
-    "maestro": {
-      "command": "npx",
-      "args": ["-y", "@maestro/mcp-server", "D:\\SEU\\DIRETÓRIO\\DE\\PROJETOS"],
-      "disabled": false,
-      "env": {}
-    }
-  }
-}
-```
+   ```json
+   {
+     "mcpServers": {
+       "maestro": {
+         "command": "npx",
+         "args": ["-y", "@maestro-ai/mcp-server@1.0.0"],
+         "disabled": false,
+         "env": {}
+       }
+     }
+   }
+   ```
 
-2. **Substitua `D:\\SEU\\DIRETÓRIO\\DE\\PROJETOS`** pelo caminho onde você cria projetos Maestro.
+2. **O Maestro usará automaticamente o diretório de trabalho atual** onde você estiver trabalhando.
+
+3. **Instalação direta (opcional)**:
+   ```bash
+   npm install -g @maestro-ai/mcp-server@1.0.0
+   ```
+
+4. **Especificar diretório manualmente (se necessário)**:
+   ```json
+   {
+     "mcpServers": {
+       "maestro": {
+         "command": "npx",
+         "args": ["-y", "@maestro-ai/mcp-server@1.0.0", "D:\\Meus\\Projetos"],
+         "disabled": false,
+         "env": {}
+       }
+     }
+   }
+   ```
+
+
 
 ### Fluxo de Uso
 
@@ -163,8 +186,24 @@ npm run start          # Modo HTTP
 # Gerar pacote
 npm run pack
 
-# Testar antes de publicar
-npx ./maestro-mcp-server-1.0.0.tgz D:\Projetos\teste
+# Testar antes de publicar (usa diretório atual)
+npx ./maestro-ai-mcp-server-1.0.0.tgz
+
+# Ou especificar diretório
+npx ./maestro-ai-mcp-server-1.0.0.tgz D:\Projetos\teste
+```
+
+### Instalação Global
+
+```bash
+# Instalar globalmente
+npm install -g @maestro-ai/mcp-server@1.0.0
+
+# Usar diretamente (usa diretório atual)
+maestro-mcp
+
+# Ou especificar diretório
+maestro-mcp D:\Projetos\meu-app
 ```
 
 ### Publicação

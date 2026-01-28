@@ -2,8 +2,10 @@
 /**
  * Entry point para modo STDIO (usado por IDEs como command)
  * 
- * Uso: node dist/stdio.js
+ * Uso: node dist/stdio.js [diretorio]
  * Ou via npx após publicar no npm
+ * 
+ * Se nenhum diretório for fornecido, usa o diretório de trabalho atual
  */
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -22,6 +24,7 @@ import {
     lerTemplate,
     lerGuia,
     lerPrompt,
+    setProjectDirectory,
 } from "./utils/files.js";
 
 import { iniciarProjeto, confirmarProjeto } from "./tools/iniciar-projeto.js";
@@ -375,10 +378,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // ==================== START ====================
 
+// Obter diretório dos argumentos ou usar cwd
+const projectsDir = process.argv[2] || process.cwd();
+
+// Configurar diretório padrão para as tools
+setProjectDirectory(projectsDir);
+
 async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("MCP Maestro (stdio) iniciado - Modo Stateless");
+    console.error(`MCP Maestro (stdio) iniciado - Modo Stateless`);
+    console.error(`Diretório de projetos: ${projectsDir}`);
 }
 
 main().catch(console.error);
