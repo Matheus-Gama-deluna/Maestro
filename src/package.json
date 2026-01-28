@@ -35,12 +35,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Matheus-Gama-deluna/Guia-dev-IA.git",
+    "url": "https://github.com/Matheus-Gama-deluna/Maestro.git",
     "directory": "src"
   },
-  "homepage": "https://github.com/Matheus-Gama-deluna/Guia-dev-IA#readme",
+  "homepage": "https://github.com/Matheus-Gama-deluna/Maestro#readme",
   "bugs": {
-    "url": "https://github.com/Matheus-Gama-deluna/Guia-dev-IA/issues"
+    "url": "https://github.com/Matheus-Gama-deluna/Maestro/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
