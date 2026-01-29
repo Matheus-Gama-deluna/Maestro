@@ -596,8 +596,8 @@ async function getToolsList() {
     return {
         tools: [
             // Core (Stateless) - requer estado_json e diretorio
-            { name: "iniciar_projeto", description: "Analisa novo projeto e sugere classificação (stateless). NÃO CRIA ARQUIVOS.", inputSchema: { type: "object", properties: { nome: { type: "string" }, descricao: { type: "string" }, diretorio: { type: "string" } }, required: ["nome", "diretorio"] } },
-            { name: "confirmar_projeto", description: "Cria efetivamente o projeto com classificação confirmada.", inputSchema: { type: "object", properties: { nome: { type: "string" }, descricao: { type: "string" }, diretorio: { type: "string" }, tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] }, nivel_complexidade: { type: "string", enum: ["simples", "medio", "complexo"] } }, required: ["nome", "diretorio", "tipo_artefato", "nivel_complexidade"] } },
+            { name: "iniciar_projeto", description: "Analisa novo projeto e sugere classificação (stateless). NÃO CRIA ARQUIVOS.", inputSchema: { type: "object", properties: { nome: { type: "string" }, descricao: { type: "string" }, diretorio: { type: "string" }, ide: { type: "string", enum: ["windsurf", "cursor", "antigravity"] } }, required: ["nome", "diretorio"] } },
+            { name: "confirmar_projeto", description: "Cria efetivamente o projeto com classificação confirmada.", inputSchema: { type: "object", properties: { nome: { type: "string" }, descricao: { type: "string" }, diretorio: { type: "string" }, tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] }, nivel_complexidade: { type: "string", enum: ["simples", "medio", "complexo"] }, ide: { type: "string", enum: ["windsurf", "cursor", "antigravity"] } }, required: ["nome", "diretorio", "tipo_artefato", "nivel_complexidade", "ide"] } },
             { name: "carregar_projeto", description: "Carrega projeto existente (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
             { name: "proximo", description: "Salva entregável e avança fase (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { entregavel: { type: "string" }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["entregavel", "estado_json", "diretorio"] } },
             { name: "status", description: "Retorna status do projeto (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
@@ -622,9 +622,9 @@ async function callTool(name: string, args?: Record<string, unknown>) {
     try {
         switch (name) {
             case "iniciar_projeto":
-                return await iniciarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string });
+                return await iniciarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string, ide: a.ide as "windsurf" | "cursor" | "antigravity" | undefined });
             case "confirmar_projeto":
-                return await confirmarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string, tipo_artefato: a.tipo_artefato as any, nivel_complexidade: a.nivel_complexidade as any });
+                return await confirmarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string, tipo_artefato: a.tipo_artefato as any, nivel_complexidade: a.nivel_complexidade as any, ide: a.ide as any });
             case "carregar_projeto":
                 return await carregarProjeto({ estado_json: a.estado_json as string, diretorio: a.diretorio as string });
             case "proximo":

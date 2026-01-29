@@ -162,6 +162,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
                     nome: { type: "string", description: "Nome do projeto" },
                     descricao: { type: "string", description: "Descrição opcional" },
                     diretorio: { type: "string", description: "Diretório absoluto do projeto" },
+                    ide: { type: "string", enum: ["windsurf", "cursor", "antigravity"], description: "IDE alvo para injection" },
                 },
                 required: ["nome", "diretorio"],
             },
@@ -177,8 +178,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
                     diretorio: { type: "string", description: "Diretório absoluto do projeto" },
                     tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"], description: "Tipo de artefato" },
                     nivel_complexidade: { type: "string", enum: ["simples", "medio", "complexo"], description: "Nível de complexidade" },
+                    ide: { type: "string", enum: ["windsurf", "cursor", "antigravity"], description: "IDE alvo para injection" },
                 },
-                required: ["nome", "diretorio", "tipo_artefato", "nivel_complexidade"],
+                required: ["nome", "diretorio", "tipo_artefato", "nivel_complexidade", "ide"],
             },
         },
         {
@@ -302,6 +304,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     nome: typedArgs.nome as string,
                     descricao: typedArgs.descricao as string | undefined,
                     diretorio: typedArgs.diretorio as string,
+                    ide: typedArgs.ide as "windsurf" | "cursor" | "antigravity" | undefined,
                 });
             case "confirmar_projeto":
                 return await confirmarProjeto({
@@ -310,6 +313,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     diretorio: typedArgs.diretorio as string,
                     tipo_artefato: typedArgs.tipo_artefato as "poc" | "script" | "internal" | "product",
                     nivel_complexidade: typedArgs.nivel_complexidade as "simples" | "medio" | "complexo",
+                    ide: typedArgs.ide as "windsurf" | "cursor" | "antigravity",
                 });
             case "carregar_projeto":
                 return await carregarProjeto({
