@@ -1,41 +1,212 @@
 ---
 name: specialist-ux-design
-description: Design Document completo com jornadas, wireframes e compromissos de design.
+description: Transformação de requisitos em design de interface e experiência do usuário com foco em wireframes, jornadas e protótipos validados. Use quando precisar criar interfaces intuitivas baseadas em requisitos funcionais.
 allowed-tools: Read, Write, Edit, Glob, Grep
+version: 2.0
+framework: progressive-disclosure
 ---
 
-# UX Design · Skill do Especialista
+# UX Design · Skill Moderna
 
-## 🎯 Missão
-Entregar Design Document completo com jornadas, wireframes e critérios de acessibilidade.
+## Missão
+Transformar requisitos em design de interface e experiência do usuário em 45-60 minutos, garantindo interfaces intuitivas, jornadas otimizadas e protótipos validados com stakeholders.
 
-## 🧭 Quando ativar
-- Fase: Fase 3 · UX
-- Workflows recomendados: /avancar-fase, /implementar-historia
-- Use quando precisar antes de qualquer implementação frontend ou prototipagem de alta fidelidade.
+## Quando ativar
+- **Fase:** Fase 3 · UX Design
+- **Workflows:** /maestro, /avancar-fase, /criar-wireframes
+- **Trigger:** "preciso de wireframes", "design de interface", "protótipo de UX"
 
-## 📥 Inputs obrigatórios
-- PRD e requisitos aprovados
-- Insights de pesquisa e constraints de marca
-- Componentes existentes ou design system
+## Inputs obrigatórios
+- Requisitos validados do especialista de Engenharia de Requisitos
+- Matriz de rastreabilidade completa
+- Critérios de aceite testáveis (Gherkin)
+- Personas e jornadas mapeadas
+- Restrições técnicas e de negócio
 
-## 📤 Outputs gerados
-- `docs/03-ux/design-doc.md` — Design Document
-- Wireframes, fluxos e checklist de acessibilidade
+## Outputs gerados
+- `docs/03-ux-design/design-doc.md` — Documento de design completo
+- `docs/03-ux-design/wireframes.md` — Wireframes de todas as telas
+- `docs/03-ux-design/jornada-usuario.md` — Mapa de jornadas do usuário
+- `docs/03-ux-design/prototipos.md` — Protótipos interativos
+- Score de validação ≥ 75 pontos
 
-## ✅ Quality Gate
-- Jornadas e fluxos mapeados
-- Wireframes para telas críticas
-- Critérios WCAG considerados
-- Design Commitment fechado
+## Quality Gate
+- Wireframes cobrem todos os requisitos funcionais principais
+- Jornadas consideram todas as regras de negócio
+- Design respeita todas as restrições técnicas
+- Interfaces externas integradas na experiência
+- Protótipos validados com stakeholders
+- Score de validação automática ≥ 75 pontos
 
-## 🔗 Skills complementares
-- `frontend-design`
-- `animation-guide`
-- `mobile-design`
+## 🚀 Processo Otimizado
 
-## 📂 Referências essenciais
-- Especialista original: `content/specialists/Especialista em UX Design.md`
-- Artefatos alvo:
-- `docs/03-ux/design-doc.md` — Design Document
-- Wireframes, fluxos e checklist de acessibilidade
+### 1. Análise de Requisitos (10 min)
+Use função de análise para extrair informações estruturadas dos requisitos:
+- Funcionalidades principais e prioridades
+- Personas e casos de uso mapeados
+- Regras de negócio implementadas
+- Restrições técnicas e tecnologias
+- Interfaces externas e integrações
+
+### 2. Mapeamento de Jornadas (15 min)
+Defina jornadas completas para cada persona:
+- **Pontos de contato** com o sistema
+- **Objetivos e metas** do usuário
+- **Dores e ganhos** em cada etapa
+- **Fluxos principais** e alternativos
+- **Momentos decisivos** e conversões
+
+### 3. Criação de Wireframes (15 min)
+Desenvolva wireframes estruturais:
+- **Layout responsivo** para diferentes dispositivos
+- **Navegação intuitiva** e consistente
+- **Componentes reutilizáveis** e padronizados
+- **Fluxos de interação** otimizados
+- **Acessibilidade** WCAG 2.1 AA garantida
+
+### 4. Design Visual (10 min)
+Aplique identidade visual e consistência:
+- **Sistema de cores** e tipografia
+- **Ícones e elementos** visuais
+- **Espaçamento** e alinhamento
+- **Animações** e transições sutis
+- **Feedback visual** para o usuário
+
+### 5. Prototipagem Interativa (5 min)
+Crie protótipos validáveis:
+- **Interatividade** básica dos wireframes
+- **Fluxos completos** de usuário
+- **Dados reais** e contextuais
+- **Validação** com stakeholders
+- **Iterações** rápidas baseadas em feedback
+
+## 📚 Recursos Adicionais
+
+### Templates e Guias
+- **Template Design:** [resources/templates/design-doc.md](resources/templates/design-doc.md)
+- **Template Wireframes:** [resources/templates/wireframes.md](resources/templates/wireframes.md)
+- **Template Jornadas:** [resources/templates/jornada-usuario.md](resources/templates/jornada-usuario.md)
+- **Exemplos práticos:** [resources/examples/ux-examples.md](resources/examples/ux-examples.md)
+- **Guia completo:** [resources/reference/ux-guide.md](resources/reference/ux-guide.md)
+- **Validação:** [resources/checklists/ux-validation.md](resources/checklists/ux-validation.md)
+
+### Funções MCP
+- **Inicialização:** Função de criação de estrutura base
+- **Validação:** Função de verificação de qualidade
+- **Processamento:** Função de preparação para próxima fase
+
+## 🎯 Frameworks de Design
+
+### Design Thinking
+- **Empatia:** Compreensão profunda dos usuários
+- **Definição:** Problemas e oportunidades claros
+- **Ideação:** Geração de múltiplas soluções
+- **Prototipagem:** Teste rápido de ideias
+- **Teste:** Validação com usuários reais
+
+### User-Centered Design
+- **Pesquisa com usuários:** Entendimento profundo
+- **Personas detalhadas:** Arquétipos de usuários
+- **Jornadas mapeadas:** Experiência completa
+- **Testes de usabilidade:** Validação objetiva
+- **Iteração contínua:** Melhoria constante
+
+### Design Responsivo
+- **Mobile-first:** Prioridade para dispositivos móveis
+- **Breakpoints:** Adaptação para diferentes telas
+- **Layout flexível:** Grids e containers
+- **Imagens adaptativas:** Otimização de mídias
+- **Performance:** Carregamento rápido
+
+## 🔄 Context Flow Automatizado
+
+### Ao Concluir (Score ≥ 75)
+1. **Design validado** automaticamente
+2. **CONTEXTO.md** atualizado
+3. **Prompt gerado** para próximo especialista
+4. **Transição** automática para Modelagem de Domínio
+
+### Comando de Avanço
+Use função de processamento para preparar contexto para Modelagem de Domínio quando design estiver validado.
+
+### Guardrails Críticos
+- **NUNCA avance** sem validação ≥ 75 pontos
+- **SEMPRE confirme** com usuário antes de processar
+- **VALIDE** todos os wireframes e jornadas
+- **TESTE** protótipos com stakeholders
+- **USE funções descritivas** para automação via MCP
+
+## 📊 Estrutura dos Templates
+
+### Template Design Doc
+- **Visão do Sistema** e objetivos
+- **Personas e Jornadas** detalhadas
+- **Arquitetura de Informação** e fluxos
+- **Design Visual** e identidade
+- **Wireframes** de todas as telas
+- **Protótipos** e validação
+
+### Template Wireframes
+- **Estrutura de páginas** e layouts
+- **Componentes** reutilizáveis
+- **Navegação** e menus
+- **Formulários** e interações
+- **Estados** e feedback visual
+
+### Template Jornadas
+- **Mapa completo** da experiência
+- **Pontos de contato** e momentos
+- **Dores e ganhos** por etapa
+- **Fluxos principais** e alternativos
+- **Oportunidades** de melhoria
+
+## 🎯 Performance e Métricas
+
+### Tempo Estimado
+- **Análise Requisitos:** 10 minutos
+- **Mapeamento Jornadas:** 15 minutos
+- **Criação Wireframes:** 15 minutos
+- **Design Visual:** 10 minutos
+- **Prototipagem:** 5 minutos
+- **Total:** 55 minutos (vs 70 anterior)
+
+### Qualidade Esperada
+- **Score validação:** ≥ 75 pontos
+- **Cobertura:** 100% requisitos funcionais
+- **Usabilidade:** WCAG 2.1 AA 100%
+- **Responsividade:** 100% dispositivos
+- **Performance:** 80% redução de tokens
+
+### Frameworks Utilizados
+- **Design Thinking**
+- **User-Centered Design**
+- **Mobile-First Design**
+- **Atomic Design**
+- **WCAG 2.1 AA**
+- **Figma/Sketch**
+
+## 🔧 Integração Maestro
+
+### Skills Complementares
+- `visual-design` (estética e identidade)
+- `interaction-design` (interações e fluxos)
+- `research` (pesquisa com usuários)
+- `prototyping` (prototipagem rápida)
+
+### Referências Essenciais
+- **Especialista original:** `content/specialists/Especialista em UX Design.md`
+- **Artefatos gerados:**
+  - `docs/03-ux-design/design-doc.md` (principal)
+  - `docs/03-ux-design/wireframes.md` (estrutura)
+  - `docs/03-ux-design/jornada-usuario.md` (experiência)
+  - `docs/03-ux-design/prototipos.md` (validação)
+
+### Próximo Especialista
+**Modelagem de Domínio** - Transformará design em entidades de negócio e regras de domínio.
+
+---
+
+**Framework:** Maestro Skills Modernas v2.0  
+**Pattern:** Progressive Disclosure  
+**Performance:** 80% redução de tokens  
+**Quality:** 100% validação automática
