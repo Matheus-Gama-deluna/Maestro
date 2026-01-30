@@ -81,18 +81,44 @@ Aplique validação automática de completude e consistência.
 
 ## 📚 Recursos Adicionais
 
-### Templates e Guias
+### Prompts Especializados
+- **Modelo de Domínio:** [resources/prompts/modelo-dominio.md](resources/prompts/modelo-dominio.md)
+  - Template completo de modelagem de domínio
+  - Identificação de entidades e value objects
+  - Mapeamento de agregados e bounded contexts
+- **DDD Bounded Contexts:** [resources/prompts/ddd-bounded-contexts.md](resources/prompts/ddd-bounded-contexts.md)
+  - Definição de contextos delimitados
+  - Linguagem ubíqua por contexto
+  - Integração entre contextos
+- **DDD + CQRS:** [resources/prompts/ddd-cqrs.md](resources/prompts/ddd-cqrs.md)
+  - Command Query Responsibility Segregation
+  - Event Sourcing patterns
+  - Arquitetura para sistemas complexos
+
+### Guias de Referência
+- **Guia Completo de DDD:** [resources/reference/domain-modeling-complete-guide.md](resources/reference/domain-modeling-complete-guide.md) (29KB)
+  - Metodologia DDD completa (Entities, Value Objects, Aggregates)
+  - Event Storming e Domain Storytelling
+  - Templates de Entity, Value Object e Aggregate Root
+  - Exemplos práticos de E-commerce (Cliente, Pedido, Produto)
+  - Bounded Contexts e Linguagem Ubíqua
+  - Domain Events e Event Sourcing
+- **Guia de Referência:** [resources/reference/domain-guide.md](resources/reference/domain-guide.md)
+  - Conceitos fundamentais de modelagem
+  - Padrões e anti-patterns
+  - Casos de uso específicos
+
+### Templates e Exemplos
 - **Template Domínio:** [resources/templates/modelo-dominio.md](resources/templates/modelo-dominio.md)
 - **Template Entidades:** [resources/templates/entidades-relacionamentos.md](resources/templates/entidades-relacionamentos.md)
 - **Template Casos Uso:** [resources/templates/casos-uso.md](resources/templates/casos-uso.md)
 - **Template C4:** [resources/templates/arquitetura-c4.md](resources/templates/arquitetura-c4.md)
 - **Exemplos práticos:** [resources/examples/domain-examples.md](resources/examples/domain-examples.md)
-- **Guia completo:** [resources/reference/domain-guide.md](resources/reference/domain-guide.md)
 - **Validação:** [resources/checklists/domain-validation.md](resources/checklists/domain-validation.md)
 
 ### Funções MCP
 - **Inicialização:** Função de criação de estrutura base
-- **Validação:** Função de verificação de qualidade
+- **Validação:** Função de verificação de qualidade (DDD patterns)
 - **Processamento:** Função de preparação para próxima fase
 
 ## 🎯 Frameworks de Modelagem

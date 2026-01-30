@@ -1,415 +1,194 @@
 ---
-name: specialist-exploracao-codebase
-description: Mapeamento de codebases legadas e documentação de insights.
-allowed-tools: Read, Write, Edit, Glob, Grep
+name: "Exploração de Codebase"
+version: "1.0.0"
+type: "specialist"
+category: "complementar"
+complexity: "media"
+estimated_time: "90 minutos"
+score_minimo: 75
+tags: ["codebase", "exploration", "technical-debt", "refactoring", "documentation", "analysis"]
+dependencies: ["Codebase existente", "Debugging e Troubleshooting", "Documentação Técnica"]
 ---
 
-# Exploração de Codebase · Skill do Especialista
+# Especialista: Exploração de Codebase
 
-## Missão
-Entender rapidamente uma codebase existente e produzir recomendações, criando mapa completo do projeto antes de fazer mudanças.
+## 🎯 Visão Geral
 
-## Quando ativar
-- Fase: Fase 17 · Exploração
-- Workflows recomendados: /maestro, /refatorar-codigo
-- Use quando precisar em due diligences, auditorias ou repasses de projetos.
+Este especialista auxilia na análise sistemática de codebases existentes, identificando estrutura, padrões, dívida técnica e oportunidades de melhoria. Gera documentação completa e planos de refatoração baseados em análise profunda do código.
 
-## Inputs obrigatórios
-- Código fonte existente
-- Documentação disponível
-- Objetivos de análise
-- CONTEXTO.md do projeto
-- package.json/requirements.txt/composer.json
+**Quando Usar:**
+- Ao iniciar trabalho em codebase legado ou desconhecido
+- Antes de grandes refatorações ou migrações
+- Para documentar arquitetura de sistemas existentes
+- Quando precisa identificar dívida técnica
+- Para onboarding de novos desenvolvedores
 
-## Outputs gerados
-- Relatório de exploração completo
-- Mapa de dependências e riscos
-- Codebase Map estruturado
-- Technical Debt Report
-- Recomendações priorizadas
+**Não Usar Quando:**
+- Codebase ainda não existe (use especialistas de desenvolvimento)
+- Projeto é muito pequeno (< 1000 linhas)
+- Apenas debugging pontual (use Debugging e Troubleshooting)
 
-## Quality Gate
-- Codebase mapeada completamente
-- Arquitetura identificada
-- Débito técnico quantificado
-- Riscos documentados
-- Ações recomendadas priorizadas
+## 📋 Processo de 3 Fases
 
-## Processo de Exploração (3 Fases)
+### Fase 1: Scan (25 min)
+**Objetivo:** Análise automática da estrutura do código
 
-### Fase 1: Estrutura Geral
-```bash
-# 1. Árvore de diretórios
-tree -L 3 -I 'node_modules|vendor|dist|.git'
+**Ações:**
+- Escanear estrutura de diretórios
+- Identificar linguagens e frameworks
+- Mapear dependências principais
+- Contar métricas básicas (LOC, arquivos, módulos)
+- Detectar padrões arquiteturais
 
-# 2. Arquivos principais
-ls -lh *.{json,yaml,md,config.*}
+**Entregável:** Mapa estrutural do codebase
 
-# 3. Dependências
-cat package.json | jq '.dependencies'
-cat requirements.txt
-cat composer.json | jq '.require'
+**Função MCP:** `scan_codebase_structure`
 
-# 4. Identificar stack
-find . -name "*.js" -o -name "*.ts" -o -name "*.php" -o -name "*.py" | head -20
+### Fase 2: Analyze (40 min)
+**Objetivo:** Identificação de padrões, debt e oportunidades
+
+**Ações:**
+- Analisar qualidade do código
+- Identificar code smells
+- Calcular dívida técnica
+- Mapear dependências complexas
+- Identificar componentes críticos
+- Avaliar cobertura de testes
+
+**Entregável:** Relatório de análise técnica
+
+**Template:** Ver `resources/templates/technical-debt-report.md`
+
+**Função MCP:** `analyze_technical_debt`
+
+### Fase 3: Document (25 min)
+**Objetivo:** Geração de mapa e recomendações
+
+**Ações:**
+- Gerar mapa visual do codebase
+- Documentar arquitetura descoberta
+- Criar plano de refatoração priorizado
+- Documentar decisões arquiteturais inferidas
+- Gerar guia de navegação
+
+**Entregável:** Codebase map + plano de refatoração
+
+**Templates:** Ver `resources/templates/codebase-map.md` e `refactoring-plan.md`
+
+**Função MCP:** `generate_codebase_map`
+
+## 🔧 Funções MCP Disponíveis
+
+### scan_codebase_structure
+Escaneia estrutura do codebase e identifica padrões.
+
+**Quando usar:** Início da Fase 1 (Scan)
+
+**Saída:** Estrutura de diretórios, linguagens, frameworks, métricas
+
+### analyze_technical_debt
+Analisa qualidade e identifica dívida técnica.
+
+**Quando usar:** Durante Fase 2 (Analyze)
+
+**Saída:** Score de qualidade, code smells, recomendações
+
+### generate_codebase_map
+Gera mapa visual e documentação do codebase.
+
+**Quando usar:** Ao final da Fase 3 (Document)
+
+**Saída:** Mapa visual, arquitetura, plano de refatoração
+
+**Detalhes:** Ver `MCP_INTEGRATION.md` para parâmetros completos
+
+## 📚 Progressive Disclosure
+
+### Para Aprender Mais
+- **Exemplos Práticos:** `resources/examples/exploration-examples.md`
+  - 5 cenários completos (Monolito, Microserviços, Frontend SPA, Mobile, Legacy)
+
+- **Checklist de Validação:** `resources/checklists/exploration-validation.md`
+  - Sistema de pontuação (100 pontos)
+  - Score mínimo: 75 pontos
+
+- **Guia Completo:** `resources/reference/exploration-guide.md`
+  - Técnicas de análise de código
+  - Ferramentas de análise estática
+  - Padrões arquiteturais comuns
+  - Identificação de code smells
+  - Cálculo de dívida técnica
+
+### Templates Disponíveis
+- `resources/templates/codebase-map.md` - Mapa do codebase
+- `resources/templates/technical-debt-report.md` - Relatório de dívida técnica
+- `resources/templates/refactoring-plan.md` - Plano de refatoração
+
+## 💡 Exemplo Rápido
+
+**Cenário:** Monolito Node.js legado
+
+**Input:**
+```
+Codebase: 50k LOC, Node.js + Express
+Estrutura: src/ com 200+ arquivos
+Testes: 30% cobertura
+Idade: 3 anos
 ```
 
-**Output:** Entendimento de estrutura de pastas e tech stack.
-
-### Fase 2: Análise de Código
-```bash
-# Lines of Code por linguagem
-cloc .
-
-# Complexidade ciclomática
-lizard -l javascript src/
-lizard -l python src/
-lizard -l php src/
-
-# Code duplication
-jscpd src/
-
-# Test coverage
-npm run test:coverage
-pytest --cov=.
-```
-
-**Thresholds de alerta:**
-- Complexidade > 10 → Refactor urgente
-- Duplicação > 5% → DRY violation
-- Test coverage < 70% → Risco alto
-- LOC por arquivo > 500 → Refactor necessário
-
-### Fase 3: Dependências e Riscos
-```bash
-# Dependências desatualizadas
-npm outdated
-pip list --outdated
-composer outdated
-
-# Vulnerabilidades
-npm audit
-safety check
-pip-audit
-
-# Análise de arquitetura
-madge --circular src/
-dependency-cruiser src/
-```
-
-## Checklist de Análise
-
-### Estrutura e Organização
-- [ ] Estrutura de pastas mapeada
-- [ ] Entry points identificados
-- [ ] Arquitetura detectada (MVC, Clean, Monolith, Microservices)
-- [ ] Padrões de código documentados
-- [ ] Convenções de nomenclatura
-- [ ] Separação de responsabilidades clara
-
-### Qualidade de Código
-- [ ] Métricas de complexidade analisadas
-- [ ] Code duplication identificada
-- [ ] Test coverage medido
-- [ ] Code smells detectados
-- [ ] Performance bottlenecks identificados
-- [ ] Dead code removido
-
-### Dependências e Segurança
-- [ ] Package manager identificado
-- [ ] Dependências desatualizadas listadas
-- [ ] Vulnerabilidades conhecidas verificadas
-- [ Licenças compatíveis
-- [ ] Dependências críticas atualizadas
-- [ ] Supply chain security avaliada
-
-### Documentação
-- [ ] README.md completo
-- [ ] Documentação de arquitetura
-- [ ] API docs atualizadas
-- [ ] Guia de setup disponível
-- [ ] Changelog mantido
-- [ ] Contributing guide existente
-
-## Output: Codebase Map Template
-
-```markdown
-# Codebase Map: [Nome do Projeto]
-
-## Visão Geral
-- **Tipo:** [Monolith/Microservices/Híbrido]
-- **Stack Principal:** [Tecnologias principais]
-- **Ano de Criação:** [Ano]
-- **Equipe Atual:** [Tamanho da equipe]
-- **Manutenção:** [Ativa/Parada/Legada]
-
-## Stack Tecnológico
-### Frontend
-- **Framework:** [React/Vue/Angular/etc]
-- **Linguagem:** [JavaScript/TypeScript/etc]
-- **Build Tool:** [Webpack/Vite/etc]
-- **CSS Framework:** [Tailwind/Bootstrap/etc]
-- **State Management:** [Redux/Vuex/etc]
-
-### Backend
-- **Framework:** [Laravel/Django/Spring/etc]
-- **Linguagem:** [PHP/Python/Java/etc]
-- **Banco de Dados:** [MySQL/PostgreSQL/etc]
-- **Cache:** [Redis/Memcached/etc]
-- **Queue:** [Redis SQS/etc]
-
-### Infraestrutura
-- **Cloud:** [AWS/Azure/GCP/On-premise]
-- **Containerização:** [Docker/Kubernetes]
-- **CI/CD:** [GitHub Actions/Jenkins/etc]
-- **Monitoramento:** [Datadog/New Relic/etc]
-
-## Estrutura de Diretórios
-```
-src/
-├── controllers/          # Controllers/Handlers
-├── services/            # Business logic
-├── models/              # Data models
-├── views/               # UI components
-├── utils/               # Helper functions
-├── tests/               # Test files
-├── config/              # Configuration
-└── docs/                # Documentation
-```
-
-## Entry Points
-- **Principal:** [arquivo principal]
-- **API:** [entry point da API]
-- **Frontend:** [entry point do frontend]
-- **CLI:** [scripts de linha de comando]
-- **Worker:** [background jobs]
-
-## Padrões Identificados
-- **Arquitetural:** [MVC/Clean/Hexagonal/etc]
-- **Design Patterns:** [Repository/Service/Factory/etc]
-- **Code Patterns:** [Singleton/Observer/etc]
-- **Frontend:** [Custom Hooks/Context/etc]
-- **Backend:** [Repository/Service/Controller/etc]
-
-## Métricas de Qualidade
-- **Total LOC:** [número total de linhas]
-- **Por Linguagem:**
-  - [Linguagem 1]: [número de linhas]
-  - [Linguagem 2]: [número de linhas]
-  - [Linguagem 3]: [número de linhas]
-- **Complexidade Média:** [valor médio]
-- **Test Coverage:** [percentual]
-- **Code Duplication:** [percentual]
-
-## Débito Técnico
-### 🔴 Críticos (Ação Imediata)
-- [ ] [Descrição do débito crítico]
-- [ ] [Localização no código]
-- [ ] [Impacto no negócio]
-
-### 🟡 Médios (Planejar)
-- [ ] [Descrição do débito médio]
-- [ ] [Localização no código]
-- [ ] [Timeline para correção]
-
-### 🟢 Baixos (Monitorar)
-- [ ] [Descrição do débito baixo]
-- [ ] [Localização no código]
-
-## Riscos Identificados
-### 🔴 Críticos
-- **Segurança:** [descrição do risco]
-- **Performance:** [descrição do risco]
-- **Manutenibilidade:** [descrição do risco]
-- **Escalabilidade:** [descrição do risco]
-
-### 🟡 Médios
-- **Tecnologia:** [descrição do risco]
-- **Time-to-Market:** [descrição do risco]
-- **Equipe:** [descrição do risco]
-
-### 🟢 Baixos
-- **Compliance:** [descrição do risco]
-- **Documentação:** [descrição do risco]
-
-## Recomendações Priorizadas
-
-### 1. Imediato (1-2 semanas)
-- [ ] [Ação 1 crítica]
-- [ ] [Ação 2 crítica]
-- [ ] [Ação 3 crítica]
-
-### 2. Curto Prazo (1 mês)
-- [ ] [Ação 1 média]
-- [ ] [Ação 2 média]
-- [ ] [Ação 3 média]
-
-### 3. Médio Prazo (2-3 meses)
-- [ ] [Ação 1 baixa]
-- [ ] [Ação 2 baixa]
-- [ ] [Ação 3 baixa]
-
-## Próximos Passos
-1. **Priorizar** ações críticas
-2. **Planejar** refatoração em fases
-3. **Alocar** recursos adequados
-4. **Monitorar** progresso
-5. **Validar** melhorias
-
-## Guardrails Críticos
-
-### ❌ NUNCA Faça
-- **NUNCA** faça mudanças sem entender contexto
-- **NUNCA** ignore métricas de qualidade
-- **NUNCA** pule análise de dependências
-- **NUNCA** refatore sem testes
-
-### ✅ SEMPRE Faça
-- **SEMPRE** mapeie antes de modificar
-- **SEMPRE** documente descobertas
-- **SEMPRE** meça impacto das mudanças
-- **SEMPRE** envolva equipe nas decisões
-
-## Ferramentas Recomendadas
-
-### Análise de Código
-```bash
-# Métricas básicas
-cloc .                    # Lines of code
-lizard -l src/             # Complexidade
-jscpd src/                  # Duplicação
-sonarcloud --sonarcloud src/  # Bugs de segurança
-
-# Visualização
-madge --circular src/        # Dependências circulares
-dependency-cruiser src/      # Grafo de dependências
-```
-
-### Dependências
-```bash
-# Node.js
-npm outdated                # Dependências desatualizadas
-npm audit                  # Vulnerabilidades
-npm ls                     # Árvore de dependências
-
-# Python
-pip list --outdated          # Dependências desatualizadas
-pip-audit                  # Vulnerabilidades
-pip freeze                 # Congela dependências
-
-# PHP
-composer outdated            # Dependências desatualizadas
-composer validate            # Validação de dependências
-```
-
-### Testes
-```bash
-# JavaScript
-npm test                    # Rodar todos os testes
-npm run test:coverage        # Cobertura de código
-
-# Python
-pytest                     # Rodar testes
-pytest --cov=.           # Cobertura de código
-
-# PHP
-php artisan test             # Rodar testes
-phpunit --coverage-html     # Cobertura de código
-```
-
-## Context Flow
-
-### Artefatos Obrigatórios para Iniciar
-Cole no início:
-1. Código fonte completo
-2. Documentação disponível
-3. Objetivos da análise
-4. CONTEXTO.md com contexto
-5. Dependências listadas
-
-### Prompt de Continuação
-```
-Atue como Arqueito de Código Especialista.
-
-Contexto do projeto:
-[COLE docs/CONTEXTO.md]
-
-Código fonte:
-[COLE CÓDIGO FONTE]
-
-Objetivos da análise:
-[COLE OBJETIVOS]
-
-Preciso mapear esta codebase e identificar riscos e oportunidades.
-```
-
-### Ao Concluir Esta Fase
-1. **Mapeie** estrutura completa
-2. **Analise** qualidade e padrões
-3. **Identifique** riscos e débitos
-4. **Documente** descobertas
-5. **Priorize** ações
-6. **Apresente** recomendações
-
-## Templates Prontos
-
-### Technical Debt Report
-```markdown
-# Technical Debt Report
-
-## Resumo Executivo
-- **Débito Total:** [valor estimado em dias-homem]
-- **Risco Crítico:** [descrição]
-- **Impacto no Negócio:** [descrição]
-- **Timeline para Correção:** [timeline]
-
-## Débito por Categoria
-
-### 🔴 Críticos (Ação Imediata)
-1. **[Débito 1]**
-   - **Local:** [arquivo:linha]
-   - **Descrição:** [descrição detalhada]
-   - **Impacto:** [impacto]
-   - **Estimativa:** [dias-homem]
-   - **Prioridade:** Alta
-
-### 🟡 Médios (Planejar)
-1. **[Débito 2]**
-   - **Local:** [arquivo:linha]
-   - **Descrição:** [descrição detalhada]
-   - **Impacto:** [impacto]
-   - **Estimativa:** [dias-homem]
-   - **Prioridade:** Média
-
-## Plano de Ação
-### Fase 1 (Semanas 1-2)
-- [ ] Corrigir débitos críticos
-- [ ] Atualizar dependências de segurança
-- [ ] Aumentar test coverage
-
-### Fase 2 (Semanas 3-4)
-- [ ] Refatorar arquitetura
-- [ ] Implementar padrões de código
-- [ ] Melhorar documentação
-
-### Fase 3 (Semanas 5-6)
-- [ ] Otimizar performance
-- [] Reduzir complexidade
-- [] Implementar monitoramento
-```
-
-## Skills complementares
-- `clean-code`
-- `systematic-debugging`
-- `code-review-checklist`
-- `architecture-patterns`
-- `performance-profiling`
-
-## Referências essenciais
-- **Especialista original:** `content/specialists/Especialista em Exploração de Codebase.md`
-- **Artefatos alvo:**
-  - Relatório de exploração completo
-  - Codebase Map estruturado
-  - Technical Debt Report
-  - Mapa de dependências e riscos
-  - Recomendações priorizadas
+**Processo:**
+1. **Scan (25 min):** Identificar 15 módulos principais, Express + MongoDB
+2. **Analyze (40 min):** Detectar 45 code smells, debt score 62/100
+3. **Document (25 min):** Gerar mapa, plano de refatoração em 3 fases
+
+**Output:** Mapa completo + plano de refatoração priorizado em ~90 minutos
+
+**Ver exemplo completo:** `resources/examples/exploration-examples.md#monolito-nodejs`
+
+## 🎯 Inovações
+
+### Codebase Map Visual
+Mapa interativo da estrutura do código com dependências, complexidade e hotspots de mudança.
+
+### Technical Debt Scoring
+Score automático de dívida técnica baseado em múltiplas métricas (complexidade, duplicação, cobertura).
+
+### Refactoring Recommendations
+Sugestões priorizadas de refatoração baseadas em impacto vs esforço.
+
+### Dependency Graph
+Grafo de dependências automatizado mostrando acoplamento e pontos críticos.
+
+## 📊 Métricas de Sucesso
+
+- **Tempo Total:** ~90 minutos (vs 4-8 horas manual)
+- **Cobertura:** 100% do codebase mapeado
+- **Precisão:** >90% na identificação de padrões
+- **Utilidade:** >85% das recomendações implementadas
+
+## ✅ Próximos Passos
+
+Após conclusão da exploração:
+1. Compartilhar codebase map com equipe
+2. Priorizar itens de dívida técnica
+3. Criar histórias de refatoração
+4. Atualizar documentação arquitetural
+5. Planejar sprints de melhoria técnica
+
+## 🔗 Integração com Outros Especialistas
+
+**Recebe de:**
+- Debugging e Troubleshooting → Bug reports, logs
+- Documentação Técnica → Docs existentes
+
+**Entrega para:**
+- Migração e Modernização → Análise para migração
+- Refatoração → Plano de refatoração
+- Documentação Técnica → Arquitetura documentada
+- Plano de Execução → Histórias de melhoria técnica
+
+---
+
+**Versão:** 1.0.0  
+**Última Atualização:** 30/01/2026  
+**Mantido por:** Maestro Team
