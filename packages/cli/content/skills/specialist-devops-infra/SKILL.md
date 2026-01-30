@@ -1,326 +1,162 @@
 ---
-name: specialist-devops-infra
-description: Pipelines, IaC, Docker e monitoramento para deploy seguro.
-allowed-tools: Read, Write, Edit, Glob, Grep
+title: "Especialista em DevOps e Infraestrutura"
+description: "Engenharia DevOps para automação, CI/CD e infraestrutura como código"
+version: "2.0"
+type: "specialist"
+domain: "devops"
+priority: "high"
+phase: "2"
+dependencies:
+  - "arquitetura.md"
+  - "codigo-fonte"
+outputs:
+  - "estado-template.json"
+  - "Dockerfile"
+  - "ci-cd-pipeline.yml"
+  - "main.tf"
+quality_threshold: 80
+progressive_disclosure: true
 ---
 
-# DevOps e Infraestrutura · Skill do Especialista
+# 🚀 Especialista em DevOps e Infraestrutura
 
-## Missão
-Configurar CI/CD, contêineres e infraestrutura pronta para produção, garantindo entregas automatizadas, seguras e confiáveis.
+## 🎯 Missão
+Configurar infraestrutura automatizada, CI/CD e deploy confiável para aplicações modernas com foco em:
+- **Automação completa** de pipelines de build, test e deploy
+- **Infraestrutura como código** (reprodutível e versionada)
+- **Observabilidade proativa** com métricas e alertas
+- **Alta disponibilidade** e disaster recovery
 
-## Quando ativar
-- Fase: Fase 12 · DevOps
-- Workflows recomendados: /deploy, /maestro
-- Use quando precisar antes de releases e para manter ambientes confiáveis.
+## 📋 Contexto Necessário
 
-## Inputs obrigatórios
-- Arquitetura (`docs/06-arquitetura/arquitetura.md`)
-- Código fonte (`src/`)
-- CONTEXTO.md do projeto
-- Requisitos de infraestrutura
-- Secrets e credenciais seguras
-- Métricas esperadas
+### Inputs Obrigatórios
+- **Arquitetura** (`docs/05-arquitetura/arquitetura.md`) - Stack tecnológica e decisões de deploy
+- **Código Fonte** (`src/`) - Aplicação para containerização
 
-## Outputs gerados
-- Pipelines CI/CD completos
-- Dockerfiles otimizados
-- Docker Compose para desenvolvimento
-- IaC (Terraform/Pulumi)
-- Configurações de deploy
-- Monitoramento e alertas
+### Context Flow
+- **Recebe de**: Arquitetura de Software, Desenvolvimento Backend/Frontend
+- **Entrega para**: Dados e Analytics, Documentação Técnica
 
-## Quality Gate
-- Dockerfile otimizado (multi-stage)
-- Pipeline CI/CD funcionando
-- Deploy automatizado para staging
-- Métricas e logs configurados
-- Alertas básicos definidos
-- Rollback testado
-- Infraestrutura como código versionada
+---
 
-## Ferramentas Recomendadas
+## 🔄 Processo Otimizado
 
-### CI/CD
-- **GitHub Actions**: pipelines declarativos, integração nativa
-- **GitLab CI**: pipelines robustos, runners self-hosted
-- **ArgoCD**: GitOps para Kubernetes
+### 1. Inicialização Estruturada
+Use função de inicialização para criar estrutura base com template `estado-template.json`.
 
-### Containerização
-- **Docker**: empacotamento de aplicações
-- **Docker Compose**: orquestração local
-- **Kubernetes**: orquestração em produção
-- **Helm**: charts para deploy em K8s
+### 2. Discovery Rápido (15 min)
+Faça perguntas focadas:
+1. Qual **stack tecnológica** da aplicação?
+2. Qual **cloud provider** de preferência?
+3. Qual **nível de criticidade** (alta/média/baixa)?
+4. Quais **requisitos de compliance**?
 
-### Infraestrutura como Código
-- **Terraform**: multi-cloud, state management
-- **Pulumi**: IaC com linguagens de programação
-- **Ansible**: configuração de servidores
+### 3. Geração com Template
+Use template estruturado: `resources/templates/estado-template.json`
 
-### Observabilidade
-- **Prometheus + Grafana**: métricas e dashboards
-- **Loki**: logs centralizados
-- **Jaeger/Zipkin**: tracing distribuído
-- **PagerDuty/Opsgenie**: alertas e on-call
+### 4. Validação de Qualidade
+Aplique validação automática de completude e consistência.
 
-## Processo Obrigatório de Configuração
+### 5. Processamento para Próxima Fase
+Prepare contexto estruturado para próximo especialista.
 
-### 1. Análise da Arquitetura
-```text
-Com base na arquitetura:
-[COLE ARQUITETURA]
+---
 
-Identifique:
-- Stack tecnológica (Node, Python, Java, etc.)
-- Dependências (banco, cache, filas)
-- Requisitos de escala
-- Restrições de segurança/compliance
-```
+## 🛠️ Templates Disponíveis
 
-### 2. Containerização
-```text
-Para a stack [TECNOLOGIA]:
-- Crie Dockerfile otimizado (multi-stage)
-- Configure docker-compose.yml
-- Defina health checks
-- Otimize tamanho da imagem
-```
+### Template Principal
+- **`estado-template.json`** - Estado completo da infraestrutura
 
-### 3. Pipeline CI/CD
-```text
-Configure pipeline com:
-- Build automatizado
-- Testes unitários e integração
-- Análise estática (linting, SAST)
-- Build de imagem com tag semântica
-- Deploy para staging
-- Deploy para produção com aprovação
-```
+### Templates de Apoio
+- **`Dockerfile`** - Containerização da aplicação
+- **`ci-cd-pipeline.yml`** - Pipeline de CI/CD
+- **`main.tf`** - Infraestrutura como código (Terraform)
 
-### 4. Infraestrutura como Código
-```text
-Defina infraestrutura usando [TERRAFORM/PULUMI]:
-- Recursos de cloud (VPC, EC2, RDS, etc.)
-- Kubernetes clusters
-- Networking e segurança
-- Backup e disaster recovery
-```
+---
 
-## Checklists Obrigatórias
+## ✅ Quality Gates
 
-### Pipeline de CI/CD
-- [ ] Build automatizado a cada push
-- [ ] Testes unitários e de integração no pipeline
-- [ ] Análise estática de código (linting, SAST)
-- [ ] Build de imagem Docker com tag semântica
-- [ ] Deploy automatizado para staging
-- [ ] Deploy para produção com aprovação manual ou automática
-- [ ] Rollback automatizado em caso de falha
+### Critérios de Validação
+- **Stack definida**: Linguagem, framework, database, cloud
+- **Ambientes configurados**: dev, staging, production
+- **CI/CD planejado**: Provider e status inicial
+- **Containerização**: Registry e image name
+- **IaC definida**: Tool e state location
+- **Compliance**: Security scan, secrets, backup, monitoring
 
-### Containerização
-- [ ] Dockerfile otimizado (multi-stage build)
-- [ ] Imagens base oficiais e atualizadas
-- [ ] Variáveis de ambiente para configuração
-- [ ] Health checks configurados
-- [ ] Recursos (CPU/memória) limitados
-- [ ] Security scanning de imagens
+### Threshold Mínimo
+- **Score ≥ 80 pontos** para aprovação automática
+- **100% campos obrigatórios** preenchidos
+- **Validação de segurança** aprovada
 
-### Infraestrutura
-- [ ] Infraestrutura definida em código (Terraform/Pulumi)
-- [ ] State armazenado de forma segura (S3, GCS)
-- [ ] Ambientes isolados (dev, staging, prod)
-- [ ] Backups automatizados
-- [ ] Disaster recovery testado
-- [ ] Segurança (firewalls, IAM, encryption)
+---
 
-### Observabilidade
-- [ ] Métricas de aplicação expostas (Prometheus)
-- [ ] Logs estruturados e centralizados
-- [ ] Dashboards para métricas críticas
-- [ ] Alertas para SLOs/SLIs
-- [ ] Runbooks para incidentes comuns
-- [ ] Tracing distribuído (se microserviços)
+## 🚀 Automação via MCP
 
-## Guardrails Críticos
+### Funções MCP Disponíveis
+1. **`init_infrastructure_structure`** - Cria estrutura base
+2. **`validate_infrastructure_quality`** - Valida qualidade
+3. **`generate_ci_cd_pipeline`** - Gera pipeline completo
 
-### NUNCA Faça
-- **NUNCA** exponha secrets em código ou logs
-- **NUNCA** use imagens base inseguras
-- **NUNCA** pule testes em produção
-- **NUNCA** ignore alertas críticas
+### Context Flow Automatizado
 
-### SEMPRE Faça
-- **SEMPRE** use multi-stage builds
-- **SEMPRE** versione infraestrutura como código
-- **SEMPRE** implemente rollback automático
-- **SEMPRE** monitore SLOs/SLIs
+#### Ao Concluir (Score ≥ 80)
+1. **Infraestrutura validada** automaticamente
+2. **CONTEXTO.md** atualizado com informações de deploy
+3. **Prompt gerado** para próximo especialista
+4. **Transição** automática para Dados e Analytics
 
-### Segurança Obrigatória
-```yaml
-# Exemplo de security scanning
-- name: Security Scan
-  uses: aquasecurity/trivy-action@master
-  with:
-    image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-    format: 'sarif'
-    exit-code: '1'
-```
+#### Guardrails Críticos
+- **NUNCA avance** sem validação ≥ 80 pontos
+- **SEMPRE confirme** com usuário antes de processar
+- **USE funções descritivas** para automação via MCP
 
-## Context Flow
+---
 
-### Artefatos Obrigatórios para Iniciar
-Cole no início:
-1. Arquitetura completa com stack definida
-2. Código fonte com dependências
-3. CONTEXTO.md com restrições
-4. Requisitos de compliance (se aplicável)
+## 📊 Recursos Carregados Sob Demanda
 
-### Prompt de Continuação
-```
-Atue como Engenheiro DevOps Sênior.
+### Templates
+- `resources/templates/estado-template.json`
+- `resources/templates/Dockerfile`
+- `resources/templates/ci-cd-pipeline.yml`
+- `resources/templates/main.tf`
 
-Contexto do projeto:
-[COLE docs/CONTEXTO.md]
+### Examples
+- `resources/examples/devops-examples.md`
 
-Arquitetura:
-[COLE docs/06-arquitetura/arquitetura.md]
+### Checklists
+- `resources/checklists/devops-validation.md`
 
-Preciso configurar CI/CD, containerização e deploy.
-```
+### Reference
+- `resources/reference/devops-guide.md`
 
-### Ao Concluir Esta Fase
-1. **Configure pipelines** e Dockerfiles
-2. **Crie infraestrutura** como código
-3. **Configure monitoramento** e alertas
-4. **Teste deploy** em staging
-5. **Documente runbooks** para operação
-6. **Atualize o CONTEXTO.md** com informações de deploy
+---
 
-## Métricas e SLOs
+## 🎯 Especialização
 
-### Indicadores Obrigatórios
-- **Build Time:** < 5 minutos
-- **Deploy Time:** < 10 minutos
-- **Uptime:** ≥ 99.9%
-- **MTTR:** < 30 minutos
-- **MTBF:** > 30 dias
+### Stack Coverage
+- **Languages**: Node.js, Python, Java, Go, Rust
+- **Frameworks**: Next, Nest, Django, FastAPI, Spring
+- **Databases**: Postgres, MySQL, Mongo, Redis
+- **Clouds**: AWS, GCP, Azure
+- **CI/CD**: GitHub Actions, GitLab CI
+- **IaC**: Terraform, Pulumi
+- **Containers**: Docker, Kubernetes
 
-### SLOs Recomendados
-- **Availability:** 99.9% (43min downtime/mês)
-- **Latency:** p95 < 500ms
-- **Error Rate:** < 0.1%
-- **Recovery Time:** < 5 minutos
+### Métricas de Sucesso
+- **Tempo de setup**: < 60 minutos
+- **Automação**: 100% do pipeline
+- **Disponibilidade**: 99.9%+ SLO
+- **Recovery**: < 5 minutos MTTR
 
-## Templates Prontos
+---
 
-### Dockerfile (Node.js)
-```dockerfile
-# Build stage
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+## 🔄 Progressive Disclosure
 
-# Production stage
-FROM node:20-alpine AS production
-WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
-COPY . .
-RUN npm run build
+Este skill utiliza carregamento progressivo para performance otimizada:
+- **SKILL.md**: Informações essenciais (< 500 linhas)
+- **Resources**: Carregados sob demanda
+- **Templates**: Estruturas reutilizáveis
+- **Examples**: Casos práticos reais
 
-# Security
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
-
-USER nextjs
-EXPOSE 3000
-ENV NODE_ENV=production
-CMD ["npm", "start"]
-```
-
-### GitHub Actions (CI/CD)
-```yaml
-name: CI/CD Pipeline
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run test
-      - run: npm run build
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-
-  deploy:
-    needs: [test, security]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Deploy to staging
-        run: echo "Deploy to staging"
-      - name: Deploy to production
-        if: success()
-        run: echo "Deploy to production"
-```
-
-### Terraform (AWS)
-```hcl
-provider "aws" {
-  region = var.aws_region
-}
-
-resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  tags = {
-    Name        = "${var.project_name}-vpc"
-    Environment = var.environment
-  }
-}
-
-resource "aws_ecs_cluster" "main" {
-  name = "${var.project_name}-cluster"
-  
-  setting {
-    name  = "containerInsights"
-    value = "enabled"
-  }
-}
-```
-
-## Skills complementares
-- `deployment-procedures`
-- `server-management`
-- `powershell-windows`
-- `bash-linux`
-- `kubernetes-patterns`
-
-## Referências essenciais
-- **Especialista original:** `content/specialists/Especialista em DevOps e Infraestrutura.md`
-- **Artefatos alvo:**
-  - Pipelines CI/CD completos
-  - Dockerfiles otimizados
-  - IaC versionada
-  - Configurações de deploy
-  - Monitoramento e alertas
+Para acessar recursos completos, consulte a documentação em `resources/`.
