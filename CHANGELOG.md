@@ -6,6 +6,18 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.
 
 ---
 
+## [2.3.0] - 2026-02-01
+
+### 🤖 Modern Skills v2.0
+- **Adaptação Completa**: MCP Server adaptado para usar skills locais injetadas
+- **Zero Dependência MCP**: Remoção do uso de resources `maestro://` em favor de arquivos locais
+- **Progressive Disclosure**: IDE gerencia descoberta de skills via `.agent/skills/`
+- **Skills Mapping**: Novo sistema de mapeamento fase → skill local
+- **Tools Atualizados**: `iniciar_projeto`, `proximo`, `status`, `validar_gate`, `contexto` agora suportam skills locais
+- **Rules v2**: `GEMINI.md` atualizado com novos protocolos de carregamento e estrutura de arquivos
+
+---
+
 ## [2.2.0] - 2026-01-07
 
 ### 🎼 Renomeação do Projeto
