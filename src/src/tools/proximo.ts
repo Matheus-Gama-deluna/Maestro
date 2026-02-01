@@ -12,7 +12,7 @@ import { gerarInstrucaoProximaFase } from "../utils/instructions.js";
 import type { EntregavelResumo, ProjectSummary } from "../types/memory.js";
 import { logEvent, EventTypes } from "../utils/history.js";
 import { gerarSystemMd } from "../utils/system-md.js";
-import { gerarSecaoPrompts } from "../utils/prompt-mapper.js";
+import { gerarSecaoPrompts, getSkillParaFase, getSkillPath, getSkillResourcePath } from "../utils/prompt-mapper.js";
 import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
 
 interface ProximoArgs {
@@ -526,7 +526,50 @@ confirmar_classificacao(
         // Aqui apenas registramos que passou.
     }
 
-    // Não precisa mais carregar especialista/template - resposta compacta
+    // Gerar informações da próxima skill
+    const proximaSkillInfo = await (async () => {
+        if (!proximaFase) return "";
+        
+        const proximaSkill = getSkillParaFase(proximaFase.nome);
+        if (!proximaSkill) return "";
+        
+        let templatesInfo = "";
+        try {
+            const { readdir } = await import("fs/promises");
+            const templatesPath = getSkillResourcePath(proximaSkill, diretorio, 'templates');
+            
+            if (existsSync(templatesPath)) {
+                const templates = await readdir(templatesPath);
+                if (templates.length > 0) {
+                    templatesInfo = `\n\n📋 **Templates Disponíveis**:\n${templates.map(t => `- \`.agent/skills/${proximaSkill}/resources/templates/${t}\``).join("\n")}`;
+                }
+            }
+        } catch (error) {
+            // Silenciosamente ignorar erro de leitura
+        }
+        
+        return `
+
+## 🤖 Próximo Especialista
+
+**Skill:** \`${proximaSkill}\`  
+**Localização:** \`.agent/skills/${proximaSkill}/SKILL.md\`
+
+> 💡 **Próximos passos:**
+> 1. Ative a skill: \`@${proximaSkill}\`
+> 2. Leia SKILL.md para entender a fase
+> 3. Consulte o template apropriado
+> 4. Siga o checklist de validação${templatesInfo}
+
+**Resources disponíveis:**
+- 📋 Templates: \`.agent/skills/${proximaSkill}/resources/templates/\`
+- 📖 Examples: \`.agent/skills/${proximaSkill}/resources/examples/\`
+- ✅ Checklists: \`.agent/skills/${proximaSkill}/resources/checklists/\`
+- 📚 Reference: \`.agent/skills/${proximaSkill}/resources/reference/\`
+- 🔧 MCP Functions: \`.agent/skills/${proximaSkill}/MCP_INTEGRATION.md\`
+`;
+    })();
+
     const resposta = `# ✅ Fase ${faseAnterior} Concluída!
 
 ## 📁 Entregável
@@ -547,7 +590,7 @@ ${classificacaoInfoAdicional}
 
 ## Gate de Saída
 ${proximaFase?.gate_checklist.map(item => `- [ ] ${item}`).join("\n") || "Nenhum"}
-${proximaFase ? gerarSecaoPrompts(proximaFase.nome) : ""}
+${proximaSkillInfo}
 ---
 
 ## ⚡ AÇÃO OBRIGATÓRIA - Salvar Arquivos
@@ -566,11 +609,6 @@ ${estadoFile.content}
 ### 3. Atualizar resumo
 **Caminho:** \`${diretorio}/.maestro/resumo.json\`
 (conteúdo no campo files)
-
----
-
-> 💡 Use \`read_resource("maestro://especialista/${proximaFase?.especialista || "..."}")\` para ver o especialista.
-> 💡 Use \`read_resource("maestro://template/${proximaFase?.template || "..."}")\` para ver o template.
 `;
 
     return {

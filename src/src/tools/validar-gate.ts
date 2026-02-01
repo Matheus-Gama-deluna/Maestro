@@ -5,6 +5,7 @@ import { validarGate as validarGateCore, formatarResultadoGate } from "../gates/
 import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { resolve } from "path";
+import { getSkillParaFase } from "../utils/prompt-mapper.js";
 
 interface ValidarGateArgs {
     fase?: number;
@@ -112,6 +113,19 @@ validar_gate(
     const resposta = `# Gate da Fase ${numeroFase}: ${fase.nome}
 
 ${resultadoFormatado}
+
+${(() => {
+    const skillAtual = getSkillParaFase(fase.nome);
+    if (!skillAtual) return "";
+    
+    return `
+## 📋 Checklist da Skill
+
+**Localização:** \`.agent/skills/${skillAtual}/resources/checklists/\`
+
+> 💡 Consulte o checklist completo da skill para validação detalhada.
+`;
+})()}
 
 ${resultado.valido
             ? "✅ **Você pode avançar!** Use `proximo(entregavel: \"...\", estado_json: \"...\")` para ir para a próxima fase."

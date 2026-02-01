@@ -9,6 +9,124 @@ export interface PromptRef {
 }
 
 /**
+ * Mapeamento de fases para skills locais
+ * Skills estão em .agent/skills/{nome}/
+ * @since 2.0.0 - Skills v2.0 Migration
+ */
+export const FASE_SKILL_MAP: Record<string, string> = {
+    // ========================================
+    // FLUXO SIMPLES (7 fases)
+    // ========================================
+    "Produto": "specialist-gestao-produto",
+    "Requisitos": "specialist-engenharia-requisitos-ia",
+    "UX Design": "specialist-ux-design",
+    "Arquitetura": "specialist-arquitetura-software",
+    "Backlog": "specialist-plano-execucao-ia",
+    "Frontend": "specialist-desenvolvimento-frontend",
+    "Backend": "specialist-desenvolvimento-backend",
+    
+    // ========================================
+    // FLUXO MÉDIO (13 fases) - Adiciona:
+    // ========================================
+    "Modelo de Domínio": "specialist-modelagem-dominio",
+    "Banco de Dados": "specialist-banco-dados",
+    "Segurança": "specialist-seguranca-informacao",
+    "Testes": "specialist-analise-testes",
+    "Contrato API": "specialist-contrato-api",
+    "Integração": "specialist-devops-infra",
+    
+    // ========================================
+    // FLUXO COMPLEXO (17 fases) - Adiciona:
+    // ========================================
+    "Arquitetura Avançada": "specialist-arquitetura-avancada",
+    "Performance": "specialist-performance-escalabilidade",
+    "Observabilidade": "specialist-observabilidade",
+    
+    // ========================================
+    // OPCIONAL
+    // ========================================
+    "Prototipagem": "specialist-prototipagem-stitch",
+    
+    // ========================================
+    // COMPLEMENTARES
+    // ========================================
+    "Dados e Analytics": "specialist-dados-analytics-ia",
+    "Acessibilidade": "specialist-acessibilidade",
+    "Debugging": "specialist-debugging-troubleshooting",
+    "Documentação": "specialist-documentacao-tecnica",
+    "Exploração": "specialist-exploracao-codebase",
+    "Migração": "specialist-migracao-modernizacao",
+    "Mobile": "specialist-desenvolvimento-mobile",
+    "Mobile Design": "specialist-mobile-design-avancado"
+};
+
+/**
+ * Retorna o nome da skill para uma fase
+ * @param faseNome Nome da fase (ex: "Produto", "Requisitos")
+ * @returns Nome da skill (ex: "specialist-gestao-produto") ou null se não encontrado
+ * @since 2.0.0
+ */
+export function getSkillParaFase(faseNome: string): string | null {
+    return FASE_SKILL_MAP[faseNome] || null;
+}
+
+/**
+ * Verifica se uma fase tem skill associada
+ * @param faseNome Nome da fase
+ * @returns true se existe skill para a fase
+ * @since 2.0.0
+ */
+export function temSkillParaFase(faseNome: string): boolean {
+    return faseNome in FASE_SKILL_MAP;
+}
+
+/**
+ * Retorna o caminho completo para uma skill no projeto
+ * @param skillNome Nome da skill (ex: "specialist-gestao-produto")
+ * @param diretorio Diretório do projeto
+ * @returns Caminho absoluto para a skill
+ * @since 2.0.0
+ */
+export function getSkillPath(skillNome: string, diretorio: string): string {
+    const { join } = require("path");
+    return join(diretorio, '.agent', 'skills', skillNome);
+}
+
+/**
+ * Retorna o caminho para um arquivo específico da skill
+ * @param skillNome Nome da skill
+ * @param diretorio Diretório do projeto
+ * @param arquivo Nome do arquivo (ex: "SKILL.md", "README.md")
+ * @returns Caminho absoluto para o arquivo
+ * @since 2.0.0
+ */
+export function getSkillFilePath(
+    skillNome: string, 
+    diretorio: string, 
+    arquivo: string
+): string {
+    const { join } = require("path");
+    return join(getSkillPath(skillNome, diretorio), arquivo);
+}
+
+/**
+ * Retorna o caminho para resources de uma skill
+ * @param skillNome Nome da skill
+ * @param diretorio Diretório do projeto
+ * @param tipo Tipo de resource (templates, examples, checklists, reference)
+ * @returns Caminho absoluto para o diretório de resources
+ * @since 2.0.0
+ */
+export function getSkillResourcePath(
+    skillNome: string,
+    diretorio: string,
+    tipo: 'templates' | 'examples' | 'checklists' | 'reference'
+): string {
+    const { join } = require("path");
+    return join(getSkillPath(skillNome, diretorio), 'resources', tipo);
+}
+
+/**
  * Mapeamento fase → prompts relacionados
  * Os prompts são carregados de .maestro/content/prompts/ ou fallback do servidor
  */

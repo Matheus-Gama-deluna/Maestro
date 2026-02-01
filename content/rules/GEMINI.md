@@ -71,42 +71,67 @@ version: 1.0.0
 
 **SEMPRE ATIVO: Carregar especialista correto para cada fase**
 
-### Protocol de Carregamento
+### Protocol de Carregamento (ATUALIZADO - Skills Locais v2.0)
 
 ```
 1. Ler estado.json → obter fase_atual
-2. Mapear fase → especialista (via fluxo)
-3. Carregar via resource maestro://especialista/{nome}
-4. Aplicar persona e instruções do especialista
-5. Usar template correto para a fase
+2. Mapear fase → nome da skill (via FASE_SKILL_MAP)
+3. Skill está em `.agent/skills/{nome}/SKILL.md`
+4. Ativar skill via `@{nome}` ou ler SKILL.md diretamente
+5. Usar templates em `.agent/skills/{nome}/resources/templates/`
+6. Seguir checklist em `.agent/skills/{nome}/resources/checklists/`
 ```
 
-### Mapeamento Fase → Especialista
+**Exemplo de Uso:**
+
+```markdown
+// Estado atual
+fase_atual: 1
+nivel_complexidade: "medio"
+
+// Fase 1 = Produto → skill = specialist-gestao-produto
+skill_nome: "specialist-gestao-produto"
+skill_path: ".agent/skills/specialist-gestao-produto/"
+
+// Ativar skill
+@specialist-gestao-produto
+
+// Acessar resources
+- SKILL.md (descrição e persona)
+- README.md (documentação completa)
+- MCP_INTEGRATION.md (funções MCP disponíveis)
+- resources/templates/PRD.md
+- resources/checklists/prd-validation.md
+- resources/examples/prd-examples.md
+- resources/reference/product-guide.md
+```
+
+### Mapeamento Fase → Skill
 
 **Fluxo Simples (7 fases)**:
-1. Produto → `Gestão de Produto`
-2. Requisitos → `Engenharia de Requisitos`
-3. UX Design → `UX Design`
-4. Arquitetura → `Arquitetura de Software`
-5. Backlog → `Plano de Execução`
-6. Frontend → `Desenvolvimento Frontend`
-7. Backend → `Desenvolvimento`
+1. Produto → `specialist-gestao-produto`
+2. Requisitos → `specialist-engenharia-requisitos-ia`
+3. UX Design → `specialist-ux-design`
+4. Arquitetura → `specialist-arquitetura-software`
+5. Backlog → `specialist-plano-execucao-ia`
+6. Frontend → `specialist-desenvolvimento-frontend`
+7. Backend → `specialist-desenvolvimento-backend`
 
 **Fluxo Médio (13 fases)** adiciona:
-4. Modelo de Domínio → `Modelagem e Arquitetura de Domínio com IA`
-5. Banco de Dados → `Banco de Dados`
-7. Segurança → `Segurança da Informação`
-8. Testes → `Análise de Testes`
-10. Contrato API → `Contrato de API`
-13. Integração → `DevOps e Infraestrutura`
+4. Modelo de Domínio → `specialist-modelagem-dominio`
+5. Banco de Dados → `specialist-banco-dados`
+7. Segurança → `specialist-seguranca-informacao`
+8. Testes → `specialist-analise-testes`
+10. Contrato API → `specialist-contrato-api`
+13. Integração → `specialist-devops-infra`
 
 **Fluxo Complexo (17 fases)** adiciona:
-7. Arquitetura Avançada → `Arquitetura Avançada`
-9. Performance → `Performance e Escalabilidade`
-10. Observabilidade → `Observabilidade`
+7. Arquitetura Avançada → `specialist-arquitetura-avancada`
+9. Performance → `specialist-performance-escalabilidade`
+10. Observabilidade → `specialist-observabilidade`
 
 **Fase Stitch (Opcional)** - Inserida após UX Design:
-- Prototipagem → `Prototipagem Rápida com Google Stitch`
+- Prototipagem → `specialist-prototipagem-stitch`
 
 ### Response Format (MANDATORY)
 
@@ -114,8 +139,15 @@ Ao carregar especialista, informar:
 
 ```markdown
 🎯 **Fase {número}: {nome}**
-🤖 **Especialista**: `{nome_especialista}`
+🤖 **Skill**: `{nome_skill}`
+📁 **Localização**: `.agent/skills/{nome_skill}/SKILL.md`
 📋 **Entregável**: {entregavel_esperado}
+
+> 💡 **Como usar:**
+> 1. Ative: `@{nome_skill}`
+> 2. Leia SKILL.md para instruções
+> 3. Consulte templates em `resources/templates/`
+> 4. Valide com checklist em `resources/checklists/`
 
 [Continuar com instruções do especialista]
 ```
@@ -154,13 +186,27 @@ await mcp_maestro_proximo({
 
 ### 📁 File Structure Awareness
 
-**Estrutura Padrão MCP Maestro**:
+**Estrutura Padrão MCP Maestro (ATUALIZADO)**:
 
 ```
 projeto/
 ├── .maestro/
 │   ├── estado.json       # ⭐ FONTE DA VERDADE
-│   └── resumo.json       # Cache de contexto
+│   ├── resumo.json       # Cache de contexto
+│   └── content/          # Conteúdo interno MCP (templates, prompts, guias)
+├── .agent/
+│   └── skills/           # ⭐ SKILLS LOCAIS (v2.0)
+│       ├── specialist-gestao-produto/
+│       │   ├── SKILL.md
+│       │   ├── README.md
+│       │   ├── MCP_INTEGRATION.md
+│       │   └── resources/
+│       │       ├── templates/
+│       │       ├── examples/
+│       │       ├── checklists/
+│       │       └── reference/
+│       ├── specialist-engenharia-requisitos-ia/
+│       └── ... (outras skills)
 ├── docs/
 │   ├── 01-produto/
 │   │   └── PRD.md

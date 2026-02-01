@@ -7,7 +7,7 @@ import { getFase, getFluxo } from "../flows/types.js";
 import { descreverNivel } from "../flows/classifier.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { gerarInstrucaoRecursosCompacta } from "../utils/instructions.js";
-import { gerarSecaoPrompts } from "../utils/prompt-mapper.js";
+import { gerarSecaoPrompts, getSkillParaFase, getSkillPath } from "../utils/prompt-mapper.js";
 import { temContentLocal, normalizeProjectPath, joinProjectPath } from "../utils/files.js";
 
 interface StatusArgs {
@@ -117,13 +117,38 @@ ${fasesCompletas.length > 0 ? fasesCompletas.join("\n") : "Nenhuma fase concluí
 - Especialista: ${faseAtual?.especialista || "N/A"}
 - Entregável esperado: ${faseAtual?.entregavel_esperado || "N/A"}
 
+${(() => {
+    if (!faseAtual) return "";
+    const skillAtual = getSkillParaFase(faseAtual.nome);
+    if (!skillAtual) return "";
+    
+    return `
+## 🤖 Especialista Ativo
+
+**Skill:** \`${skillAtual}\`  
+**Localização:** \`.agent/skills/${skillAtual}/SKILL.md\`
+
+> 💡 **Como usar:**
+> 1. Ative: \`@${skillAtual}\`
+> 2. Leia SKILL.md para instruções
+> 3. Consulte resources disponíveis
+
+**Resources Disponíveis:**
+- 📋 Templates: \`.agent/skills/${skillAtual}/resources/templates/\`
+- 📖 Examples: \`.agent/skills/${skillAtual}/resources/examples/\`
+- ✅ Checklists: \`.agent/skills/${skillAtual}/resources/checklists/\`
+- 📚 Reference: \`.agent/skills/${skillAtual}/resources/reference/\`
+- 🔧 MCP Functions: \`.agent/skills/${skillAtual}/MCP_INTEGRATION.md\`
+`;
+})()}
+
 ### ⬜ Pendentes (${fasesPendentes.length})
 ${fasesPendentes.length > 0 ? fasesPendentes.join("\n") : "Todas as fases foram concluídas!"}
 
 ## Gate da Fase Atual
 
 ${faseAtual?.gate_checklist.map(item => `- [ ] ${item}`).join("\n") || "N/A"}
-${faseAtual ? gerarSecaoPrompts(faseAtual.nome) : ""}
+
 ## Entregáveis Gerados
 
 ${Object.keys(estado.entregaveis).length > 0
@@ -133,8 +158,6 @@ ${Object.keys(estado.entregaveis).length > 0
 ---
 
 **Última atualização:** ${new Date(estado.atualizado_em).toLocaleString("pt-BR")}
-
-${faseAtual ? gerarInstrucaoRecursosCompacta(faseAtual.especialista, faseAtual.template) : ""}
 `;
 
     return {

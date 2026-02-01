@@ -6,6 +6,7 @@ import { setCurrentDirectory } from "../state/context.js";
 import { gerarInstrucaoRecursosCompacta } from "../utils/instructions.js";
 import { normalizeProjectPath, resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { resolve } from "path";
+import { getSkillParaFase } from "../utils/prompt-mapper.js";
 
 interface ContextoArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -101,14 +102,47 @@ contexto(
 
 ${entregaveisResumo || "Nenhum entregável gerado ainda."}
 
+## 🤖 Skills Utilizadas
+
+${(() => {
+    const skillsUtilizadas = estado.gates_validados
+        .map(num => {
+            const fase = getFase(estado.nivel, num);
+            if (!fase) return null;
+            const skill = getSkillParaFase(fase.nome);
+            return skill ? `- ✅ **${fase.nome}**: \`${skill}\`` : null;
+        })
+        .filter(Boolean);
+    
+    return skillsUtilizadas.length > 0 
+        ? skillsUtilizadas.join("\n")
+        : "Nenhuma skill utilizada ainda.";
+})()}
+
 ## Próxima Fase
 
 ${faseAtual ? `
 | Campo | Valor |
 |-------|-------|
 | **Especialista** | ${faseAtual.especialista} |
-| **Template** | ${faseAtual.template} |
 | **Entregável esperado** | ${faseAtual.entregavel_esperado} |
+
+${(() => {
+    const proximaSkill = getSkillParaFase(faseAtual.nome);
+    if (!proximaSkill) return "";
+    
+    return `
+### 💡 Próximos Passos com Skill
+
+**Skill:** \`${proximaSkill}\`  
+**Localização:** \`.agent/skills/${proximaSkill}/SKILL.md\`
+
+1. Ativar skill: \`@${proximaSkill}\`
+2. Ler \`SKILL.md\` para instruções da fase
+3. Consultar templates em \`resources/templates/\`
+4. Seguir checklist em \`resources/checklists/\`
+`;
+})()}
 
 ### Checklist de Gate
 ${faseAtual.gate_checklist.map(item => `- [ ] ${item}`).join("\n")}
@@ -125,8 +159,6 @@ ${fluxo.fases.map(f => {
 ---
 
 *Use este contexto para manter consistência entre as fases do projeto.*
-
-${faseAtual ? gerarInstrucaoRecursosCompacta(faseAtual.especialista, faseAtual.template) : ""}
 `;
 
     return {

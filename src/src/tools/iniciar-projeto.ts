@@ -9,7 +9,7 @@ import { criarResumoInicial, serializarResumo } from "../state/memory.js";
 import { determinarTierGate, descreverTier } from "../gates/tiers.js";
 import { logEvent, EventTypes } from "../utils/history.js";
 import { gerarSystemMd } from "../utils/system-md.js";
-import { detectarStack, gerarSecaoPrompts, gerarSecaoExemplo } from "../utils/prompt-mapper.js";
+import { detectarStack, gerarSecaoPrompts, gerarSecaoExemplo, getSkillParaFase, getSkillPath } from "../utils/prompt-mapper.js";
 import { resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { ensureContentInstalled, injectContentForIDE } from "../utils/content-injector.js";
 
@@ -251,6 +251,32 @@ ${resumoFiles[1].content}
 \`\`\`
 
 ---
+
+## 🤖 Especialista Ativado
+
+${(() => {
+    const skillInicial = getSkillParaFase("Produto");
+    if (!skillInicial) return "";
+    
+    return `**Skill:** \`${skillInicial}\`  
+**Localização:** \`.agent/skills/${skillInicial}/SKILL.md\`
+
+> 💡 **Como usar a skill:**
+> 1. Ative com: \`@${skillInicial}\`
+> 2. Leia SKILL.md para instruções detalhadas
+> 3. Consulte templates em \`resources/templates/\`
+> 4. Valide com checklist em \`resources/checklists/\`
+
+**Resources disponíveis:**
+- 📋 Templates: \`.agent/skills/${skillInicial}/resources/templates/\`
+- 📖 Examples: \`.agent/skills/${skillInicial}/resources/examples/\`
+- ✅ Checklists: \`.agent/skills/${skillInicial}/resources/checklists/\`
+- 📚 Reference: \`.agent/skills/${skillInicial}/resources/reference/\`
+- 🔧 MCP Functions: \`.agent/skills/${skillInicial}/MCP_INTEGRATION.md\`
+
+---
+`;
+})()}
 
 ## 🎨 Prototipagem Rápida com Google Stitch (Opcional)
 
