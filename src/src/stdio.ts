@@ -37,6 +37,50 @@ import { classificar } from "./tools/classificar.js";
 import { salvar } from "./tools/salvar.js";
 import { injetar_conteudo } from "./tools/injetar-conteudo.js";
 
+// 🆕 FASE 1: Knowledge Base
+import {
+    recordADR,
+    recordADRSchema,
+    recordPattern,
+    recordPatternSchema,
+    getContext,
+    getContextSchema,
+    searchKnowledge,
+    searchKnowledgeSchema,
+} from "./tools/fase1/knowledge.tools.js";
+
+// 🆕 FASE 1: Checkpoint
+import {
+    createCheckpoint,
+    createCheckpointSchema,
+    rollbackTotal,
+    rollbackTotalSchema,
+    rollbackPartial,
+    rollbackPartialSchema,
+    listCheckpoints,
+    listCheckpointsSchema,
+} from "./tools/fase1/checkpoint.tools.js";
+
+// 🆕 FASE 1: Validation
+import {
+    validateDependencies,
+    validateDependenciesSchema,
+    validateSecurity,
+    validateSecuritySchema,
+    checkCompliance,
+    checkComplianceSchema,
+} from "./tools/fase1/validation.tools.js";
+
+// 🆕 FASE 1: Risk, AutoFix, Discovery
+import {
+    evaluateRisk,
+    evaluateRiskSchema,
+    autoFix,
+    autoFixSchema,
+    discoverCodebase,
+    discoverCodebaseSchema,
+} from "./tools/fase1/misc.tools.js";
+
 // Criar servidor MCP
 const server = new Server(
     {
@@ -289,6 +333,80 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
                 required: ["diretorio"],
             },
         },
+        // 🆕 FASE 1: KNOWLEDGE BASE
+        {
+            name: "record_adr",
+            description: "Registra Architecture Decision Record com decisão, contexto, alternativas e consequências",
+            inputSchema: recordADRSchema,
+        },
+        {
+            name: "record_pattern",
+            description: "Registra padrão identificado com contexto, problema e solução",
+            inputSchema: recordPatternSchema,
+        },
+        {
+            name: "get_context",
+            description: "Retorna contexto relevante para fase específica (ADRs, padrões, decisões)",
+            inputSchema: getContextSchema,
+        },
+        {
+            name: "search_knowledge",
+            description: "Busca na base de conhecimento por query",
+            inputSchema: searchKnowledgeSchema,
+        },
+        // 🆕 FASE 1: CHECKPOINT
+        {
+            name: "create_checkpoint",
+            description: "Cria checkpoint do projeto antes de mudanças arriscadas",
+            inputSchema: createCheckpointSchema,
+        },
+        {
+            name: "rollback_total",
+            description: "Rollback total para um checkpoint",
+            inputSchema: rollbackTotalSchema,
+        },
+        {
+            name: "rollback_partial",
+            description: "Rollback parcial (apenas módulos específicos)",
+            inputSchema: rollbackPartialSchema,
+        },
+        {
+            name: "list_checkpoints",
+            description: "Lista todos os checkpoints disponíveis",
+            inputSchema: listCheckpointsSchema,
+        },
+        // 🆕 FASE 1: VALIDATION
+        {
+            name: "validate_dependencies",
+            description: "Valida dependências e detecta hallucinations",
+            inputSchema: validateDependenciesSchema,
+        },
+        {
+            name: "validate_security",
+            description: "Valida segurança contra OWASP Top 10",
+            inputSchema: validateSecuritySchema,
+        },
+        {
+            name: "check_compliance",
+            description: "Verifica compliance (LGPD, PCI-DSS, HIPAA)",
+            inputSchema: checkComplianceSchema,
+        },
+        // 🆕 FASE 1: RISK, AUTOFIX, DISCOVERY
+        {
+            name: "evaluate_risk",
+            description: "Avalia risco de uma operação",
+            inputSchema: evaluateRiskSchema,
+        },
+        {
+            name: "auto_fix",
+            description: "Tenta corrigir automaticamente erros de código",
+            inputSchema: autoFixSchema,
+        },
+        {
+            name: "discover_codebase",
+            description: "Analisa codebase e detecta arquitetura/stack",
+            inputSchema: discoverCodebaseSchema,
+        },
     ],
 }));
 
@@ -365,6 +483,122 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     source: typedArgs.source as "builtin" | "custom" | undefined,
                     custom_path: typedArgs.custom_path as string | undefined,
                     force: typedArgs.force as boolean | undefined,
+                });
+            
+            // 🆕 FASE 1: KNOWLEDGE BASE
+            case "record_adr":
+                return await recordADR({
+                    decision: typedArgs.decision as string,
+                    context: typedArgs.context as string,
+                    alternatives: typedArgs.alternatives as any[],
+                    consequences: typedArgs.consequences as any,
+                    risks: typedArgs.risks as any[] | undefined,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "record_pattern":
+                return await recordPattern({
+                    name: typedArgs.name as string,
+                    context: typedArgs.context as string,
+                    problem: typedArgs.problem as string,
+                    solution: typedArgs.solution as string,
+                    examples: typedArgs.examples as string[] | undefined,
+                    relatedPatterns: typedArgs.relatedPatterns as string[] | undefined,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "get_context":
+                return await getContext({
+                    fase: typedArgs.fase as number | undefined,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "search_knowledge":
+                return await searchKnowledge({
+                    query: typedArgs.query as string,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            // 🆕 FASE 1: CHECKPOINT
+            case "create_checkpoint":
+                return await createCheckpoint({
+                    reason: typedArgs.reason as string,
+                    auto: typedArgs.auto as boolean,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "rollback_total":
+                return await rollbackTotal({
+                    checkpointId: typedArgs.checkpointId as string,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "rollback_partial":
+                return await rollbackPartial({
+                    checkpointId: typedArgs.checkpointId as string,
+                    modules: typedArgs.modules as string[],
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "list_checkpoints":
+                return await listCheckpoints({
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            // 🆕 FASE 1: VALIDATION
+            case "validate_dependencies":
+                return await validateDependencies({
+                    code: typedArgs.code as string,
+                    language: typedArgs.language as any,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "validate_security":
+                return await validateSecurity({
+                    code: typedArgs.code as string,
+                    language: typedArgs.language as any,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "check_compliance":
+                return await checkCompliance({
+                    code: typedArgs.code as string,
+                    standard: typedArgs.standard as any,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            // 🆕 FASE 1: RISK, AUTOFIX, DISCOVERY
+            case "evaluate_risk":
+                return await evaluateRisk({
+                    operation: typedArgs.operation as string,
+                    context: typedArgs.context as any,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "auto_fix":
+                return await autoFix({
+                    code: typedArgs.code as string,
+                    error: typedArgs.error as string,
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
+                });
+            
+            case "discover_codebase":
+                return await discoverCodebase({
+                    estado_json: typedArgs.estado_json as string,
+                    diretorio: typedArgs.diretorio as string,
                 });
             default:
                 return {
