@@ -9,7 +9,7 @@ import { SyntacticValidator } from './layers/SyntacticValidator.js';
 import { SemanticValidator } from './layers/SemanticValidator.js';
 import { QualityValidator } from './layers/QualityValidator.js';
 import { ArchitectureValidator } from './layers/ArchitectureValidator.js';
-import { SecurityValidator } from '../security/SecurityValidator.js';
+import { SecurityValidatorWrapper } from './layers/SecurityValidatorWrapper.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -60,7 +60,7 @@ export class ValidationPipeline {
                 name: 'Segurança',
                 order: 5,
                 minScore: 90,
-                validator: new SecurityValidator(),
+                validator: new SecurityValidatorWrapper(),
                 stopOnFailure: true // Para se encontrar vulnerabilidades críticas
             }
         ];
