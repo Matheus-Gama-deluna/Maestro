@@ -1,10 +1,41 @@
-# MCP Maestro
+# MCP Maestro v2.0
 
-Servidor **MCP (Model Context Protocol)** para desenvolvimento assistido por IA.
+Servidor **MCP (Model Context Protocol)** para desenvolvimento assistido por IA com **otimizações inteligentes**, **frontend-first** e **gerenciamento de tarefas**.
 
 [![Status](https://img.shields.io/badge/status-online-success)](https://maestro.deluna.dev.br/health)
 [![npm](https://img.shields.io/npm/v/@maestro-ai/cli)](https://www.npmjs.com/package/@maestro-ai/cli)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue)](CHANGELOG_V2.md)
+
+## 🆕 Novidades v2.0
+
+### 💰 Modos de Operação (Economia de Créditos)
+- **Economy:** -70% prompts, ideal para POCs e protótipos
+- **Balanced:** -45% prompts, ideal para projetos internos (padrão)
+- **Quality:** Máxima qualidade, ideal para produtos complexos
+
+### 🎨 Frontend-First Architecture
+- Geração automática de contratos de API (OpenAPI 3.0)
+- Schemas TypeScript + Zod para validação
+- Mocks realistas com MSW e Faker.js
+- Cliente API gerado automaticamente
+- Desenvolvimento paralelo Frontend + Backend
+
+### 📋 Sistema de Gerenciamento de Tarefas
+- Hierarquia completa: Epic → Feature → Story → Task → Subtask
+- Dependências e detecção de ciclos
+- Tracking de progresso em tempo real
+- Estatísticas e métricas
+
+### ⚡ Otimizações Inteligentes
+- **6 estratégias** de economia de prompts
+- Cache inteligente de contexto (TTL 1h)
+- Validação incremental com early exit
+- Batch prompts (consolida perguntas)
+- One-shot generation (código completo)
+- Differential updates (apenas diffs)
+
+**[Ver CHANGELOG completo](./CHANGELOG_V2.md)** | **[Guia de Migração v1→v2](./docs/MIGRACAO_V1_V2.md)**
 
 ## 🚀 Início Rápido
 

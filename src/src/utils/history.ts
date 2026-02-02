@@ -43,5 +43,16 @@ export const EventTypes = {
   DELIVERABLE_SAVED: 'deliverable_saved',
   FEATURE_STARTED: 'feature_started',
   BUG_STARTED: 'bug_started',
-  REFACTOR_STARTED: 'refactor_started'
+  REFACTOR_STARTED: 'refactor_started',
+  // v2.0: Novos eventos
+  CONFIG_CHANGED: 'config_changed',
+  MODE_CHANGED: 'mode_changed',
+  TASK_CREATED: 'task_created',
+  TASK_UPDATED: 'task_updated',
+  TASK_COMPLETED: 'task_completed',
+  CHECKPOINT_CREATED: 'checkpoint_created',
+  AUTO_FIX_ATTEMPTED: 'auto_fix_attempted',
+  CONTRACT_GENERATED: 'contract_generated',
+  MOCKS_GENERATED: 'mocks_generated',
+  OPTIMIZATION_APPLIED: 'optimization_applied'
 } as const;

@@ -44,6 +44,48 @@ export interface EstadoProjeto {
         criterios: string[];
     };
 
+    // v2.0: Configuração de modo e otimizações
+    config?: {
+        mode: 'economy' | 'balanced' | 'quality';
+        flow: 'principal' | 'feature' | 'bugfix' | 'refactor';
+        optimization: {
+            batch_questions: boolean;
+            context_caching: boolean;
+            template_compression: boolean;
+            smart_validation: boolean;
+            one_shot_generation: boolean;
+            differential_updates: boolean;
+        };
+        frontend_first: boolean;
+        auto_checkpoint: boolean;
+        auto_fix: boolean;
+    };
+
+    // v2.0: Sistema de tarefas
+    tasks?: Array<{
+        id: string;
+        type: 'epic' | 'feature' | 'story' | 'task' | 'subtask';
+        title: string;
+        description: string;
+        status: 'todo' | 'in_progress' | 'blocked' | 'review' | 'done';
+        priority: 'critical' | 'high' | 'medium' | 'low';
+        parent_id?: string;
+        children_ids: string[];
+        dependencies: string[];
+        phase?: number;
+        estimate_hours?: number;
+        actual_hours?: number;
+        created_at: string;
+        updated_at: string;
+        tags: string[];
+        metadata?: {
+            files?: string[];
+            commits?: string[];
+            tests?: string[];
+            acceptance_criteria?: string[];
+        };
+    }>;
+
     criado_em: string;
     atualizado_em: string;
 }
