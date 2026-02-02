@@ -23,7 +23,7 @@ export interface Task {
     started_at?: string;
     completed_at?: string;
     tags: string[];
-    metadata: {
+    metadata?: {
         files?: string[];
         commits?: string[];
         tests?: string[];
