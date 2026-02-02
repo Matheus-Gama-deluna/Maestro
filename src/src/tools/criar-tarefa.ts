@@ -70,11 +70,15 @@ export async function criarTarefa(args: CriarTarefaArgs): Promise<ToolResult> {
 
     const estadoAtualizado = serializarEstado(estado);
 
-    await logEvent(args.diretorio, EventTypes.TASK_CREATED, {
-        task_id: task.id,
-        type: task.type,
-        title: task.title,
-        phase: task.phase,
+    await logEvent(args.diretorio, {
+        type: EventTypes.TASK_CREATED,
+        fase: estado.fase_atual || task.phase || 0,
+        data: {
+            task_id: task.id,
+            type: task.type,
+            title: task.title,
+            phase: task.phase,
+        }
     });
 
     const hierarchy = getTaskHierarchy(task);

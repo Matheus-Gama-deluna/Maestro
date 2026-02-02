@@ -348,7 +348,11 @@ export class TaskManager {
 
     importTasks(tasks: Task[]): void {
         tasks.forEach(task => {
-            this.tasks.set(task.id, task);
+            const normalized: Task = {
+                ...task,
+                metadata: task.metadata || {},
+            };
+            this.tasks.set(task.id, normalized);
         });
     }
 

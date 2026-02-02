@@ -83,12 +83,15 @@ export async function gerarContratoAPI(args: GerarContratoAPIArgs): Promise<Tool
         mockFiles = mockGenerator.generateMockFiles(contract);
     }
 
-    await logEvent(args.diretorio, EventTypes.DELIVERABLE_SAVED, {
+    await logEvent(args.diretorio, {
+        type: EventTypes.DELIVERABLE_SAVED,
         fase: estado.fase_atual,
-        tipo: 'api-contract',
-        endpoints_count: args.endpoints.length,
-        schemas_count: Object.keys(args.schemas || {}).length,
-        mocks_generated: args.generate_mocks !== false,
+        data: {
+            tipo: 'api-contract',
+            endpoints_count: args.endpoints.length,
+            schemas_count: Object.keys(args.schemas || {}).length,
+            mocks_generated: args.generate_mocks !== false,
+        }
     });
 
     const files: Record<string, string> = {
@@ -101,8 +104,10 @@ export async function gerarContratoAPI(args: GerarContratoAPIArgs): Promise<Tool
         ),
     };
 
-    if (args.generate_mocks !== false) {
-        files['api-contract/README.md'] = generateReadme(contract, args.generate_mocks !== false);
+    const withMocks = args.generate_mocks !== false;
+
+    if (withMocks) {
+        files['api-contract/README.md'] = generateReadme(contract, true);
     }
 
     let output = `# ✅ Contrato de API Gerado

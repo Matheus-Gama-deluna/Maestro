@@ -68,10 +68,14 @@ export async function configurarModo(args: ConfigurarModoArgs): Promise<ToolResu
 
     const estadoAtualizado = serializarEstado(estado);
 
-    await logEvent(args.diretorio, EventTypes.CONFIG_CHANGED, {
-        previous_mode: previousMode,
-        new_mode: args.mode,
-        optimization: modeConfig.optimization,
+    await logEvent(args.diretorio, {
+        type: EventTypes.CONFIG_CHANGED,
+        fase: estado.fase_atual || 0,
+        data: {
+            previous_mode: previousMode,
+            new_mode: args.mode,
+            optimization: modeConfig.optimization,
+        }
     });
 
     const modeInfo = getModeDescription(args.mode);
