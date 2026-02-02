@@ -17,6 +17,11 @@
 - [ ] **[7 pts]** Validação de entrada (DTOs)
 - [ ] **[5 pts]** Error handling robusto
 
+## Frontend-First (Obrigatório)
+
+- [ ] **Contrato API validado** - CONT-XXX aprovado antes do BE
+- [ ] **Mocks existentes** - handlers/servidor mock gerados do contrato
+
 ## Testes (25 pontos)
 
 - [ ] **[10 pts]** Testes unitários (>80% coverage)

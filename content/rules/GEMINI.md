@@ -330,6 +330,12 @@ Produto(1) → Requisitos(2) → UX Design(3) → Stitch(4) → Modelo(5) → ..
 
 **Para features que envolvem Frontend + Backend**:
 
+**Regra oficial (obrigatória):**
+- **NUNCA** iniciar FE/BE sem **Contrato API validado + Mock server ativo**
+- **Frontend** só pode consumir **mocks gerados do contrato**
+- **Backend** deve **implementar exatamente o contrato**, sem alterações fora do versionamento
+- **Integração** só inicia após FE + BE concluídos
+
 ```
 FEAT-001: Criar Pedido
 │

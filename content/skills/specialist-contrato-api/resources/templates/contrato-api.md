@@ -19,6 +19,12 @@
 - **Backend:** {{STACK_BACKEND}}
 - **Banco de Dados:** {{BANCO_DADOS}}
 
+### **Regra Frontend-First**
+- **Contrato validado** antes de qualquer implementação FE/BE
+- **Mocks obrigatórios** gerados a partir deste contrato
+- **Frontend** deve consumir **somente** mocks do contrato
+- **Backend** deve seguir **exatamente** o contrato (alterações → versionamento)
+
 ---
 
 ## 🔌 Endpoints

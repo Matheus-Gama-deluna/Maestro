@@ -42,6 +42,11 @@ interface {{REQUEST_TYPE}} {
 }
 ```
 
+### **Regra Frontend-First (Obrigatória)**
+- [ ] Contrato API validado (CONT-{{ID}})
+- [ ] Mocks ativos gerados do contrato
+- [ ] Frontend consome **somente** mocks até a fase de integração
+
 ### **Mocks (MSW)**
 ```typescript
 // mocks/handlers/{{FEATURE}}.ts

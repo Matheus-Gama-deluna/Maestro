@@ -46,6 +46,11 @@ Este checklist contém os critérios de qualidade obrigatórios para validar art
 - [ ] **CONTRIBUTING.md** - Guia de contribuição presente
 - [ ] **.storybook/** - Configuração Storybook presente
 
+### Frontend-First (Obrigatório)
+- [ ] **Contrato API validado** - CONT-XXX aprovado antes do FE
+- [ ] **Mocks ativos** - MSW/Mock server rodando com handlers do contrato
+- [ ] **Consumo via mocks** - FE aponta apenas para mock até integração
+
 ---
 
 ## 🧩 Componentes (25 pontos)
