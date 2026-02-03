@@ -282,26 +282,31 @@ export function getExemploParaStack(stack?: string | null): string | null {
 
 /**
  * Gera markdown com seção de prompts recomendados
+ * @since 2.0.0 - Atualizado para usar skills ao invés de resources
  */
 export function gerarSecaoPrompts(faseNome: string): string {
-    const prompts = getPromptsParaFase(faseNome);
+    const skillNome = getSkillParaFase(faseNome);
     
-    if (prompts.length === 0) {
+    if (!skillNome) {
         return "";
     }
     
-    const linhas = prompts.map(p => 
-        `- \`read_resource("maestro://prompt/${p.categoria}/${p.nome}")\``
-    );
-    
     return `
-## 📚 Prompts Recomendados
+## 📚 Recursos Recomendados
 
-Para gerar o entregável com qualidade, consulte:
+Para gerar o entregável com qualidade, consulte os recursos da skill:
 
-${linhas.join("\n")}
+**Skill Ativa:** \`${skillNome}\`
 
-> 💡 Estes prompts contêm instruções detalhadas e exemplos práticos.
+### Recursos Disponíveis na Skill:
+- **SKILL.md**: Instruções e contexto do especialista
+- **resources/templates/**: Templates de entregáveis
+- **resources/examples/**: Exemplos práticos
+- **resources/checklists/**: Checklists de validação
+- **resources/reference/**: Material de referência
+
+> 💡 Todos os recursos estão disponíveis localmente na pasta da skill.
+> A IA tem acesso direto a estes arquivos através do sistema de skills.
 `;
 }
 

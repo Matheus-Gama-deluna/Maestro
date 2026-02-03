@@ -354,6 +354,7 @@ import { implementarHistoria } from "./tools/implementar-historia.js";
 import { novaFeature, corrigirBug, refatorar } from "./tools/fluxos-alternativos.js";
 import { aprovarGate } from "./tools/aprovar-gate.js";
 import { confirmarClassificacao } from "./tools/confirmar-classificacao.js";
+import { discovery } from "./tools/discovery.js";
 
 // Definição das tools para exibição como resources no seletor @mcp:maestro:
 const TOOLS_AS_RESOURCES = [
@@ -613,6 +614,7 @@ async function getToolsList() {
             { name: "corrigir_bug", description: "Inicia fluxo de correção de bug", inputSchema: { type: "object", properties: { descricao: { type: "string" }, severidade: { type: "string", enum: ["critica", "alta", "media", "baixa"] }, ticket_id: { type: "string" } }, required: ["descricao"] } },
             { name: "refatorar", description: "Inicia fluxo de refatoração", inputSchema: { type: "object", properties: { area: { type: "string" }, motivo: { type: "string" } }, required: ["area", "motivo"] } },
             { name: "confirmar_classificacao", description: "Confirma e efetiva a reclassificação após PRD", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" }, nivel: { type: "string", enum: ["simples", "medio", "complexo"] }, tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] } }, required: ["estado_json", "diretorio"] } },
+            { name: "discovery", description: "Coleta informações iniciais agrupadas para reduzir perguntas durante o projeto. Gera questionário adaptado ao modo selecionado.", inputSchema: { type: "object", properties: { estado_json: { type: "string", description: "Conteúdo do arquivo .maestro/estado.json" }, diretorio: { type: "string", description: "Diretório absoluto do projeto" }, respostas: { type: "object", description: "Respostas do questionário (opcional - se omitido, retorna o questionário)" } }, required: ["estado_json", "diretorio"] } },
         ],
     };
 }
@@ -651,6 +653,8 @@ async function callTool(name: string, args?: Record<string, unknown>) {
                 return await aprovarGate({ acao: a.acao as "aprovar" | "rejeitar", estado_json: a.estado_json as string, diretorio: a.diretorio as string });
             case "confirmar_classificacao":
                 return await confirmarClassificacao({ estado_json: a.estado_json as string, diretorio: a.diretorio as string, nivel: a.nivel as any, tipo_artefato: a.tipo_artefato as any });
+            case "discovery":
+                return await discovery({ estado_json: a.estado_json as string, diretorio: a.diretorio as string, respostas: a.respostas as any });
             default:
                 return { content: [{ type: "text", text: `Tool não encontrada: ${name}` }], isError: true };
         }

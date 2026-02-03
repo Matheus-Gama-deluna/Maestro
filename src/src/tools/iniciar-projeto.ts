@@ -141,11 +141,19 @@ export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResu
     const inferenciaTipo = inferirTipoArtefato(args.nome, args.descricao);
     const inferenciaNivel = inferirComplexidade(inferenciaTipo.tipo, args.descricao);
     const tierSugerido = determinarTierGate(inferenciaTipo.tipo, inferenciaNivel.nivel);
+    
+    // Validação de segurança
+    if (!tierSugerido) {
+        return {
+            content: [{ type: "text", text: "❌ Erro: Não foi possível determinar o tier do projeto." }],
+            isError: true,
+        };
+    }
+    
     const descricaoTier = descreverTier(tierSugerido);
     
     // Mapear modo para nível de complexidade se não especificado
     const modoSugerido = args.modo || mapearModoParaNivel(inferenciaTipo.tipo);
-    const nivelPorModo = mapearModoParaNivel(modoSugerido);
 
     const resposta = `# 🧐 Análise de Novo Projeto: ${args.nome}
 
@@ -155,7 +163,33 @@ Analisei a descrição e sugiro a seguinte configuração:
 |---|---|---|
 | **Tipo de Artefato** | \`${inferenciaTipo.tipo}\` | ${inferenciaTipo.razao} |
 | **Complexidade** | \`${inferenciaNivel.nivel}\` | ${inferenciaNivel.razao} |
-| **Tier de Gates** | **${tierSugerido.toUpperCase()}** | ${descricaoTier} |
+| **Tier de Gates** | **${tierSugerido?.toUpperCase() || 'N/A'}** | ${descricaoTier} |
+| **Modo** | **${modoSugerido.toUpperCase()}** | ${getModoDescription(modoSugerido)} |
+
+---
+
+## � Informações sobre as Configurações
+
+### Tipo de Artefato
+- **poc**: Prova de conceito, experimentos rápidos
+- **script**: Automações, CLIs, ferramentas de linha de comando
+- **internal**: Ferramentas internas, backoffice, dashboards
+- **product**: Sistemas voltados ao usuário final (padrão)
+
+### Complexidade
+- **simples**: CRUDs básicos, landing pages, scripts simples
+- **medio**: Aplicações web/mobile padrão (padrão)
+- **complexo**: Microserviços, sistemas distribuídos, alta escala
+
+### Tier de Gates
+- **ESSENCIAL**: 7 fases, validações mínimas (POCs, scripts)
+- **BASE**: 13 fases, validações completas (padrão)
+- **AVANÇADO**: 17 fases, validações avançadas (sistemas críticos)
+
+### Modo de Execução
+- **economy**: Rápido - 7 fases, perguntas mínimas, validação essencial
+- **balanced**: Equilibrado - 13 fases, perguntas moderadas, validação completa (padrão)
+- **quality**: Qualidade - 17 fases, perguntas detalhadas, validação avançada
 
 ---
 
@@ -163,8 +197,6 @@ Analisei a descrição e sugiro a seguinte configuração:
 
 Para efetivamente criar o projeto, você precisa **confirmar ou ajustar** estes valores.
 
-**Opção 1: Concordo (Criar como sugerido)**
-\`\`\`
 **Opção 1: Concordo (Criar como sugerido)**
 \`\`\`
 confirmar_projeto(
@@ -178,15 +210,16 @@ confirmar_projeto(
 )
 \`\`\`
 
-**Opção 2: Ajustar (Forçar outro tipo)**
+**Opção 2: Ajustar Configurações**
 \`\`\`
 confirmar_projeto(
     nome: "${args.nome}",
     descricao: "${args.descricao || ''}",
     diretorio: "${args.diretorio}",
-    tipo_artefato: "product",  <-- altere aqui
-    nivel_complexidade: "complexo", <-- altere aqui
-    ide: "${args.ide}"
+    tipo_artefato: "product",     // poc | script | internal | product
+    nivel_complexidade: "complexo", // simples | medio | complexo
+    ide: "${args.ide}",
+    modo: "quality"                // economy | balanced | quality
 )
 \`\`\`
 `;
@@ -217,6 +250,14 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
     // Recalcula tier baseado no confirmado
     const tier = determinarTierGate(args.tipo_artefato, args.nivel_complexidade);
+    
+    // Validação de segurança
+    if (!tier) {
+        return {
+            content: [{ type: "text", text: "❌ Erro: Não foi possível determinar o tier do projeto. Verifique tipo_artefato e nivel_complexidade." }],
+            isError: true,
+        };
+    }
 
     const projetoId = randomUUID();
 
@@ -280,8 +321,8 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 **Configuração Confirmada:**
 - Tipo: \`${args.tipo_artefato}\`
 - Complexidade: \`${args.nivel_complexidade}\`
-- Tier: **${tier.toUpperCase()}**
-- Modo: **${args.modo.toUpperCase()}** ${getModoDescription(args.modo)}
+- Tier: **${tier?.toUpperCase() || 'N/A'}**
+- Modo: **${args.modo?.toUpperCase() || 'BALANCED'}** ${getModoDescription(args.modo || 'balanced')}
 
 | Campo | Valor |
 |-------|-------|
@@ -325,7 +366,7 @@ ${(() => {
     return formatSkillMessage(skillInicial, args.ide) + "\n\n---\n";
 })()}
 
-## � Próximo Passo: Discovery
+## 📍 Próximo Passo: Discovery
 
 ${args.modo === 'economy' ? 
 '**Modo Economy:** Vamos coletar apenas informações essenciais para começar rapidamente.' :
@@ -335,14 +376,18 @@ args.modo === 'quality' ?
 
 Para reduzir a quantidade de perguntas durante o projeto, execute o **Discovery**:
 
-\`\`\`
-discovery(
-    estado_json: "<conteúdo do estado.json>",
+\`\`\`typescript
+// 1. Ler o estado.json criado
+const estadoJson = await readFile('${diretorio}/.maestro/estado.json');
+
+// 2. Executar discovery para gerar questionário
+await mcp_maestro_discovery({
+    estado_json: estadoJson,
     diretorio: "${diretorio}"
-)
+});
 \`\`\`
 
-Isso irá gerar um questionário agrupado. Após responder, os especialistas terão todo o contexto necessário!
+Isso irá gerar um questionário agrupado adaptado ao modo selecionado. Após o usuário responder, execute novamente com o parâmetro \`respostas\` preenchido. Os especialistas terão todo o contexto necessário!
 
 ---
 
@@ -357,7 +402,7 @@ Se desejar, você pode usar o **Google Stitch** para prototipagem de UI após a 
 ## 🎨 Próximos Passos (Alternativo)
 
 Se não for usar o Stitch, você pode iniciar a Fase 1 (Produto) direto.
-O projeto foi inicializado no Tier **${tier.toUpperCase()}**.
+O projeto foi inicializado no Tier **${tier?.toUpperCase() || 'N/A'}**.
 ${gerarSecaoPrompts("Produto")}
 ${gerarSecaoExemplo(detectarStack(args.nome, args.descricao))}
 `;
