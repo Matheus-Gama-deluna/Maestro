@@ -2,7 +2,7 @@
 
 Servidor MCP (Model Context Protocol) para o Maestro - Guia de Desenvolvimento Assistido por IA.
 
-**Pacote**: `@maestro/mcp-server@2.1.0`
+**Pacote**: `@maestro-ai/mcp-server@2.1.0`
 
 ## 🚀 Uso via npx (Recomendado)
 
@@ -17,7 +17,7 @@ O Maestro agora é distribuído como pacote npm e executado localmente via `npx`
      "mcpServers": {
        "maestro": {
          "command": "npx",
-         "args": ["-y", "@maestro/mcp-server@latest"],
+         "args": ["-y", "@maestro-ai/mcp-server@latest"],
          "disabled": false,
          "env": {}
        }
@@ -33,7 +33,7 @@ O Maestro agora é distribuído como pacote npm e executado localmente via `npx`
      "mcpServers": {
        "maestro": {
          "command": "npx",
-         "args": ["-y", "@maestro/mcp-server@latest", "D:\\Meus\\Projetos"],
+         "args": ["-y", "@maestro-ai/mcp-server@latest", "D:\\Meus\\Projetos"],
          "disabled": false,
          "env": {}
        }

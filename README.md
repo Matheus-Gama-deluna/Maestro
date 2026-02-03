@@ -60,16 +60,16 @@ npx @maestro-ai/cli
 
 ---
 
-## � Configuração MCP via npx (local)
+## 🔧 Configuração MCP via npx (local)
 
-Use sempre a versão mais recente via `npx`:
+Use sempre a versão mais recente via `npx` (diretório atual):
 
 ```json
 {
   "mcpServers": {
     "maestro": {
       "command": "npx",
-      "args": ["-y", "@maestro/mcp-server@latest"],
+      "args": ["-y", "@maestro-ai/mcp-server@latest"],
       "disabled": false,
       "env": {}
     }
@@ -77,48 +77,25 @@ Use sempre a versão mais recente via `npx`:
 }
 ```
 
-O Maestro utilizará automaticamente o diretório de trabalho atual; se precisar especificar, adicione o caminho como último argumento em `args`.
-
----
-
-## 🔧 Configuração do MCP
-
-### Gemini / Antigravity
+Para especificar manualmente um diretório, adicione o caminho ao final de `args`:
 
 ```json
 {
   "mcpServers": {
     "maestro": {
-      "serverUrl": "https://maestro.deluna.dev.br/mcp"
+      "command": "npx",
+      "args": ["-y", "@maestro-ai/mcp-server@latest", "D:\\Meus\\Projetos"],
+      "disabled": false,
+      "env": {}
     }
   }
 }
-```
-
-### VS Code / Cursor / Windsurf
-
-```json
-{
-  "mcpServers": {
-    "maestro": {
-      "url": "https://maestro.deluna.dev.br/mcp",
-      "transport": "http"
-    }
-  }
-}
-```
-
-### HTTP Direto
-
-```bash
-curl -X POST https://maestro.deluna.dev.br/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":"1","method":"tools/list","params":{}}'
 ```
 
 ---
 
-## � Fluxo de Desenvolvimento
+
+## Fluxo de Desenvolvimento
 
 ```mermaid
 graph TD
