@@ -107,7 +107,7 @@ function getModoDescription(modo: 'economy' | 'balanced' | 'quality'): string {
 
 /**
  * Tool: iniciar_projeto
- * Analisa a descrição, infere tipo e tier, e PEDE CONFIRMAÇÃO
+ * Faz perguntas interativas sobre tipo, complexidade e modo
  * NÃO CRIA ARQUIVOS AINDA
  */
 export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResult> {
@@ -121,83 +121,90 @@ export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResu
     // Normalizar e resolver diretório
     const diretorio = resolveProjectPath(args.diretorio);
 
-    // 🚀 INJETAR CONTEÚDO AUTOMATICAMENTE (via npx)
-    // 🚀 INJETAR CONTEÚDO AUTOMATICAMENTE
+    // Verificar IDE
+    if (!args.ide) {
+        return {
+            content: [{ type: "text", text: `# 🎯 Configuração do Projeto: ${args.nome}
+
+## ❓ Pergunta 1/4: Qual IDE você está utilizando?
+
+Escolha uma das opções:
+
+- **windsurf**: Windsurf IDE
+- **cursor**: Cursor IDE
+- **antigravity**: Antigravity IDE
+
+**Responda executando:**
+\`\`\`
+iniciar_projeto(
+    nome: "${args.nome}",
+    descricao: "${args.descricao || ''}",
+    diretorio: "${args.diretorio}",
+    ide: "windsurf"  // Escolha: windsurf | cursor | antigravity
+)
+\`\`\`` }],
+        };
+    }
+
     // 🚀 INJETAR CONTEÚDO AUTOMATICAMENTE
     try {
-        if (args.ide) {
-            const injResult = await injectContentForIDE(diretorio, args.ide);
-            console.error(`[INFO] Rules/Skills injetados para ${args.ide} em: ${injResult.targetDir}`);
-        } else {
-            return {
-                content: [{ type: "text", text: `⚠️ **Ação Necessária**: Por favor, informe qual IDE você está utilizando para configurar o ambiente corretamente.\n\nExecute novamente o comando informando o parâmetro \`ide\`:\n\n- \`windsurf\`\n- \`cursor\`\n- \`antigravity\`\n\nExemplo:\n\`iniciar_projeto(..., ide: "cursor")\`` }],
-            };
-        }
+        const injResult = await injectContentForIDE(diretorio, args.ide);
+        console.error(`[INFO] Rules/Skills injetados para ${args.ide} em: ${injResult.targetDir}`);
     } catch (error) {
         console.error('[WARN] Não foi possível injetar conteúdo:', error);
     }
 
-    // Inferir Classificação
+    // Inferir sugestões baseadas na descrição
     const inferenciaTipo = inferirTipoArtefato(args.nome, args.descricao);
     const inferenciaNivel = inferirComplexidade(inferenciaTipo.tipo, args.descricao);
-    const tierSugerido = determinarTierGate(inferenciaTipo.tipo, inferenciaNivel.nivel);
-    
-    // Validação de segurança
-    if (!tierSugerido) {
-        return {
-            content: [{ type: "text", text: "❌ Erro: Não foi possível determinar o tier do projeto." }],
-            isError: true,
-        };
-    }
-    
-    const descricaoTier = descreverTier(tierSugerido);
-    
-    // Mapear modo para nível de complexidade se não especificado
     const modoSugerido = args.modo || mapearModoParaNivel(inferenciaTipo.tipo);
 
-    const resposta = `# 🧐 Análise de Novo Projeto: ${args.nome}
+    const resposta = `# 🎯 Configuração do Projeto: ${args.nome}
 
-Analisei a descrição e sugiro a seguinte configuração:
-
-| Configuração | Sugestão | Motivo |
-|---|---|---|
-| **Tipo de Artefato** | \`${inferenciaTipo.tipo}\` | ${inferenciaTipo.razao} |
-| **Complexidade** | \`${inferenciaNivel.nivel}\` | ${inferenciaNivel.razao} |
-| **Tier de Gates** | **${tierSugerido?.toUpperCase() || 'N/A'}** | ${descricaoTier} |
-| **Modo** | **${modoSugerido.toUpperCase()}** | ${getModoDescription(modoSugerido)} |
+Analisei a descrição do projeto. Agora preciso de algumas informações para configurar corretamente:
 
 ---
 
-## � Informações sobre as Configurações
+## ❓ Pergunta 2/4: Qual o tipo de artefato?
 
-### Tipo de Artefato
+**Sugestão baseada na análise:** \`${inferenciaTipo.tipo}\` (${inferenciaTipo.razao})
+
+### Opções disponíveis:
+
 - **poc**: Prova de conceito, experimentos rápidos
 - **script**: Automações, CLIs, ferramentas de linha de comando
 - **internal**: Ferramentas internas, backoffice, dashboards
-- **product**: Sistemas voltados ao usuário final (padrão)
+- **product**: Sistemas voltados ao usuário final
 
-### Complexidade
+---
+
+## ❓ Pergunta 3/4: Qual a complexidade do projeto?
+
+**Sugestão baseada na análise:** \`${inferenciaNivel.nivel}\` (${inferenciaNivel.razao})
+
+### Opções disponíveis:
+
 - **simples**: CRUDs básicos, landing pages, scripts simples
-- **medio**: Aplicações web/mobile padrão (padrão)
+- **medio**: Aplicações web/mobile padrão
 - **complexo**: Microserviços, sistemas distribuídos, alta escala
 
-### Tier de Gates
-- **ESSENCIAL**: 7 fases, validações mínimas (POCs, scripts)
-- **BASE**: 13 fases, validações completas (padrão)
-- **AVANÇADO**: 17 fases, validações avançadas (sistemas críticos)
+---
 
-### Modo de Execução
+## ❓ Pergunta 4/4: Qual modo de execução deseja?
+
+**Sugestão baseada no tipo:** \`${modoSugerido}\`
+
+### Opções disponíveis:
+
 - **economy**: Rápido - 7 fases, perguntas mínimas, validação essencial
-- **balanced**: Equilibrado - 13 fases, perguntas moderadas, validação completa (padrão)
+- **balanced**: Equilibrado - 13 fases, perguntas moderadas, validação completa
 - **quality**: Qualidade - 17 fases, perguntas detalhadas, validação avançada
 
 ---
 
-## 🚦 Confirmação Necessária
+## 🚦 Confirme as Configurações
 
-Para efetivamente criar o projeto, você precisa **confirmar ou ajustar** estes valores.
-
-**Opção 1: Concordo (Criar como sugerido)**
+**Opção 1: Usar sugestões (Recomendado)**
 \`\`\`
 confirmar_projeto(
     nome: "${args.nome}",
@@ -210,16 +217,16 @@ confirmar_projeto(
 )
 \`\`\`
 
-**Opção 2: Ajustar Configurações**
+**Opção 2: Personalizar**
 \`\`\`
 confirmar_projeto(
     nome: "${args.nome}",
     descricao: "${args.descricao || ''}",
     diretorio: "${args.diretorio}",
     tipo_artefato: "product",     // poc | script | internal | product
-    nivel_complexidade: "complexo", // simples | medio | complexo
+    nivel_complexidade: "medio",   // simples | medio | complexo
     ide: "${args.ide}",
-    modo: "quality"                // economy | balanced | quality
+    modo: "balanced"               // economy | balanced | quality
 )
 \`\`\`
 `;
@@ -374,20 +381,9 @@ args.modo === 'quality' ?
 '**Modo Quality:** Vamos coletar informações detalhadas para garantir máxima qualidade.' :
 '**Modo Balanced:** Vamos coletar informações moderadas para equilibrar velocidade e qualidade.'}
 
-Para reduzir a quantidade de perguntas durante o projeto, execute o **Discovery**:
+O processo de **Discovery** será conduzido através da ferramenta MCP \`discovery\` ou pelo especialista skill ativado. Ele irá gerar um questionário agrupado adaptado ao modo selecionado e coletar as informações necessárias para o projeto.
 
-\`\`\`typescript
-// 1. Ler o estado.json criado
-const estadoJson = await readFile('${diretorio}/.maestro/estado.json');
-
-// 2. Executar discovery para gerar questionário
-await mcp_maestro_discovery({
-    estado_json: estadoJson,
-    diretorio: "${diretorio}"
-});
-\`\`\`
-
-Isso irá gerar um questionário agrupado adaptado ao modo selecionado. Após o usuário responder, execute novamente com o parâmetro \`respostas\` preenchido. Os especialistas terão todo o contexto necessário!
+Após a coleta, todos os especialistas terão o contexto completo para trabalhar!
 
 ---
 
@@ -399,10 +395,11 @@ Se desejar, você pode usar o **Google Stitch** para prototipagem de UI após a 
 
 ---
 
-## 🎨 Próximos Passos (Alternativo)
+## � Próximos Passos
 
-Se não for usar o Stitch, você pode iniciar a Fase 1 (Produto) direto.
 O projeto foi inicializado no Tier **${tier?.toUpperCase() || 'N/A'}**.
+
+Você pode iniciar a Fase 1 (Produto) diretamente ou usar o Google Stitch para prototipagem rápida.
 ${gerarSecaoPrompts("Produto")}
 ${gerarSecaoExemplo(detectarStack(args.nome, args.descricao))}
 `;
