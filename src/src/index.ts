@@ -622,9 +622,9 @@ async function callTool(name: string, args?: Record<string, unknown>) {
     try {
         switch (name) {
             case "iniciar_projeto":
-                return await iniciarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string, ide: a.ide as "windsurf" | "cursor" | "antigravity" | undefined });
+                return await iniciarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string, ide: a.ide as "windsurf" | "cursor" | "antigravity" | undefined, modo: a.modo as "economy" | "balanced" | "quality" | undefined });
             case "confirmar_projeto":
-                return await confirmarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string, tipo_artefato: a.tipo_artefato as any, nivel_complexidade: a.nivel_complexidade as any, ide: a.ide as any });
+                return await confirmarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string, tipo_artefato: a.tipo_artefato as any, nivel_complexidade: a.nivel_complexidade as any, ide: a.ide as any, modo: a.modo as any });
             case "carregar_projeto":
                 return await carregarProjeto({ estado_json: a.estado_json as string, diretorio: a.diretorio as string });
             case "proximo":

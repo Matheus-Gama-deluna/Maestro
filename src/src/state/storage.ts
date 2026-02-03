@@ -44,7 +44,8 @@ export async function salvarEstado(diretorio: string, estado: EstadoProjeto): Pr
 export function criarEstadoInicial(
     projetoId: string,
     nome: string,
-    diretorio: string
+    diretorio: string,
+    ide?: 'windsurf' | 'cursor' | 'antigravity'
 ): EstadoProjeto {
     return {
         projeto_id: projetoId,
@@ -62,6 +63,7 @@ export function criarEstadoInicial(
         tipo_artefato: "product",
         tier_gate: "base",
         classificacao_confirmada: false,
+        ide, // IDE utilizada no projeto
 
         // Campos de confirmação de classificação
         aguardando_classificacao: false,

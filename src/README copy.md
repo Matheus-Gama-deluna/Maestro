@@ -44,27 +44,25 @@ Servidor **MCP (Model Context Protocol)** para desenvolvimento assistido por IA 
 - One-shot generation (código completo)
 - Differential updates (apenas diffs)
 
+---
+
+## Destaques do Changelog v2.1
+- Modos de operação: economy / balanced / quality com otimizações automáticas
+- Discovery agrupado para reduzir 40-75% dos prompts iniciais
+- Multi-IDE consolidado via `ide-paths.ts` (Windsurf, Cursor, Antigravity)
+- Correções de dependências e atualização do SDK MCP para 1.25.3
+
 **[Ver CHANGELOG completo](./CHANGELOG_V2.md)** | **[Guia de Migração v1→v2](./docs/MIGRACAO_V1_V2.md)**
 
 ## 🚀 Início Rápido
 
 ```bash
-# 1. Inicialize seu projeto
+# 1. Inicialize seu projeto (instala conteúdo)
 npx @maestro-ai/cli
 
-# 2. Configure o MCP na sua IDE (veja abaixo)
-
-# 3. Comece a desenvolver!
-@mcp:maestro iniciar_projeto
-```
-
----
-
-## � Configuração MCP via npx (local)
-
-Use sempre a versão mais recente via `npx`:
-
-```json
+# 2. Configure o MCP na sua IDE com npx @latest
+# Exemplo (Gemini / VS Code / Cline):
+# Adicione ao seu mcpServers
 {
   "mcpServers": {
     "maestro": {
@@ -75,13 +73,75 @@ Use sempre a versão mais recente via `npx`:
     }
   }
 }
-```
 
-O Maestro utilizará automaticamente o diretório de trabalho atual; se precisar especificar, adicione o caminho como último argumento em `args`.
+# 3. Comece a desenvolver!
+@mcp:maestro iniciar_projeto
+```
 
 ---
 
-## 🔧 Configuração do MCP
+## 🌐 Servidor Público
+
+```
+https://maestro.deluna.dev.br
+```
+
+```bash
+# Verificar status
+curl https://maestro.deluna.dev.br/health
+```
+
+---
+
+## 📦 CLI - Instalação
+
+O CLI injeta automaticamente todo o conteúdo necessário no seu projeto:
+
+```bash
+# Instalação completa (todas as IDEs)
+npx @maestro-ai/cli
+
+# Apenas para uma IDE específica
+npx @maestro-ai/cli --ide gemini
+npx @maestro-ai/cli --ide cursor
+npx @maestro-ai/cli --ide copilot
+npx @maestro-ai/cli --ide windsurf
+```
+
+### Opções do CLI
+
+| Opção | Descrição |
+|-------|-----------|
+| `--ide <ide>` | IDE alvo: `gemini`, `cursor`, `copilot`, `windsurf`, `all` (default: `all`) |
+| `--force` | Sobrescreve arquivos existentes |
+| `--minimal` | Instala apenas workflows + rules |
+
+### Estrutura Criada
+
+```
+projeto/
+├── .maestro/
+│   ├── config.json          # Configuração do projeto
+│   ├── content/             # Especialistas, templates, prompts
+│   └── history/             # Histórico de conversas
+├── .agent/
+│   ├── skills/              # Skills para a IA
+│   └── workflows/           # Workflows automatizados
+└── [Arquivos de regras por IDE]
+```
+
+### Arquivos de Regras por IDE
+
+| IDE | Arquivo Gerado |
+|-----|----------------|
+| Gemini/Antigravity | `.gemini/GEMINI.md` |
+| Cursor | `.cursorrules` |
+| GitHub Copilot | `.github/copilot-instructions.md` |
+| Windsurf | `.windsurfrules` |
+
+---
+
+## 🔧 Configuração do MCP (sempre usar @latest)
 
 ### Gemini / Antigravity
 
@@ -101,8 +161,9 @@ O Maestro utilizará automaticamente o diretório de trabalho atual; se precisar
 {
   "mcpServers": {
     "maestro": {
-      "url": "https://maestro.deluna.dev.br/mcp",
-      "transport": "http"
+      "command": "npx",
+      "args": ["-y", "@maestro/mcp-server@latest"],
+      "transport": "stdio"
     }
   }
 }

@@ -1,7 +1,7 @@
 import { join, resolve } from "path";
 import { existsSync, readdirSync } from "fs";
 import { platform } from "os";
-import { v4 as uuid } from "uuid";
+import { randomUUID } from "crypto";
 import type { ToolResult, TipoArtefato, NivelComplexidade, TierGate } from "../types/index.js";
 import { criarEstadoInicial, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
@@ -12,18 +12,21 @@ import { gerarSystemMd } from "../utils/system-md.js";
 import { detectarStack, gerarSecaoPrompts, gerarSecaoExemplo, getSkillParaFase, getSkillPath } from "../utils/prompt-mapper.js";
 import { resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { ensureContentInstalled, injectContentForIDE } from "../utils/content-injector.js";
+import { formatSkillMessage } from "../utils/ide-paths.js";
 
 interface IniciarProjetoArgs {
     nome: string;
     descricao?: string;
     diretorio: string;
     ide?: 'windsurf' | 'cursor' | 'antigravity';
+    modo?: 'economy' | 'balanced' | 'quality';
 }
 
 interface ConfirmarProjetoArgs extends IniciarProjetoArgs {
     tipo_artefato: TipoArtefato;
     nivel_complexidade: NivelComplexidade;
     ide: 'windsurf' | 'cursor' | 'antigravity';
+    modo: 'economy' | 'balanced' | 'quality';
 }
 
 /**
@@ -66,6 +69,43 @@ function inferirComplexidade(tipo: TipoArtefato, descricao: string = ""): { nive
 }
 
 /**
+ * Mapeia modo para nível de complexidade sugerido
+ */
+function mapearModoParaNivel(modo: 'economy' | 'balanced' | 'quality' | TipoArtefato): 'economy' | 'balanced' | 'quality' {
+    // Se já é um modo, retorna
+    if (modo === 'economy' || modo === 'balanced' || modo === 'quality') {
+        return modo;
+    }
+    
+    // Se é um tipo de artefato, sugere modo baseado no tipo
+    switch (modo) {
+        case 'poc':
+        case 'script':
+            return 'economy';
+        case 'internal':
+            return 'balanced';
+        case 'product':
+            return 'quality';
+        default:
+            return 'balanced';
+    }
+}
+
+/**
+ * Retorna descrição do modo selecionado
+ */
+function getModoDescription(modo: 'economy' | 'balanced' | 'quality'): string {
+    switch (modo) {
+        case 'economy':
+            return '(Rápido: 7 fases, perguntas mínimas, validação essencial)';
+        case 'balanced':
+            return '(Equilibrado: 13 fases, perguntas moderadas, validação completa)';
+        case 'quality':
+            return '(Qualidade: 17 fases, perguntas detalhadas, validação avançada)';
+    }
+}
+
+/**
  * Tool: iniciar_projeto
  * Analisa a descrição, infere tipo e tier, e PEDE CONFIRMAÇÃO
  * NÃO CRIA ARQUIVOS AINDA
@@ -102,6 +142,10 @@ export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResu
     const inferenciaNivel = inferirComplexidade(inferenciaTipo.tipo, args.descricao);
     const tierSugerido = determinarTierGate(inferenciaTipo.tipo, inferenciaNivel.nivel);
     const descricaoTier = descreverTier(tierSugerido);
+    
+    // Mapear modo para nível de complexidade se não especificado
+    const modoSugerido = args.modo || mapearModoParaNivel(inferenciaTipo.tipo);
+    const nivelPorModo = mapearModoParaNivel(modoSugerido);
 
     const resposta = `# 🧐 Análise de Novo Projeto: ${args.nome}
 
@@ -129,7 +173,8 @@ confirmar_projeto(
     diretorio: "${args.diretorio}",
     tipo_artefato: "${inferenciaTipo.tipo}",
     nivel_complexidade: "${inferenciaNivel.nivel}",
-    ide: "${args.ide}"
+    ide: "${args.ide}",
+    modo: "${modoSugerido}"
 )
 \`\`\`
 
@@ -173,14 +218,31 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
     // Recalcula tier baseado no confirmado
     const tier = determinarTierGate(args.tipo_artefato, args.nivel_complexidade);
 
-    const projetoId = uuid();
+    const projetoId = randomUUID();
 
     // Cria estado com novos campos
-    const estado = criarEstadoInicial(projetoId, args.nome, diretorio);
+    const estado = criarEstadoInicial(projetoId, args.nome, diretorio, args.ide);
     estado.nivel = args.nivel_complexidade;
     estado.tipo_artefato = args.tipo_artefato;
     estado.tier_gate = tier;
     estado.classificacao_confirmada = true;
+    
+    // Configurar modo e otimizações
+    estado.config = {
+        mode: args.modo,
+        flow: 'principal',
+        optimization: {
+            batch_questions: args.modo === 'economy',
+            context_caching: args.modo !== 'economy',
+            template_compression: args.modo === 'economy',
+            smart_validation: args.modo === 'quality',
+            one_shot_generation: args.modo === 'economy',
+            differential_updates: args.modo === 'balanced' || args.modo === 'quality',
+        },
+        frontend_first: true,
+        auto_checkpoint: args.modo === 'quality',
+        auto_fix: args.modo !== 'economy',
+    };
 
     // Cria resumo
     const resumo = criarResumoInicial(projetoId, args.nome, args.nivel_complexidade, 1, 10);
@@ -219,11 +281,13 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 - Tipo: \`${args.tipo_artefato}\`
 - Complexidade: \`${args.nivel_complexidade}\`
 - Tier: **${tier.toUpperCase()}**
+- Modo: **${args.modo.toUpperCase()}** ${getModoDescription(args.modo)}
 
 | Campo | Valor |
 |-------|-------|
 | **ID** | \`${projetoId}\` |
 | **Diretório** | \`${diretorio}\` |
+| **IDE** | ${args.ide} |
 
 ---
 
@@ -258,57 +322,35 @@ ${(() => {
     const skillInicial = getSkillParaFase("Produto");
     if (!skillInicial) return "";
     
-    return `**Skill:** \`${skillInicial}\`  
-**Localização:** \`.agent/skills/${skillInicial}/SKILL.md\`
-
-> 💡 **Como usar a skill:**
-> 1. Ative com: \`@${skillInicial}\`
-> 2. Leia SKILL.md para instruções detalhadas
-> 3. Consulte templates em \`resources/templates/\`
-> 4. Valide com checklist em \`resources/checklists/\`
-
-**Resources disponíveis:**
-- 📋 Templates: \`.agent/skills/${skillInicial}/resources/templates/\`
-- 📖 Examples: \`.agent/skills/${skillInicial}/resources/examples/\`
-- ✅ Checklists: \`.agent/skills/${skillInicial}/resources/checklists/\`
-- 📚 Reference: \`.agent/skills/${skillInicial}/resources/reference/\`
-- 🔧 MCP Functions: \`.agent/skills/${skillInicial}/MCP_INTEGRATION.md\`
-
----
-`;
+    return formatSkillMessage(skillInicial, args.ide) + "\n\n---\n";
 })()}
 
-## 🎨 Prototipagem Rápida com Google Stitch (Opcional)
+## � Próximo Passo: Discovery
 
-Antes de iniciar o desenvolvimento, você gostaria de usar o **Google Stitch** para criar protótipos de UI rapidamente?
+${args.modo === 'economy' ? 
+'**Modo Economy:** Vamos coletar apenas informações essenciais para começar rapidamente.' :
+args.modo === 'quality' ?
+'**Modo Quality:** Vamos coletar informações detalhadas para garantir máxima qualidade.' :
+'**Modo Balanced:** Vamos coletar informações moderadas para equilibrar velocidade e qualidade.'}
 
-### Com Stitch você pode:
-- ✨ Validar UI com stakeholders antes de desenvolver
-- 🎯 Gerar código base para componentes
-- ⚡ Acelerar a fase de design
-
-> [Mais sobre Google Stitch](https://stitch.withgoogle.com)
-
----
-
-## ❓ AGUARDANDO RESPOSTA DO USUÁRIO
-
-**Pergunte ao usuário:**
-> "Deseja utilizar o Google Stitch para prototipagem rápida de UI?"
->
-> Opções: **"Sim"** ou **"Não"**
-
-Após a resposta, use a tool \`confirmar_stitch\`:
+Para reduzir a quantidade de perguntas durante o projeto, execute o **Discovery**:
 
 \`\`\`
-confirmar_stitch(
+discovery(
     estado_json: "<conteúdo do estado.json>",
-    diretorio: "${diretorio}",
-    usar_stitch: true  // ou false
+    diretorio: "${diretorio}"
 )
 \`\`\`
 
-> ⚠️ **IMPORTANTE**: Aguarde a resposta do usuário antes de prosseguir!
+Isso irá gerar um questionário agrupado. Após responder, os especialistas terão todo o contexto necessário!
+
+---
+
+## 🎨 Prototipagem Rápida com Google Stitch (Opcional)
+
+Se desejar, você pode usar o **Google Stitch** para prototipagem de UI após a fase de UX Design.
+
+> [Mais sobre Google Stitch](https://stitch.withgoogle.com)
 
 ---
 
@@ -336,7 +378,8 @@ export const iniciarProjetoSchema = {
         nome: { type: "string", description: "Nome do projeto" },
         descricao: { type: "string", description: "Descrição para análise" },
         diretorio: { type: "string", description: "Diretório absoluto" },
-        ide: { type: "string", enum: ['windsurf', 'cursor', 'antigravity'], description: "IDE alvo para injection" }
+        ide: { type: "string", enum: ['windsurf', 'cursor', 'antigravity'], description: "IDE alvo para injection" },
+        modo: { type: "string", enum: ['economy', 'balanced', 'quality'], description: "Modo de execução: economy (rápido), balanced (equilibrado), quality (máxima qualidade)" }
     },
     required: ["nome", "diretorio"],
 };
@@ -349,7 +392,8 @@ export const confirmarProjetoSchema = {
         diretorio: { type: "string" },
         tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] },
         nivel_complexidade: { type: "string", enum: ["simples", "medio", "complexo"] },
-        ide: { type: "string", enum: ['windsurf', 'cursor', 'antigravity'], description: "IDE alvo para injection" }
+        ide: { type: "string", enum: ['windsurf', 'cursor', 'antigravity'], description: "IDE alvo para injection" },
+        modo: { type: "string", enum: ['economy', 'balanced', 'quality'], description: "Modo de execução" }
     },
-    required: ["nome", "diretorio", "tipo_artefato", "nivel_complexidade", "ide"],
+    required: ["nome", "diretorio", "tipo_artefato", "nivel_complexidade", "ide", "modo"],
 };

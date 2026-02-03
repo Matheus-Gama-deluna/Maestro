@@ -5,7 +5,6 @@ import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { getFase, getFluxo, getFaseComStitch, getFluxoComStitch } from "../flows/types.js";
 import { classificarPRD, descreverNivel } from "../flows/classifier.js";
 import { validarGate, formatarResultadoGate } from "../gates/validator.js";
-import { validarEstrutura } from "../gates/estrutura.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { parsearResumo, serializarResumo, criarResumoInicial, extrairResumoEntregavel } from "../state/memory.js";
 import { gerarInstrucaoProximaFase } from "../utils/instructions.js";
@@ -13,7 +12,9 @@ import type { EntregavelResumo, ProjectSummary } from "../types/memory.js";
 import { logEvent, EventTypes } from "../utils/history.js";
 import { gerarSystemMd } from "../utils/system-md.js";
 import { gerarSecaoPrompts, getSkillParaFase, getSkillPath, getSkillResourcePath } from "../utils/prompt-mapper.js";
-import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
+import { validarEstrutura } from "../gates/estrutura.js";
+import { normalizeProjectPath, resolveProjectPath, joinProjectPath } from "../utils/files.js";
+import { formatSkillMessage, detectIDE, getSkillResourcePath as getIDESkillResourcePath } from "../utils/ide-paths.js";
 
 interface ProximoArgs {
     entregavel: string;
@@ -282,8 +283,8 @@ O entregável tem qualidade abaixo do ideal.
 
 ### Itens Pendentes
 
-${estruturaResult.secoes_faltando.length > 0 ? `**Seções faltando:**\n${estruturaResult.secoes_faltando.map(s => `- ${s}`).join("\n")}\n` : ""}
-${gateResultado.itens_pendentes.length > 0 ? `**Checklist pendente:**\n${gateResultado.itens_pendentes.map(item => `- ${item}`).join("\n")}` : ""}
+${estruturaResult.secoes_faltando.length > 0 ? `**Seções faltando:**\n${estruturaResult.secoes_faltando.map((s: string) => `- ${s}`).join("\n")}\n` : ""}
+${gateResultado.itens_pendentes.length > 0 ? `**Checklist pendente:**\n${gateResultado.itens_pendentes.map((item: string) => `- ${item}`).join("\n")}` : ""}
 
 ---
 
@@ -533,6 +534,9 @@ confirmar_classificacao(
         const proximaSkill = getSkillParaFase(proximaFase.nome);
         if (!proximaSkill) return "";
         
+        // Detectar IDE do estado ou do diretório
+        const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
+        
         let templatesInfo = "";
         try {
             const { readdir } = await import("fs/promises");
@@ -541,7 +545,8 @@ confirmar_classificacao(
             if (existsSync(templatesPath)) {
                 const templates = await readdir(templatesPath);
                 if (templates.length > 0) {
-                    templatesInfo = `\n\n📋 **Templates Disponíveis**:\n${templates.map(t => `- \`.agent/skills/${proximaSkill}/resources/templates/${t}\``).join("\n")}`;
+                    const templatesRelPath = getIDESkillResourcePath(proximaSkill, 'templates', ide);
+                    templatesInfo = `\n\n📋 **Templates Disponíveis**:\n${templates.map((t: string) => `- \`${templatesRelPath}${t}\``).join("\n")}`;
                 }
             }
         } catch (error) {
@@ -552,21 +557,13 @@ confirmar_classificacao(
 
 ## 🤖 Próximo Especialista
 
-**Skill:** \`${proximaSkill}\`  
-**Localização:** \`.agent/skills/${proximaSkill}/SKILL.md\`
+${formatSkillMessage(proximaSkill, ide)}
 
 > 💡 **Próximos passos:**
 > 1. Ative a skill: \`@${proximaSkill}\`
 > 2. Leia SKILL.md para entender a fase
 > 3. Consulte o template apropriado
 > 4. Siga o checklist de validação${templatesInfo}
-
-**Resources disponíveis:**
-- 📋 Templates: \`.agent/skills/${proximaSkill}/resources/templates/\`
-- 📖 Examples: \`.agent/skills/${proximaSkill}/resources/examples/\`
-- ✅ Checklists: \`.agent/skills/${proximaSkill}/resources/checklists/\`
-- 📚 Reference: \`.agent/skills/${proximaSkill}/resources/reference/\`
-- 🔧 MCP Functions: \`.agent/skills/${proximaSkill}/MCP_INTEGRATION.md\`
 `;
     })();
 

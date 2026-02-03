@@ -23,6 +23,7 @@ export interface EstadoProjeto {
     tipo_artefato: TipoArtefato;           // Novo: tipo de artefato
     tier_gate: TierGate;                    // Novo: tier de validações
     classificacao_confirmada: boolean;      // Novo: se usuário confirmou tipo/complexidade
+    ide?: 'windsurf' | 'cursor' | 'antigravity';  // IDE utilizada no projeto
     tipo_fluxo: TipoFluxo;
     fase_atual: number;
     total_fases: number;

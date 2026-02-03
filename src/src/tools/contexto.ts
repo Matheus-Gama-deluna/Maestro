@@ -1,4 +1,3 @@
-
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado } from "../state/storage.js";
 import { getFase, getFluxo } from "../flows/types.js";
@@ -7,6 +6,7 @@ import { gerarInstrucaoRecursosCompacta } from "../utils/instructions.js";
 import { normalizeProjectPath, resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { resolve } from "path";
 import { getSkillParaFase } from "../utils/prompt-mapper.js";
+import { formatSkillMessage, detectIDE } from "../utils/ide-paths.js";
 
 interface ContextoArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -134,8 +134,7 @@ ${(() => {
     return `
 ### 💡 Próximos Passos com Skill
 
-**Skill:** \`${proximaSkill}\`  
-**Localização:** \`.agent/skills/${proximaSkill}/SKILL.md\`
+${formatSkillMessage(proximaSkill, estado.ide || detectIDE(args.diretorio) || 'windsurf')}
 
 1. Ativar skill: \`@${proximaSkill}\`
 2. Ler \`SKILL.md\` para instruções da fase

@@ -9,6 +9,7 @@ import { setCurrentDirectory } from "../state/context.js";
 import { gerarInstrucaoRecursosCompacta } from "../utils/instructions.js";
 import { gerarSecaoPrompts, getSkillParaFase, getSkillPath } from "../utils/prompt-mapper.js";
 import { temContentLocal, normalizeProjectPath, joinProjectPath } from "../utils/files.js";
+import { formatSkillMessage, detectIDE } from "../utils/ide-paths.js";
 
 interface StatusArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -122,23 +123,13 @@ ${(() => {
     const skillAtual = getSkillParaFase(faseAtual.nome);
     if (!skillAtual) return "";
     
+    // Detectar IDE do estado ou do diretório
+    const ide = estado.ide || detectIDE(args.diretorio) || 'windsurf';
+    
     return `
 ## 🤖 Especialista Ativo
 
-**Skill:** \`${skillAtual}\`  
-**Localização:** \`.agent/skills/${skillAtual}/SKILL.md\`
-
-> 💡 **Como usar:**
-> 1. Ative: \`@${skillAtual}\`
-> 2. Leia SKILL.md para instruções
-> 3. Consulte resources disponíveis
-
-**Resources Disponíveis:**
-- 📋 Templates: \`.agent/skills/${skillAtual}/resources/templates/\`
-- 📖 Examples: \`.agent/skills/${skillAtual}/resources/examples/\`
-- ✅ Checklists: \`.agent/skills/${skillAtual}/resources/checklists/\`
-- 📚 Reference: \`.agent/skills/${skillAtual}/resources/reference/\`
-- 🔧 MCP Functions: \`.agent/skills/${skillAtual}/MCP_INTEGRATION.md\`
+${formatSkillMessage(skillAtual, ide)}
 `;
 })()}
 

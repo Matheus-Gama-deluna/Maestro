@@ -36,6 +36,9 @@ import { avaliarEntregavel, avaliarEntregavelSchema } from "./avaliar-entregavel
 // Tools de injeção de conteúdo
 import { injetar_conteudo, injetarConteudoSchema } from "./injetar-conteudo.js";
 
+// Tools de discovery
+import { discovery, discoverySchema } from "./discovery.js";
+
 /**
  * Registra todas as tools no servidor MCP
  */
@@ -149,6 +152,12 @@ export function registerTools(server: Server) {
                 name: "injetar_conteudo",
                 description: "Injeta conteúdo base (especialistas, templates, guias) no projeto. Use force:true para sobrescrever.",
                 inputSchema: injetarConteudoSchema,
+            },
+            // === DISCOVERY ===
+            {
+                name: "discovery",
+                description: "Coleta informações iniciais agrupadas para reduzir prompts. Retorna questionário ou salva respostas.",
+                inputSchema: discoverySchema,
             },
         ],
     }));
@@ -306,6 +315,13 @@ export function registerTools(server: Server) {
                         source: typedArgs?.source as "builtin" | "custom" | undefined,
                         custom_path: typedArgs?.custom_path as string | undefined,
                         force: typedArgs?.force as boolean | undefined,
+                    });
+
+                case "discovery":
+                    return await discovery({
+                        estado_json: typedArgs?.estado_json as string,
+                        diretorio: typedArgs?.diretorio as string,
+                        respostas: typedArgs?.respostas as any,
                     });
 
                 default:

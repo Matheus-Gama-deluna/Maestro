@@ -3,7 +3,7 @@ import { setCurrentDirectory } from "../state/context.js";
 import { salvarEstado, criarEstadoInicial, carregarEstado } from "../state/storage.js";
 import { lerEspecialista, lerTemplate, normalizeProjectPath } from "../utils/files.js";
 import { FLUXO_FEATURE, FLUXO_BUG, FLUXO_REFATORACAO } from "../flows/alternativas.js";
-import { v4 as uuid } from "uuid";
+import { randomUUID } from "crypto";
 
 interface NovaFeatureArgs {
     descricao: string;
@@ -20,7 +20,7 @@ export async function novaFeature(args: NovaFeatureArgs): Promise<ToolResult> {
 
     // Se não existe projeto, cria um para a feature
     if (!estado) {
-        estado = criarEstadoInicial(uuid(), `Feature: ${args.descricao.slice(0, 50)}`, diretorio);
+        estado = criarEstadoInicial(randomUUID(), `Feature: ${args.descricao.slice(0, 50)}`, diretorio);
     }
 
     estado.tipo_fluxo = "feature";
@@ -103,7 +103,7 @@ export async function corrigirBug(args: CorrigirBugArgs): Promise<ToolResult> {
     let estado = await carregarEstado(diretorio);
 
     if (!estado) {
-        estado = criarEstadoInicial(uuid(), `Bug: ${args.descricao.slice(0, 50)}`, diretorio);
+        estado = criarEstadoInicial(randomUUID(), `Bug: ${args.descricao.slice(0, 50)}`, diretorio);
     }
 
     estado.tipo_fluxo = "bug";
@@ -191,7 +191,7 @@ export async function refatorar(args: RefatorarArgs): Promise<ToolResult> {
     let estado = await carregarEstado(diretorio);
 
     if (!estado) {
-        estado = criarEstadoInicial(uuid(), `Refatoração: ${args.area}`, diretorio);
+        estado = criarEstadoInicial(randomUUID(), `Refatoração: ${args.area}`, diretorio);
     }
 
     estado.tipo_fluxo = "refatoracao";

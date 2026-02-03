@@ -1,8 +1,8 @@
-# MCP Maestro
+# MCP Maestro v2.1
 
 Servidor MCP (Model Context Protocol) para o Maestro - Guia de Desenvolvimento Assistido por IA.
 
-**Pacote**: `@maestro-ai/mcp-server@1.0.0`
+**Pacote**: `@maestro/mcp-server@2.1.0`
 
 ## 🚀 Uso via npx (Recomendado)
 
@@ -17,7 +17,7 @@ O Maestro agora é distribuído como pacote npm e executado localmente via `npx`
      "mcpServers": {
        "maestro": {
          "command": "npx",
-         "args": ["-y", "@maestro-ai/mcp-server@1.0.0"],
+         "args": ["-y", "@maestro/mcp-server@latest"],
          "disabled": false,
          "env": {}
        }
@@ -27,18 +27,13 @@ O Maestro agora é distribuído como pacote npm e executado localmente via `npx`
 
 2. **O Maestro usará automaticamente o diretório de trabalho atual** onde você estiver trabalhando.
 
-3. **Instalação direta (opcional)**:
-   ```bash
-   npm install -g @maestro-ai/mcp-server@1.0.0
-   ```
-
-4. **Especificar diretório manualmente (se necessário)**:
+3. **Especificar diretório manualmente (se necessário)**:
    ```json
    {
      "mcpServers": {
        "maestro": {
          "command": "npx",
-         "args": ["-y", "@maestro-ai/mcp-server@1.0.0", "D:\\Meus\\Projetos"],
+         "args": ["-y", "@maestro/mcp-server@latest", "D:\\Meus\\Projetos"],
          "disabled": false,
          "env": {}
        }
@@ -48,14 +43,16 @@ O Maestro agora é distribuído como pacote npm e executado localmente via `npx`
 
 
 
-### Fluxo de Uso
+### Fluxo de Uso (inclui modos e discovery)
 
 ```bash
 # 1. Iniciar novo projeto (analisa e sugere classificação)
 iniciar_projeto(
     nome: "Meu App",
     descricao: "Sistema de gestão de tarefas",
-    diretorio: "D:\\Projetos\\meu-app"
+    diretorio: "D:\\Projetos\\meu-app",
+    ide: "windsurf",
+    modo: "balanced"   # economy | balanced | quality
 )
 
 # 2. Confirmar criação (injeta conteúdo automaticamente)
@@ -63,10 +60,18 @@ confirmar_projeto(
     nome: "Meu App",
     diretorio: "D:\\Projetos\\meu-app",
     tipo_artefato: "product",
-    nivel_complexidade: "medio"
+    nivel_complexidade: "medio",
+    ide: "windsurf",
+    modo: "balanced"
 )
 
-# 3. Trabalhar nas fases
+# 3. Coletar discovery (reduz prompts)
+discovery(
+    estado_json: "<conteudo do estado.json>",
+    diretorio: "D:\\Projetos\\meu-app"
+)
+
+# 4. Trabalhar nas fases
 proximo()      # Avança para próxima fase
 status()       # Ver status completo
 salvar()       # Salva entregáveis
@@ -97,30 +102,20 @@ meu-app/
 | `carregar_projeto` | Carrega projeto existente |
 | `proximo` | Salva entregável e avança fase |
 | `status` | Retorna status completo |
+| `discovery` | Coleta perguntas iniciais agrupadas e salva em `estado.discovery` |
 | `injetar_conteudo` | Reinjeta conteúdo (use `force:true`) |
 
 ---
 
-## 🌐 Servidor Público (Legado)
-
-O servidor HTTP público continua disponível para compatibilidade:
-
-```
-https://maestro.deluna.dev.br
-```
-
-> **Nota**: Recomendamos usar o modo npx para acesso completo aos arquivos locais.
-
-### Verificar Status
-
-```bash
-curl https://maestro.deluna.dev.br/health
-# Retorna: {"status":"ok","server":"mcp-maestro","version":"1.0.0"}
-```
+## Destaques do Changelog v2.1
+- Modos de operação: economy / balanced / quality com otimizações automáticas
+- Discovery agrupado para reduzir 40-75% dos prompts iniciais
+- Multi-IDE consolidado via `ide-paths.ts` (Windsurf, Cursor, Antigravity)
+- Correções de dependências e atualização do SDK MCP para 1.25.3
 
 ---
 
-## �️ Tools Disponíveis
+## Tools Disponíveis
 
 | Tool | Descrição |
 |------|-----------|

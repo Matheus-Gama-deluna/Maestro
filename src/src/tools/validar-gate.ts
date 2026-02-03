@@ -6,6 +6,7 @@ import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { resolve } from "path";
 import { getSkillParaFase } from "../utils/prompt-mapper.js";
+import { getSkillResourcePath, detectIDE } from "../utils/ide-paths.js";
 
 interface ValidarGateArgs {
     fase?: number;
@@ -118,10 +119,13 @@ ${(() => {
     const skillAtual = getSkillParaFase(fase.nome);
     if (!skillAtual) return "";
     
+    const ide = estado.ide || detectIDE(args.diretorio) || 'windsurf';
+    const checklistPath = getSkillResourcePath(skillAtual, 'checklists', ide);
+    
     return `
 ## 📋 Checklist da Skill
 
-**Localização:** \`.agent/skills/${skillAtual}/resources/checklists/\`
+**Localização:** \`${checklistPath}\`
 
 > 💡 Consulte o checklist completo da skill para validação detalhada.
 `;

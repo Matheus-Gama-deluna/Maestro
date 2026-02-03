@@ -10,7 +10,8 @@ export interface PromptRef {
 
 /**
  * Mapeamento de fases para skills locais
- * Skills estão em .agent/skills/{nome}/
+ * Skills estão em {IDE_SPECIFIC}/skills/{nome}/
+ * Use ide-paths.ts para obter caminhos corretos por IDE
  * @since 2.0.0 - Skills v2.0 Migration
  */
 export const FASE_SKILL_MAP: Record<string, string> = {
@@ -85,10 +86,13 @@ export function temSkillParaFase(faseNome: string): boolean {
  * @param skillNome Nome da skill (ex: "specialist-gestao-produto")
  * @param diretorio Diretório do projeto
  * @returns Caminho absoluto para a skill
- * @since 2.0.0
+ * @deprecated Use getSkillPath from ide-paths.ts com o parâmetro IDE
+ * Esta função mantida para compatibilidade, mas retorna caminho genérico
  */
 export function getSkillPath(skillNome: string, diretorio: string): string {
     const { join } = require("path");
+    // Nota: Este caminho é genérico. Para caminhos específicos de IDE,
+    // use: import { getSkillPath } from '../utils/ide-paths.js'
     return join(diretorio, '.agent', 'skills', skillNome);
 }
 

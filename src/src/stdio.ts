@@ -423,6 +423,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     descricao: typedArgs.descricao as string | undefined,
                     diretorio: typedArgs.diretorio as string,
                     ide: typedArgs.ide as "windsurf" | "cursor" | "antigravity" | undefined,
+                    modo: typedArgs.modo as "economy" | "balanced" | "quality" | undefined,
                 });
             case "confirmar_projeto":
                 return await confirmarProjeto({
@@ -432,6 +433,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     tipo_artefato: typedArgs.tipo_artefato as "poc" | "script" | "internal" | "product",
                     nivel_complexidade: typedArgs.nivel_complexidade as "simples" | "medio" | "complexo",
                     ide: typedArgs.ide as "windsurf" | "cursor" | "antigravity",
+                    modo: typedArgs.modo as "economy" | "balanced" | "quality",
                 });
             case "carregar_projeto":
                 return await carregarProjeto({
