@@ -250,21 +250,32 @@ Modernizar o sistema de validação de gates do Maestro para usar templates estr
 
 ---
 
-## 🐛 Issues Conhecidos
+## 🐛 Issues Conhecidos e Correções
 
-### 1. Detecção de Checkboxes
+### ✅ 1. Referências Antigas a `specialists/` (CORRIGIDO)
+**Descrição:** Sistema ainda referenciava diretório antigo `specialists/` ao invés de `skills/`  
+**Severidade:** Alta  
+**Erro:** `ENOENT: no such file or directory, scandir 'content/specialists'`  
+**Correção:** Atualizada função `lerEspecialista()` em `utils/files.ts` para usar `skills/{skill-name}/SKILL.md`  
+**Status:** ✅ Corrigido
+
+**Arquivos Modificados:**
+- `src/src/utils/files.ts` - `lerEspecialista()` agora busca em `skills/`
+- `src/src/utils/files.ts` - `listarEspecialistas()` agora lista pastas de skills
+
+### 2. Detecção de Checkboxes
 **Descrição:** Regex pode não detectar checkboxes com formatação diferente  
 **Severidade:** Baixa  
 **Workaround:** Templates devem seguir formato padrão `[ ]` ou `[x]`  
 **Status:** Documentado
 
-### 2. Placeholders em URLs
+### 3. Placeholders em URLs
 **Descrição:** URLs com colchetes podem ser detectados como placeholders  
 **Severidade:** Baixa  
 **Mitigação:** Filtro para ignorar URLs implementado  
 **Status:** Mitigado
 
-### 3. Performance com Templates Grandes
+### 4. Performance com Templates Grandes
 **Descrição:** Parsing pode ser lento para templates muito grandes (>10k linhas)  
 **Severidade:** Baixa  
 **Mitigação:** Cache de estruturas parseadas (não implementado)  

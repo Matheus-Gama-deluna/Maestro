@@ -48,24 +48,37 @@ function getServerContentDir(): string {
 
 /**
  * Lê conteúdo de um especialista (apenas servidor)
+ * Agora busca em skills/{skill-name}/SKILL.md
  */
 export async function lerEspecialista(nome: string): Promise<string> {
     const contentRoot = getServerContentDir();
-    const especialistasDir = join(contentRoot, "specialists");
+    const skillsDir = join(contentRoot, "skills");
     
-    const files = await readdir(especialistasDir);
-    
-    // Busca arquivo que contém o nome do especialista
-    const arquivo = files.find(f =>
-        f.toLowerCase().includes(nome.toLowerCase()) && f.endsWith(".md")
-    );
+    try {
+        const skillFolders = await readdir(skillsDir);
+        
+        // Busca pasta de skill que contém o nome
+        const skillFolder = skillFolders.find(f => {
+            const folderLower = f.toLowerCase();
+            const nomeLower = nome.toLowerCase();
+            return folderLower.includes(nomeLower) || nomeLower.includes(folderLower.replace('specialist-', ''));
+        });
 
-    if (!arquivo) {
-        throw new Error(`Especialista não encontrado: ${nome}`);
+        if (!skillFolder) {
+            throw new Error(`Skill não encontrada para especialista: ${nome}`);
+        }
+
+        // Lê o arquivo SKILL.md da pasta
+        const skillPath = join(skillsDir, skillFolder, "SKILL.md");
+        
+        if (!existsSync(skillPath)) {
+            throw new Error(`Arquivo SKILL.md não encontrado em: ${skillFolder}`);
+        }
+        
+        return readFile(skillPath, "utf-8");
+    } catch (error) {
+        throw new Error(`Erro ao ler especialista ${nome}: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    const path = join(especialistasDir, arquivo);
-    return readFile(path, "utf-8");
 }
 
 /**
@@ -136,10 +149,32 @@ export async function listarArquivos(subdir: string): Promise<string[]> {
 
 /**
  * Lista especialistas disponíveis
+ * Agora lista skills ao invés de specialists
  */
 export async function listarEspecialistas(): Promise<string[]> {
-    const files = await listarArquivos("specialists");
-    return files.map(f => f.replace(/^Especialista em /i, "").replace(".md", ""));
+    const contentRoot = getServerContentDir();
+    const skillsDir = join(contentRoot, "skills");
+    
+    try {
+        const entries = await readdir(skillsDir, { withFileTypes: true });
+        const skillFolders = entries
+            .filter(e => e.isDirectory())
+            .map(e => e.name);
+        
+        // Retorna nomes amigáveis (remove 'specialist-' prefix)
+        return skillFolders.map(folder => {
+            if (folder.startsWith('specialist-')) {
+                return folder.replace('specialist-', '').split('-').map(w => 
+                    w.charAt(0).toUpperCase() + w.slice(1)
+                ).join(' ');
+            }
+            return folder.split('-').map(w => 
+                w.charAt(0).toUpperCase() + w.slice(1)
+            ).join(' ');
+        });
+    } catch {
+        return [];
+    }
 }
 
 /**
