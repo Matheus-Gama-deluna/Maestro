@@ -1,5 +1,11 @@
 import type { GateResultado, Fase, TierGate } from "../types/index.js";
 import { getChecklistPorTier } from "./tiers.js";
+import { parseTemplate } from "./template-parser.js";
+import { validarContraTemplate, formatarResultadoValidacao } from "./template-validator.js";
+import { calcularQualidade, gerarRelatorioQualidade, compararComTier } from "./quality-scorer.js";
+import { getSkillParaFase } from "../utils/prompt-mapper.js";
+import { existsSync } from "fs";
+import { join } from "path";
 
 /**
  * Checklists de validação por fase (legado - mantido para compatibilidade)
@@ -66,7 +72,84 @@ export const GATE_CHECKLISTS: Record<number, string[]> = {
 };
 
 /**
- * Valida gate de uma fase com suporte a tier
+ * Valida gate usando template da skill (novo sistema)
+ * @param fase - Fase a validar
+ * @param entregavel - Conteúdo do entregável
+ * @param tier - Tier de validação
+ * @param diretorioContent - Diretório base do content (ex: d:/Sistemas/Maestro/content)
+ */
+export function validarGateComTemplate(
+    fase: Fase,
+    entregavel: string,
+    tier: TierGate = "base",
+    diretorioContent?: string
+): { sucesso: boolean; resultado?: any; resultadoLegacy?: GateResultado; erro?: string } {
+    const skillNome = getSkillParaFase(fase.nome);
+    
+    if (!skillNome || !diretorioContent) {
+        return { sucesso: false, erro: "Skill não encontrada ou diretório não especificado" };
+    }
+
+    // Tentar encontrar template principal da fase
+    const templatePath = resolverTemplatePath(skillNome, fase.nome, diretorioContent);
+    
+    if (!templatePath || !existsSync(templatePath)) {
+        return { sucesso: false, erro: "Template não encontrado" };
+    }
+
+    // Parsear template
+    const templateStructure = parseTemplate(templatePath);
+    
+    if (!templateStructure) {
+        return { sucesso: false, erro: "Erro ao parsear template" };
+    }
+
+    // Validar contra template
+    const resultado = validarContraTemplate(entregavel, templateStructure, tier);
+    
+    // Calcular qualidade
+    const qualidade = calcularQualidade(entregavel, templateStructure, tier);
+    
+    return {
+        sucesso: true,
+        resultado: {
+            ...resultado,
+            qualidade,
+            templateUsado: templatePath,
+            skillNome,
+        },
+    };
+}
+
+/**
+ * Resolve caminho do template baseado na skill e fase
+ */
+function resolverTemplatePath(skillNome: string, faseNome: string, diretorioContent: string): string | null {
+    const basePath = join(diretorioContent, "skills", skillNome, "resources", "templates");
+    
+    // Mapeamento de fase para arquivo de template
+    const templateMap: Record<string, string> = {
+        "Produto": "PRD.md",
+        "Requisitos": "requisitos.md",
+        "UX Design": "design-doc.md",
+        "Modelo de Domínio": "modelo-dominio.md",
+        "Banco de Dados": "design-banco.md",
+        "Arquitetura": "arquitetura.md",
+        "Segurança": "checklist-seguranca.md",
+        "Backlog": "backlog.md",
+        "Contrato API": "contrato-api.md",
+    };
+    
+    const templateFile = templateMap[faseNome];
+    if (!templateFile) {
+        return null;
+    }
+    
+    return join(basePath, templateFile);
+}
+
+/**
+ * Valida gate de uma fase com suporte a tier (legado)
  * @param fase - Fase a validar
  * @param entregavel - Conteúdo do entregável
  * @param tier - Tier de validação (default: usa checklist da fase, que é tier 'base')

@@ -1,10 +1,12 @@
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado } from "../state/storage.js";
 import { getFase } from "../flows/types.js";
-import { validarGate as validarGateCore, formatarResultadoGate } from "../gates/validator.js";
+import { validarGate as validarGateCore, formatarResultadoGate, validarGateComTemplate } from "../gates/validator.js";
+import { formatarResultadoValidacao } from "../gates/template-validator.js";
+import { gerarRelatorioQualidade, compararComTier } from "../gates/quality-scorer.js";
 import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
 import { setCurrentDirectory } from "../state/context.js";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
 import { getSkillParaFase } from "../utils/prompt-mapper.js";
 import { getSkillResourcePath, detectIDE } from "../utils/ide-paths.js";
 
@@ -107,34 +109,71 @@ validar_gate(
         };
     }
 
-    // Validar gate
-    const resultado = validarGateCore(fase, args.entregavel);
-    const resultadoFormatado = formatarResultadoGate(resultado);
-
-    const resposta = `# Gate da Fase ${numeroFase}: ${fase.nome}
-
-${resultadoFormatado}
-
-${(() => {
-    const skillAtual = getSkillParaFase(fase.nome);
-    if (!skillAtual) return "";
+    // Tentar validação com template (novo sistema)
+    const diretorioMaestro = dirname(dirname(dirname(__dirname)));
+    const diretorioContent = resolve(diretorioMaestro, "content");
+    const tier = estado.tier_gate || "base";
     
-    const ide = estado.ide || detectIDE(args.diretorio) || 'windsurf';
-    const checklistPath = getSkillResourcePath(skillAtual, 'checklists', ide);
+    const validacaoTemplate = validarGateComTemplate(fase, args.entregavel, tier, diretorioContent);
     
-    return `
-## 📋 Checklist da Skill
+    let resposta = "";
+    
+    if (validacaoTemplate.sucesso && validacaoTemplate.resultado) {
+        // Usar novo sistema baseado em template
+        const resultado = validacaoTemplate.resultado;
+        
+        resposta = `# Gate da Fase ${numeroFase}: ${fase.nome}
 
-**Localização:** \`${checklistPath}\`
-
-> 💡 Consulte o checklist completo da skill para validação detalhada.
 `;
-})()}
-
-${resultado.valido
+        resposta += `## 🎯 Validação Baseada em Template\n\n`;
+        resposta += `**Template:** \`${resultado.skillNome}\`\n`;
+        resposta += `**Tier:** ${tier}\n\n`;
+        
+        resposta += formatarResultadoValidacao(resultado, tier);
+        
+        // Relatório de qualidade
+        if (resultado.qualidade) {
+            resposta += "\n" + gerarRelatorioQualidade(resultado.qualidade, tier);
+            
+            const comparacao = compararComTier(resultado.qualidade, tier);
+            resposta += "\n" + comparacao.mensagem + "\n\n";
+        }
+        
+        // Link para template
+        const skillAtual = getSkillParaFase(fase.nome);
+        if (skillAtual) {
+            const ide = estado.ide || detectIDE(args.diretorio) || 'windsurf';
+            const templatesPath = getSkillResourcePath(skillAtual, 'templates', ide);
+            resposta += `## 📄 Template de Referência\n\n`;
+            resposta += `**Localização:** \`${templatesPath}\`\n\n`;
+            resposta += `> 💡 Consulte o template para ver a estrutura completa esperada.\n\n`;
+        }
+        
+        resposta += resultado.valido
             ? "✅ **Você pode avançar!** Use `proximo(entregavel: \"...\", estado_json: \"...\")` para ir para a próxima fase."
-            : "⚠️ **Complete os itens pendentes** ou use `proximo(entregavel: \"...\", estado_json: \"...\", confirmar_usuario: true)` para forçar avanço."}
-`;
+            : "⚠️ **Complete os itens pendentes** ou use `proximo(entregavel: \"...\", estado_json: \"...\", confirmar_usuario: true)` para forçar avanço.";
+    } else {
+        // Fallback para sistema legado
+        const resultado = validarGateCore(fase, args.entregavel);
+        const resultadoFormatado = formatarResultadoGate(resultado);
+        
+        resposta = `# Gate da Fase ${numeroFase}: ${fase.nome}\n\n`;
+        resposta += `## ⚠️ Validação Legada (Template não disponível)\n\n`;
+        resposta += resultadoFormatado + "\n\n";
+        
+        const skillAtual = getSkillParaFase(fase.nome);
+        if (skillAtual) {
+            const ide = estado.ide || detectIDE(args.diretorio) || 'windsurf';
+            const checklistPath = getSkillResourcePath(skillAtual, 'checklists', ide);
+            resposta += `## 📋 Checklist da Skill\n\n`;
+            resposta += `**Localização:** \`${checklistPath}\`\n\n`;
+            resposta += `> 💡 Consulte o checklist completo da skill para validação detalhada.\n\n`;
+        }
+        
+        resposta += resultado.valido
+            ? "✅ **Você pode avançar!** Use `proximo(entregavel: \"...\", estado_json: \"...\")` para ir para a próxima fase."
+            : "⚠️ **Complete os itens pendentes** ou use `proximo(entregavel: \"...\", estado_json: \"...\", confirmar_usuario: true)` para forçar avanço.";
+    }
 
     return {
         content: [{ type: "text", text: resposta }],
