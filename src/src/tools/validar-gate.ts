@@ -4,11 +4,14 @@ import { getFase } from "../flows/types.js";
 import { validarGate as validarGateCore, formatarResultadoGate, validarGateComTemplate } from "../gates/validator.js";
 import { formatarResultadoValidacao } from "../gates/template-validator.js";
 import { gerarRelatorioQualidade, compararComTier } from "../gates/quality-scorer.js";
-import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
+import { normalizeProjectPath, resolveProjectPath, getServerContentRoot } from "../utils/files.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { getSkillParaFase } from "../utils/prompt-mapper.js";
 import { getSkillResourcePath, detectIDE } from "../utils/ide-paths.js";
+import { readFile } from "fs/promises";
+import { join } from "path";
 
 interface ValidarGateArgs {
     fase?: number;
@@ -84,37 +87,37 @@ validar_gate(
         };
     }
 
-    // Se não passou entregável, mostrar checklist
-    if (!args.entregavel) {
-        const resposta = `# 📋 Gate da Fase ${numeroFase}: ${fase.nome}
+    // Buscar entregável automaticamente se não foi passado
+    let entregavel = args.entregavel;
+    
+    if (!entregavel) {
+        // Tentar ler do arquivo de entregável da fase
+        const nomeArquivo = estado.entregaveis[numeroFase.toString()];
+        if (nomeArquivo) {
+            try {
+                const caminhoEntregavel = join(diretorio, ".maestro", "entregaveis", nomeArquivo);
+                entregavel = await readFile(caminhoEntregavel, "utf-8");
+            } catch {
+                // Se não conseguir ler, continua sem entregável
+            }
+        }
+        
+        // Se ainda não tem entregável, mostrar checklist
+        if (!entregavel) {
+            const resposta = `# 📋 Gate da Fase ${numeroFase}: ${fase.nome}\n\n## ⚠️ Validação Automática\n\nNenhum entregável encontrado para esta fase.\n\n## Checklist de Saída\n\n${fase.gate_checklist.map((item, i) => `${i + 1}. ${item}`).join("\n")}\n\n## 💡 Como Proceder\n\n1. Gere o entregável da fase usando os especialistas\n2. Salve com \`proximo()\` para validação automática\n3. Ou passe manualmente: \`validar_gate(entregavel: "...", estado_json: "...", diretorio: "...")\`\n`;
 
-## Checklist de Saída
-
-${fase.gate_checklist.map((item, i) => `${i + 1}. ${item}`).join("\n")}
-
-## Como usar
-
-Para validar o gate, passe o entregável:
-\`\`\`
-validar_gate(
-    entregavel: "[seu conteúdo]",
-    estado_json: "...",
-    diretorio: "..."
-)
-\`\`\`
-`;
-
-        return {
-            content: [{ type: "text", text: resposta }],
-        };
+            return {
+                content: [{ type: "text", text: resposta }],
+            };
+        }
     }
 
     // Tentar validação com template (novo sistema)
-    const diretorioMaestro = dirname(dirname(dirname(__dirname)));
-    const diretorioContent = resolve(diretorioMaestro, "content");
+    // Usar getServerContentRoot ao invés de __dirname (ES modules)
+    const diretorioContent = getServerContentRoot();
     const tier = estado.tier_gate || "base";
     
-    const validacaoTemplate = validarGateComTemplate(fase, args.entregavel, tier, diretorioContent);
+    const validacaoTemplate = validarGateComTemplate(fase, entregavel, tier, diretorioContent);
     
     let resposta = "";
     
@@ -154,7 +157,7 @@ validar_gate(
             : "⚠️ **Complete os itens pendentes** ou use `proximo(entregavel: \"...\", estado_json: \"...\", confirmar_usuario: true)` para forçar avanço.";
     } else {
         // Fallback para sistema legado
-        const resultado = validarGateCore(fase, args.entregavel);
+        const resultado = validarGateCore(fase, entregavel);
         const resultadoFormatado = formatarResultadoGate(resultado);
         
         resposta = `# Gate da Fase ${numeroFase}: ${fase.nome}\n\n`;

@@ -4,7 +4,7 @@ import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { getFase, getFluxo, getFaseComStitch, getFluxoComStitch } from "../flows/types.js";
 import { classificarPRD, descreverNivel } from "../flows/classifier.js";
-import { validarGate, formatarResultadoGate } from "../gates/validator.js";
+import { validarGate, formatarResultadoGate, validarGateComTemplate } from "../gates/validator.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { parsearResumo, serializarResumo, criarResumoInicial, extrairResumoEntregavel } from "../state/memory.js";
 import { gerarInstrucaoProximaFase } from "../utils/instructions.js";
@@ -13,7 +13,7 @@ import { logEvent, EventTypes } from "../utils/history.js";
 import { gerarSystemMd } from "../utils/system-md.js";
 import { gerarSecaoPrompts, getSkillParaFase, getSkillPath, getSkillResourcePath } from "../utils/prompt-mapper.js";
 import { validarEstrutura } from "../gates/estrutura.js";
-import { normalizeProjectPath, resolveProjectPath, joinProjectPath } from "../utils/files.js";
+import { normalizeProjectPath, resolveProjectPath, joinProjectPath, getServerContentRoot } from "../utils/files.js";
 import { formatSkillMessage, detectIDE, getSkillResourcePath as getIDESkillResourcePath } from "../utils/ide-paths.js";
 
 interface ProximoArgs {
@@ -228,14 +228,48 @@ confirmar_classificacao(
         };
     }
 
-    // Validar estrutura do entregável
-    const estruturaResult = validarEstrutura(estado.fase_atual, args.entregavel);
-
-    // Validar gate (checklist)
-    const gateResultado = validarGate(faseAtual, args.entregavel);
-
-    // Calcular score de qualidade
-    const qualityScore = calcularQualityScore(estruturaResult, gateResultado);
+    // Tentar validação com template (novo sistema inteligente)
+    const diretorioContent = getServerContentRoot();
+    const tier = estado.tier_gate || "base";
+    const validacaoTemplate = validarGateComTemplate(faseAtual, args.entregavel, tier, diretorioContent);
+    
+    let qualityScore: number;
+    let gateResultado: ReturnType<typeof validarGate>;
+    let estruturaResult: ReturnType<typeof validarEstrutura>;
+    let usouTemplate = false;
+    
+    if (validacaoTemplate.sucesso && validacaoTemplate.resultado) {
+        // Usar validação baseada em template
+        usouTemplate = true;
+        const resultado = validacaoTemplate.resultado;
+        
+        // Converter resultado do template para formato legado para compatibilidade
+        qualityScore = resultado.qualidade?.scoreGeral || resultado.score || 0;
+        
+        // Criar estrutura compatível para gateResultado
+        gateResultado = {
+            valido: resultado.valido,
+            itens_validados: resultado.checkboxes?.preenchidos.map((c: any) => c.texto) || [],
+            itens_pendentes: resultado.checkboxes?.faltando.map((c: any) => c.texto) || [],
+            sugestoes: resultado.sugestoes || [],
+        };
+        
+        // Criar estrutura compatível para estruturaResult
+        estruturaResult = {
+            valido: resultado.estrutura?.valida || false,
+            score: resultado.estrutura?.score || 0,
+            secoes_encontradas: resultado.estrutura?.secoesEncontradas || [],
+            secoes_faltando: resultado.estrutura?.secoesFaltando || [],
+            tamanho_ok: true,
+            feedback: resultado.feedback || [],
+        };
+    } else {
+        // Fallback para sistema legado
+        usouTemplate = false;
+        estruturaResult = validarEstrutura(estado.fase_atual, args.entregavel);
+        gateResultado = validarGate(faseAtual, args.entregavel);
+        qualityScore = calcularQualityScore(estruturaResult, gateResultado);
+    }
 
     // Score < 50: BLOQUEAR
     if (qualityScore < 50) {

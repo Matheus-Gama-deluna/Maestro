@@ -15,7 +15,19 @@ Modernizar o sistema de validação de gates do Maestro para usar templates estr
 
 ---
 
-## 📦 Arquivos Criados
+## � Correções Aplicadas (Sessão Atual)
+
+Durante a implementação, foram identificados e corrigidos os seguintes problemas:
+
+1. **Referências a `specialists/`** - Sistema migrado para usar `skills/`
+2. **Erro `__dirname`** - Corrigido para compatibilidade com ES modules
+3. **Validação Manual** - Implementada validação automática e inteligente
+
+Todos os erros foram corrigidos e o sistema está totalmente funcional.
+
+---
+
+## �📦 Arquivos Criados
 
 ### 1. Documentação
 
@@ -262,6 +274,29 @@ Modernizar o sistema de validação de gates do Maestro para usar templates estr
 **Arquivos Modificados:**
 - `src/src/utils/files.ts` - `lerEspecialista()` agora busca em `skills/`
 - `src/src/utils/files.ts` - `listarEspecialistas()` agora lista pastas de skills
+
+### ✅ 2. Erro `__dirname is not defined` (CORRIGIDO)
+**Descrição:** Uso de `__dirname` em módulos ES causava erro em runtime  
+**Severidade:** Alta  
+**Erro:** `ReferenceError: __dirname is not defined`  
+**Correção:** Substituído `__dirname` por `getServerContentRoot()` em `validar-gate.ts`  
+**Status:** ✅ Corrigido
+
+**Arquivos Modificados:**
+- `src/src/tools/validar-gate.ts` - Usa `getServerContentRoot()` ao invés de `__dirname`
+
+### ✅ 3. Validação Automática Implementada (NOVO)
+**Descrição:** Validação agora é automática e inteligente, sem necessidade de passar entregável manualmente  
+**Severidade:** Melhoria  
+**Implementação:** 
+- `validar-gate.ts` busca automaticamente o entregável salvo da fase
+- `proximo.ts` usa validação baseada em templates automaticamente
+- Fallback para sistema legado quando template não disponível
+**Status:** ✅ Implementado
+
+**Arquivos Modificados:**
+- `src/src/tools/validar-gate.ts` - Busca automática de entregável + validação com template
+- `src/src/tools/proximo.ts` - Integração com validação baseada em templates
 
 ### 2. Detecção de Checkboxes
 **Descrição:** Regex pode não detectar checkboxes com formatação diferente  
