@@ -1,6 +1,9 @@
 ---
-name: "Exploração de Codebase"
+name: specialist-exploracao-codebase
+description: "Exploração sistemática de codebase para mapear estrutura, dívida técnica e oportunidades de refatoração."
+allowed-tools: Read, Write, Edit, Glob, Grep
 version: "1.0.0"
+framework: progressive-disclosure
 type: "specialist"
 category: "complementar"
 complexity: "media"
@@ -8,6 +11,7 @@ estimated_time: "90 minutos"
 score_minimo: 75
 tags: ["codebase", "exploration", "technical-debt", "refactoring", "documentation", "analysis"]
 dependencies: ["Codebase existente", "Debugging e Troubleshooting", "Documentação Técnica"]
+slug: exploracao-codebase
 ---
 
 # Especialista: Exploração de Codebase

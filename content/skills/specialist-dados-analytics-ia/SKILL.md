@@ -1,7 +1,9 @@
 ---
-title: "Especialista em Dados e Analytics"
-description: "Engenharia de dados, pipelines ETL e dashboards inteligentes"
+name: specialist-dados-analytics-ia
+description: "Engenharia de dados, pipelines ETL e dashboards inteligentes."
+allowed-tools: Read, Write, Edit, Glob, Grep
 version: "2.0"
+framework: progressive-disclosure
 type: "specialist"
 domain: "analytics"
 priority: "high"

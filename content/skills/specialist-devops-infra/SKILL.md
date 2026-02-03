@@ -1,7 +1,9 @@
 ---
-title: "Especialista em DevOps e Infraestrutura"
+name: specialist-devops-infra
 description: "Engenharia DevOps para automação, CI/CD e infraestrutura como código"
+allowed-tools: Read, Write, Edit, Glob, Grep
 version: "2.0"
+framework: progressive-disclosure
 type: "specialist"
 domain: "devops"
 priority: "high"
