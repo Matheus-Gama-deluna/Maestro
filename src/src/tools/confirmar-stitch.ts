@@ -164,7 +164,7 @@ Desenvolva o **PRD** definindo:
 
 Quando terminar, diga **"próximo"**.
 
-${gerarInstrucaoRecursos(fase1.especialista, fase1.template, "AÇÃO OBRIGATÓRIA - Carregar Recursos da Fase 1")}
+${gerarInstrucaoRecursos(fase1.nome, "AÇÃO OBRIGATÓRIA - Carregar Recursos da Fase 1")}
 `;
 
     return {

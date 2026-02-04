@@ -167,7 +167,7 @@ ${templateInfo}
 - Para ver status completo: \`status(estado_json: "...")\`
 - Para avançar: \`proximo(entregavel: "...", estado_json: "...")\`
 
-${faseAtual ? gerarInstrucaoRecursos(faseAtual.especialista, faseAtual.template, "AÇÃO OBRIGATÓRIA - Carregar Recursos") : ""}
+${faseAtual ? gerarInstrucaoRecursos(faseAtual.nome, "AÇÃO OBRIGATÓRIA - Carregar Recursos") : ""}
 `;
 
     return {
