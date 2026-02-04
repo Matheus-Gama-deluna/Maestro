@@ -47,8 +47,81 @@ function getServerContentDir(): string {
 }
 
 /**
+ * Normaliza nome de especialista para formato de skill
+ * Ex: "Gestão de Produto" → "gestao-produto"
+ * Remove acentos, espaços, pontuação
+ */
+function removerStopwords(nomeNormalizado: string): string {
+    return nomeNormalizado
+        .replace(/-(de|da|do|das|dos)-/g, '-')
+        .replace(/^(de|da|do|das|dos)-/, '')
+        .replace(/-(de|da|do|das|dos)$/,'')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+function normalizarNomeEspecialista(nome: string): string {
+    const trimmed = nome.trim();
+
+    return removerStopwords(
+        trimmed
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+            .replace(/[^\w\s-]/g, '') // Remove pontuação
+            .replace(/\s+/g, '-') // Espaços → hífens
+            .replace(/-+/g, '-') // Múltiplos hífens → um
+            .replace(/^-+|-+$/g, '') // Remove hífens residuais das extremidades
+    );
+}
+
+/**
+ * Mapa de aliases para especialistas (compatibilidade com nomes antigos)
+ * Mapeia nomes "humanos" para nomes de skill
+ */
+const ESPECIALISTA_SKILL_MAP: Record<string, string> = {
+    // Fluxo Simples
+    "gestao-produto": "specialist-gestao-produto",
+    "engenharia-de-requisitos": "specialist-engenharia-requisitos-ia",
+    "ux-design": "specialist-ux-design",
+    "arquitetura-de-software": "specialist-arquitetura-software",
+    "plano-de-execucao": "specialist-plano-execucao-ia",
+    "desenvolvimento-frontend": "specialist-desenvolvimento-frontend",
+    "desenvolvimento-backend": "specialist-desenvolvimento-backend",
+    "desenvolvimento": "specialist-desenvolvimento-backend",
+    
+    // Fluxo Médio
+    "modelagem-de-dominio": "specialist-modelagem-dominio",
+    "banco-de-dados": "specialist-banco-dados",
+    "seguranca": "specialist-seguranca-informacao",
+    "seguranca-da-informacao": "specialist-seguranca-informacao",
+    "analise-de-testes": "specialist-analise-testes",
+    "contrato-api": "specialist-contrato-api",
+    "devops": "specialist-devops-infra",
+    "integracao": "specialist-devops-infra",
+    
+    // Fluxo Complexo
+    "arquitetura-avancada": "specialist-arquitetura-avancada",
+    "performance": "specialist-performance-escalabilidade",
+    "escalabilidade": "specialist-performance-escalabilidade",
+    "observabilidade": "specialist-observabilidade",
+    
+    // Complementares
+    "dados-e-analytics": "specialist-dados-analytics-ia",
+    "acessibilidade": "specialist-acessibilidade",
+    "debugging": "specialist-debugging-troubleshooting",
+    "documentacao": "specialist-documentacao-tecnica",
+    "exploracao": "specialist-exploracao-codebase",
+    "migracao": "specialist-migracao-modernizacao",
+    "mobile": "specialist-desenvolvimento-mobile",
+    "mobile-design": "specialist-mobile-design-avancado",
+    "prototipagem": "specialist-prototipagem-stitch",
+};
+
+/**
  * Lê conteúdo de um especialista (apenas servidor)
  * Agora busca em skills/{skill-name}/SKILL.md
+ * Suporta normalização de nomes e aliases
  */
 export async function lerEspecialista(nome: string): Promise<string> {
     const contentRoot = getServerContentDir();
@@ -57,15 +130,45 @@ export async function lerEspecialista(nome: string): Promise<string> {
     try {
         const skillFolders = await readdir(skillsDir);
         
-        // Busca pasta de skill que contém o nome
-        const skillFolder = skillFolders.find(f => {
-            const folderLower = f.toLowerCase();
-            const nomeLower = nome.toLowerCase();
-            return folderLower.includes(nomeLower) || nomeLower.includes(folderLower.replace('specialist-', ''));
-        });
+        // Estratégia 1: Buscar por alias exato (compatibilidade)
+        const nomeNormalizado = normalizarNomeEspecialista(nome);
+        const nomeSemHifen = nomeNormalizado.replace(/-/g, '');
+        let skillFolder: string | undefined = ESPECIALISTA_SKILL_MAP[nomeNormalizado];
+        
+        // Estratégia 2: Se não encontrou por alias, buscar por matching fuzzy
+        if (!skillFolder) {
+            skillFolder = skillFolders.find(f => {
+                const folderNormalizado = normalizarNomeEspecialista(f.replace('specialist-', ''));
+                return folderNormalizado === nomeNormalizado;
+            });
+        }
+        
+        // Estratégia 3: Fallback para includes (compatibilidade com versão anterior)
+        if (!skillFolder) {
+            skillFolder = skillFolders.find(f => {
+                const folderNormalizado = normalizarNomeEspecialista(f.replace('specialist-', ''));
+                const folderSemHifen = folderNormalizado.replace(/-/g, '');
+                return folderNormalizado === nomeNormalizado
+                    || folderSemHifen === nomeSemHifen
+                    || folderNormalizado.includes(nomeNormalizado)
+                    || nomeNormalizado.includes(folderNormalizado)
+                    || folderSemHifen.includes(nomeSemHifen)
+                    || nomeSemHifen.includes(folderSemHifen);
+            });
+        }
 
         if (!skillFolder) {
-            throw new Error(`Skill não encontrada para especialista: ${nome}`);
+            // Erro detalhado com sugestões
+            const skillsDisponiveis = skillFolders
+                .filter(f => f.startsWith('specialist-'))
+                .map(f => f.replace('specialist-', '').replace(/-/g, ' '))
+                .join(', ');
+            
+            throw new Error(
+                `Skill não encontrada para especialista: "${nome}"\n\n` +
+                `Skills disponíveis: ${skillsDisponiveis || 'nenhuma'}\n\n` +
+                `Dica: Verifique se a skill está carregada em content/skills no projeto.`
+            );
         }
 
         // Lê o arquivo SKILL.md da pasta

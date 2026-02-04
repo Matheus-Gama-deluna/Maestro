@@ -10,6 +10,7 @@ export const FLUXO_SIMPLES: Fluxo = {
             nome: "Produto",
             especialista: "Gestão de Produto",
             template: "PRD",
+            skill: "specialist-gestao-produto",
             gate_checklist: [
                 "Problema claramente definido",
                 "MVP com funcionalidades listadas",
@@ -22,6 +23,7 @@ export const FLUXO_SIMPLES: Fluxo = {
             nome: "Requisitos",
             especialista: "Engenharia de Requisitos",
             template: "requisitos",
+            skill: "specialist-engenharia-requisitos-ia",
             gate_checklist: [
                 "Requisitos funcionais com IDs únicos",
                 "Requisitos não-funcionais definidos",
@@ -34,6 +36,7 @@ export const FLUXO_SIMPLES: Fluxo = {
             nome: "UX Design",
             especialista: "UX Design",
             template: "design-doc",
+            skill: "specialist-ux-design",
             gate_checklist: [
                 "Wireframes ou protótipos criados",
                 "Jornadas do usuário mapeadas",
@@ -46,6 +49,7 @@ export const FLUXO_SIMPLES: Fluxo = {
             nome: "Arquitetura",
             especialista: "Arquitetura de Software",
             template: "arquitetura",
+            skill: "specialist-arquitetura-software",
             gate_checklist: [
                 "Stack tecnológica definida",
                 "Diagrama C4 básico",
@@ -58,6 +62,7 @@ export const FLUXO_SIMPLES: Fluxo = {
             nome: "Backlog",
             especialista: "Plano de Execução",
             template: "backlog",
+            skill: "specialist-plano-execucao-ia",
             gate_checklist: [
                 "Épicos definidos",
                 "Histórias de usuário criadas",
@@ -70,6 +75,7 @@ export const FLUXO_SIMPLES: Fluxo = {
             nome: "Frontend",
             especialista: "Desenvolvimento Frontend",
             template: "historia-usuario",
+            skill: "specialist-desenvolvimento-frontend",
             gate_checklist: [
                 "Componentes seguindo design",
                 "Funcionando contra mock",
@@ -82,6 +88,7 @@ export const FLUXO_SIMPLES: Fluxo = {
             nome: "Backend",
             especialista: "Desenvolvimento",
             template: "historia-usuario",
+            skill: "specialist-desenvolvimento-backend",
             gate_checklist: [
                 "API implementada",
                 "Testes passando",

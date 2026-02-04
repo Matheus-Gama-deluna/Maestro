@@ -113,6 +113,30 @@ proximo(
     // Validar tamanho mínimo do entregável
     const TAMANHO_MINIMO_ENTREGAVEL = 200;
     if (!args.entregavel || args.entregavel.trim().length < TAMANHO_MINIMO_ENTREGAVEL) {
+        // Obter skill e IDE para instruções corretas
+        const ideDetectada = detectIDE(diretorio) || 'windsurf';
+        const skillNome = faseAtualInfo ? getSkillParaFase(faseAtualInfo.nome) : null;
+        
+        let instrucoesSkill = "";
+        if (skillNome) {
+            const skillPath = getIDESkillResourcePath(skillNome, 'reference', ideDetectada);
+            const templatesPath = getIDESkillResourcePath(skillNome, 'templates', ideDetectada);
+            instrucoesSkill = `
+### 📚 Recursos da Skill
+
+Abra os seguintes arquivos no seu IDE:
+
+1. **SKILL.md** (instruções do especialista):
+   \`${getIDESkillResourcePath(skillNome, 'reference', ideDetectada)}SKILL.md\`
+
+2. **Templates** (estrutura do entregável):
+   \`${templatesPath}\`
+
+3. **Checklists** (validação):
+   \`${getIDESkillResourcePath(skillNome, 'checklists', ideDetectada)}\`
+`;
+        }
+
         return {
             content: [{
                 type: "text",
@@ -130,21 +154,17 @@ O entregável está vazio ou muito curto.
 ## ⚡ AÇÃO OBRIGATÓRIA
 
 Você **DEVE** desenvolver o entregável corretamente:
+${instrucoesSkill}
 
-1. **Ler especialista:**
-   \`\`\`
-   read_resource("maestro://especialista/${faseAtualInfo?.especialista || "..."}")
-   \`\`\`
+### Fluxo Obrigatório
 
-2. **Ler template:**
-   \`\`\`
-   read_resource("maestro://template/${faseAtualInfo?.template || "..."}")
-   \`\`\`
-
-3. Fazer as perguntas do especialista ao usuário
-4. Gerar entregável seguindo TODAS as seções do template
-5. Apresentar ao usuário para aprovação
-6. Só então chamar \`proximo()\`
+1. Leia a **SKILL.md** → Siga as instruções e perguntas do especialista
+2. Consulte os **Templates** → Use como base estrutural
+3. Faça perguntas ao usuário → Conforme indicado na SKILL
+4. Gere o entregável → Seguindo TODAS as seções do template
+5. Valide com o **Checklist** → Antes de avançar
+6. Apresente ao usuário → Para aprovação
+7. Só então chame \`proximo()\`
 
 > ⛔ **NÃO TENTE AVANÇAR** com entregáveis vazios ou incompletos!
 `,

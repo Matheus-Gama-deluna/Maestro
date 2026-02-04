@@ -91,6 +91,9 @@ export interface EstadoProjeto {
         };
     }>;
 
+    // v3.0: Onboarding otimizado
+    onboarding?: any; // OnboardingState (importado de onboarding.ts)
+
     criado_em: string;
     atualizado_em: string;
 }
@@ -116,6 +119,7 @@ export interface Fase {
     nome: string;
     especialista: string;
     template: string;
+    skill?: string; // Nome da skill (ex: "specialist-gestao-produto")
     gate_checklist: string[];
     entregavel_esperado: string;
 }

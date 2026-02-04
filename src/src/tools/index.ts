@@ -40,6 +40,12 @@ import { injetar_conteudo, injetarConteudoSchema } from "./injetar-conteudo.js";
 // Tools de discovery
 import { discovery, discoverySchema } from "./discovery.js";
 
+// Tools de onboarding otimizado
+import { onboardingOrchestrator, onboardingOrchestratorSchema } from "../flows/onboarding-orchestrator.js";
+import { brainstorm, brainstormSchema } from "./brainstorm.js";
+import { prdWriter, prdWriterSchema } from "./prd-writer.js";
+import { nextStepsDashboard, nextStepsDashboardSchema } from "./next-steps-dashboard.js";
+
 /**
  * Registra todas as tools no servidor MCP
  */
@@ -164,6 +170,27 @@ export function registerTools(server: Server) {
                 name: "discovery",
                 description: "Coleta informações iniciais agrupadas para reduzir prompts. Retorna questionário ou salva respostas.",
                 inputSchema: discoverySchema,
+            },
+            // === ONBOARDING OTIMIZADO ===
+            {
+                name: "onboarding_orchestrator",
+                description: "Orquestra fluxo de onboarding otimizado (discovery adaptativo → brainstorm → PRD). Reduz prompts e integra coleta de contexto.",
+                inputSchema: onboardingOrchestratorSchema,
+            },
+            {
+                name: "brainstorm",
+                description: "Brainstorm assistido com prompts estruturados. Consolida respostas em insights para o PRD.",
+                inputSchema: brainstormSchema,
+            },
+            {
+                name: "prd_writer",
+                description: "Gera, valida e consolida PRD a partir do discovery e brainstorm. Calcula score de completude.",
+                inputSchema: prdWriterSchema,
+            },
+            {
+                name: "next_steps_dashboard",
+                description: "Apresenta dashboard consolidado com progresso, insights e próximas ações recomendadas.",
+                inputSchema: nextStepsDashboardSchema,
             },
         ],
     }));
@@ -337,6 +364,35 @@ export function registerTools(server: Server) {
                         estado_json: typedArgs?.estado_json as string,
                         diretorio: typedArgs?.diretorio as string,
                         respostas: typedArgs?.respostas as any,
+                    });
+
+                case "onboarding_orchestrator":
+                    return await onboardingOrchestrator({
+                        estado_json: typedArgs?.estado_json as string,
+                        diretorio: typedArgs?.diretorio as string,
+                        acao: typedArgs?.acao as 'iniciar' | 'proximo_bloco' | 'status' | 'resumo' | undefined,
+                        respostas_bloco: typedArgs?.respostas_bloco as Record<string, any> | undefined,
+                    });
+
+                case "brainstorm":
+                    return await brainstorm({
+                        estado_json: typedArgs?.estado_json as string,
+                        diretorio: typedArgs?.diretorio as string,
+                        acao: typedArgs?.acao as 'iniciar' | 'proximo_secao' | 'status' | undefined,
+                        resposta_secao: typedArgs?.resposta_secao as string | undefined,
+                    });
+
+                case "prd_writer":
+                    return await prdWriter({
+                        estado_json: typedArgs?.estado_json as string,
+                        diretorio: typedArgs?.diretorio as string,
+                        acao: typedArgs?.acao as 'gerar' | 'validar' | 'status' | undefined,
+                    });
+
+                case "next_steps_dashboard":
+                    return await nextStepsDashboard({
+                        estado_json: typedArgs?.estado_json as string,
+                        diretorio: typedArgs?.diretorio as string,
                     });
 
                 default:
