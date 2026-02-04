@@ -25,6 +25,7 @@ export interface EstadoProjeto {
     classificacao_confirmada: boolean;      // Novo: se usuário confirmou tipo/complexidade
     ide?: 'windsurf' | 'cursor' | 'antigravity';  // IDE utilizada no projeto
     tipo_fluxo: TipoFluxo;
+    status?: 'aguardando_prd' | 'ativo';
     fase_atual: number;
     total_fases: number;
     entregaveis: Record<string, string>;
@@ -44,6 +45,9 @@ export interface EstadoProjeto {
         pontuacao: number;
         criterios: string[];
     };
+
+    // Inferência contextual (balanceada para evitar excesso de suposições)
+    inferencia_contextual?: InferenciaContextual;
 
     // v2.0: Configuração de modo e otimizações
     config?: {
@@ -89,6 +93,20 @@ export interface EstadoProjeto {
 
     criado_em: string;
     atualizado_em: string;
+}
+
+export interface PerguntaPriorizada {
+    pergunta: string;
+    prioridade: 'critica' | 'importante' | 'opcional';
+    pode_inferir: boolean;
+    valor_inferido?: string;
+    confianca_inferencia?: number;
+}
+
+export interface InferenciaContextual {
+    dominio?: { nome: string; confianca: number };
+    stack?: { frontend?: string; backend?: string; database?: string; confianca: number };
+    perguntas_prioritarias?: PerguntaPriorizada[];
 }
 
 

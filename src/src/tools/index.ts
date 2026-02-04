@@ -11,6 +11,7 @@ import { carregarProjeto, carregarProjetoSchema } from "./carregar-projeto.js";
 import { proximo, proximoSchema } from "./proximo.js";
 import { status, statusSchema } from "./status.js";
 import { validarGate, validarGateSchema } from "./validar-gate.js";
+import { setupInicial, setupInicialSchema } from "./setup-inicial.js";
 
 // Tools v1.0
 import { classificar, classificarSchema } from "./classificar.js";
@@ -47,6 +48,11 @@ export function registerTools(server: Server) {
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
         tools: [
             // === CORE (Stateless) ===
+            {
+                name: "setup_inicial",
+                description: "Salva configuração global única do usuário (IDE, modo, preferências). Evita múltiplos prompts em projetos futuros.",
+                inputSchema: setupInicialSchema,
+            },
             {
                 name: "iniciar_projeto",
                 description: "Inicia um novo projeto com o Maestro. Retorna arquivos para a IA salvar e pergunta sobre Stitch. Requer diretorio.",
@@ -171,6 +177,15 @@ export function registerTools(server: Server) {
         try {
             switch (name) {
                 // Core (Stateless)
+                case "setup_inicial":
+                    return await setupInicial({
+                        ide: typedArgs?.ide as 'windsurf' | 'cursor' | 'antigravity' | undefined,
+                        modo: typedArgs?.modo as 'economy' | 'balanced' | 'quality' | undefined,
+                        usar_stitch: typedArgs?.usar_stitch as boolean | undefined,
+                        preferencias_stack: typedArgs?.preferencias_stack as any,
+                        team_size: typedArgs?.team_size as 'solo' | 'pequeno' | 'medio' | 'grande' | undefined,
+                    });
+
                 case "iniciar_projeto":
                     return await iniciarProjeto({
                         nome: typedArgs?.nome as string,

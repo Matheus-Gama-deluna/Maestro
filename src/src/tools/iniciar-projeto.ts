@@ -13,6 +13,7 @@ import { detectarStack, gerarSecaoPrompts, gerarSecaoExemplo, getSkillParaFase, 
 import { resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { ensureContentInstalled, injectContentForIDE } from "../utils/content-injector.js";
 import { formatSkillMessage } from "../utils/ide-paths.js";
+import { loadUserConfig } from "../utils/config.js";
 
 interface IniciarProjetoArgs {
     nome: string;
@@ -23,8 +24,8 @@ interface IniciarProjetoArgs {
 }
 
 interface ConfirmarProjetoArgs extends IniciarProjetoArgs {
-    tipo_artefato: TipoArtefato;
-    nivel_complexidade: NivelComplexidade;
+    tipo_artefato?: TipoArtefato;
+    nivel_complexidade?: NivelComplexidade;
     ide: 'windsurf' | 'cursor' | 'antigravity';
     modo: 'economy' | 'balanced' | 'quality';
 }
@@ -121,26 +122,34 @@ export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResu
     // Normalizar e resolver diretório
     const diretorio = resolveProjectPath(args.diretorio);
 
+    const configGlobal = await loadUserConfig();
+    const ideEfetiva = args.ide || configGlobal?.ide;
+    const modoEfetivo = args.modo || configGlobal?.modo || 'balanced';
+
     // Verificar IDE
-    if (!args.ide) {
+    if (!ideEfetiva) {
         return {
             content: [{ type: "text", text: `# 🎯 Configuração do Projeto: ${args.nome}
 
-## ❓ Pergunta 1/4: Qual IDE você está utilizando?
+Nenhuma IDE detectada. Para evitar múltiplos prompts, envie **um único comando** com sua IDE e preferências ou rode antes o setup único:
 
-Escolha uma das opções:
+1) Salvar preferências globais (recomendado, 1 vez):
+\`\`\`
+setup_inicial({
+  ide: "windsurf",      // windsurf | cursor | antigravity
+  modo: "balanced",     // economy | balanced | quality
+  usar_stitch: false
+})
+\`\`\`
 
-- **windsurf**: Windsurf IDE
-- **cursor**: Cursor IDE
-- **antigravity**: Antigravity IDE
-
-**Responda executando:**
+2) Ou informe já na abertura do projeto:
 \`\`\`
 iniciar_projeto(
-    nome: "${args.nome}",
-    descricao: "${args.descricao || ''}",
-    diretorio: "${args.diretorio}",
-    ide: "windsurf"  // Escolha: windsurf | cursor | antigravity
+  nome: "${args.nome}",
+  descricao: "${args.descricao || ''}",
+  diretorio: "${args.diretorio}",
+  ide: "windsurf",      // windsurf | cursor | antigravity
+  modo: "${modoEfetivo}"
 )
 \`\`\`` }],
         };
@@ -148,8 +157,8 @@ iniciar_projeto(
 
     // 🚀 INJETAR CONTEÚDO AUTOMATICAMENTE
     try {
-        const injResult = await injectContentForIDE(diretorio, args.ide);
-        console.error(`[INFO] Rules/Skills injetados para ${args.ide} em: ${injResult.targetDir}`);
+        const injResult = await injectContentForIDE(diretorio, ideEfetiva);
+        console.error(`[INFO] Rules/Skills injetados para ${ideEfetiva} em: ${injResult.targetDir}`);
     } catch (error) {
         console.error('[WARN] Não foi possível injetar conteúdo:', error);
     }
@@ -157,79 +166,30 @@ iniciar_projeto(
     // Inferir sugestões baseadas na descrição
     const inferenciaTipo = inferirTipoArtefato(args.nome, args.descricao);
     const inferenciaNivel = inferirComplexidade(inferenciaTipo.tipo, args.descricao);
-    const modoSugerido = args.modo || mapearModoParaNivel(inferenciaTipo.tipo);
+    const modoSugerido = modoEfetivo || mapearModoParaNivel(inferenciaTipo.tipo);
 
     const resposta = `# 🎯 Configuração do Projeto: ${args.nome}
 
-Analisei a descrição do projeto. Agora preciso de algumas informações para configurar corretamente:
+Fluxo PRD-first habilitado. Vamos coletar PRD na próxima interação (evita retrabalho de classificação).
 
----
-
-## ❓ Pergunta 2/4: Qual o tipo de artefato?
-
-**Sugestão baseada na análise:** \`${inferenciaTipo.tipo}\` (${inferenciaTipo.razao})
-
-### Opções disponíveis:
-
-- **poc**: Prova de conceito, experimentos rápidos
-- **script**: Automações, CLIs, ferramentas de linha de comando
-- **internal**: Ferramentas internas, backoffice, dashboards
-- **product**: Sistemas voltados ao usuário final
-
----
-
-## ❓ Pergunta 3/4: Qual a complexidade do projeto?
-
-**Sugestão baseada na análise:** \`${inferenciaNivel.nivel}\` (${inferenciaNivel.razao})
-
-### Opções disponíveis:
-
-- **simples**: CRUDs básicos, landing pages, scripts simples
-- **medio**: Aplicações web/mobile padrão
-- **complexo**: Microserviços, sistemas distribuídos, alta escala
-
----
-
-## ❓ Pergunta 4/4: Qual modo de execução deseja?
-
-**Sugestão baseada no tipo:** \`${modoSugerido}\`
-
-### Opções disponíveis:
-
-- **economy**: Rápido - 7 fases, perguntas mínimas, validação essencial
-- **balanced**: Equilibrado - 13 fases, perguntas moderadas, validação completa
-- **quality**: Qualidade - 17 fases, perguntas detalhadas, validação avançada
-
----
-
-## 🚦 Confirme as Configurações
-
-**Opção 1: Usar sugestões (Recomendado)**
+👉 Envie **um único prompt** para confirmar e já começar em modo discovery + PRD:
 \`\`\`
-confirmar_projeto(
-    nome: "${args.nome}",
-    descricao: "${args.descricao || ''}",
-    diretorio: "${args.diretorio}",
-    tipo_artefato: "${inferenciaTipo.tipo}",
-    nivel_complexidade: "${inferenciaNivel.nivel}",
-    ide: "${args.ide}",
-    modo: "${modoSugerido}"
-)
+confirmar_projeto({
+  nome: "${args.nome}",
+  descricao: "${args.descricao || ''}",
+  diretorio: "${args.diretorio}",
+  ide: "${ideEfetiva}",
+  modo: "${modoSugerido}" // economy | balanced | quality
+})
 \`\`\`
 
-**Opção 2: Personalizar**
-\`\`\`
-confirmar_projeto(
-    nome: "${args.nome}",
-    descricao: "${args.descricao || ''}",
-    diretorio: "${args.diretorio}",
-    tipo_artefato: "product",     // poc | script | internal | product
-    nivel_complexidade: "medio",   // simples | medio | complexo
-    ide: "${args.ide}",
-    modo: "balanced"               // economy | balanced | quality
-)
-\`\`\`
-`;
+### Sugestões automáticas
+- Tipo sugerido: \`${inferenciaTipo.tipo}\` (${inferenciaTipo.razao})
+- Complexidade sugerida: \`${inferenciaNivel.nivel}\` (${inferenciaNivel.razao})
+- Modo sugerido: \`${modoSugerido}\`
+
+Se quiser forçar tipo/complexidade, adicione no mesmo comando: \`tipo_artefato\` e \`nivel_complexidade\`.
+`; 
 
     return {
         content: [{ type: "text", text: resposta }],
@@ -255,25 +215,23 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
         console.error('[WARN] Não foi possível injetar conteúdo embutido:', error);
     }
 
-    // Recalcula tier baseado no confirmado
-    const tier = determinarTierGate(args.tipo_artefato, args.nivel_complexidade);
-    
-    // Validação de segurança
-    if (!tier) {
-        return {
-            content: [{ type: "text", text: "❌ Erro: Não foi possível determinar o tier do projeto. Verifique tipo_artefato e nivel_complexidade." }],
-            isError: true,
-        };
-    }
+    // Definir tipo/nivel a partir dos argumentos ou inferência leve da descrição
+    const tipoFinal = args.tipo_artefato || inferirTipoArtefato(args.nome, args.descricao).tipo;
+    const nivelFinal = args.nivel_complexidade || inferirComplexidade(tipoFinal, args.descricao).nivel;
+
+    // Recalcula tier baseado no confirmado ou inferido
+    const tier = determinarTierGate(tipoFinal, nivelFinal);
 
     const projetoId = randomUUID();
 
     // Cria estado com novos campos
     const estado = criarEstadoInicial(projetoId, args.nome, diretorio, args.ide);
-    estado.nivel = args.nivel_complexidade;
-    estado.tipo_artefato = args.tipo_artefato;
+    estado.nivel = nivelFinal;
+    estado.tipo_artefato = tipoFinal;
     estado.tier_gate = tier;
-    estado.classificacao_confirmada = true;
+    estado.classificacao_confirmada = Boolean(args.nivel_complexidade && args.tipo_artefato);
+    estado.aguardando_classificacao = !estado.classificacao_confirmada;
+    estado.classificacao_pos_prd_confirmada = estado.classificacao_confirmada;
     
     // Configurar modo e otimizações
     estado.config = {
@@ -293,7 +251,7 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
     };
 
     // Cria resumo
-    const resumo = criarResumoInicial(projetoId, args.nome, args.nivel_complexidade, 1, 10);
+    const resumo = criarResumoInicial(projetoId, args.nome, nivelFinal, 1, 10);
     resumo.descricao = args.descricao;
 
     const estadoFile = serializarEstado(estado);
@@ -325,9 +283,9 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
     const resposta = `# 🚀 Projeto Iniciado: ${args.nome}
 
-**Configuração Confirmada:**
-- Tipo: \`${args.tipo_artefato}\`
-- Complexidade: \`${args.nivel_complexidade}\`
+**Configuração**
+- Tipo: \`${tipoFinal}\` (pode ser ajustado após PRD)
+- Complexidade: \`${nivelFinal}\` (pode ser ajustado após PRD)
 - Tier: **${tier?.toUpperCase() || 'N/A'}**
 - Modo: **${args.modo?.toUpperCase() || 'BALANCED'}** ${getModoDescription(args.modo || 'balanced')}
 
@@ -437,5 +395,5 @@ export const confirmarProjetoSchema = {
         ide: { type: "string", enum: ['windsurf', 'cursor', 'antigravity'], description: "IDE alvo para injection" },
         modo: { type: "string", enum: ['economy', 'balanced', 'quality'], description: "Modo de execução" }
     },
-    required: ["nome", "diretorio", "tipo_artefato", "nivel_complexidade", "ide", "modo"],
+    required: ["nome", "diretorio", "ide", "modo"],
 };

@@ -233,6 +233,16 @@ O estado é mantido em \`.maestro/estado.json\` e serve como fonte da verdade pa
 }
 
 
+export async function verificarSkillCarregada(
+    diretorio: string,
+    skillName: string,
+    ide: 'windsurf' | 'cursor' | 'antigravity'
+): Promise<boolean> {
+    const skillsDir = IDE_CONFIGS[ide].skillsDir;
+    const skillPath = join(diretorio, skillsDir, skillName, 'SKILL.md');
+    return existsSync(skillPath);
+}
+
 function directoryExists(path: string): boolean {
     try {
         const stats = statSync(path);

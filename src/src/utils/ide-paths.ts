@@ -1,4 +1,5 @@
 import { join } from "path";
+import { existsSync } from "fs";
 
 /**
  * Configurações de diretórios para cada IDE
@@ -79,24 +80,21 @@ export function getSkillMCPPath(skillName: string, ide: IDEType): string {
  * Detecta a IDE baseada nos arquivos presentes no diretório
  */
 export function detectIDE(projectDir: string): IDEType | null {
-    const fs = require('fs');
-    const { join } = require('path');
-    
     // Verifica Windsurf
-    if (fs.existsSync(join(projectDir, '.windsurfrules')) || 
-        fs.existsSync(join(projectDir, '.windsurf'))) {
+    if (existsSync(join(projectDir, '.windsurfrules')) || 
+        existsSync(join(projectDir, '.windsurf'))) {
         return 'windsurf';
     }
     
     // Verifica Cursor
-    if (fs.existsSync(join(projectDir, '.cursorrules')) || 
-        fs.existsSync(join(projectDir, '.cursor'))) {
+    if (existsSync(join(projectDir, '.cursorrules')) || 
+        existsSync(join(projectDir, '.cursor'))) {
         return 'cursor';
     }
     
     // Verifica Antigravity
-    if (fs.existsSync(join(projectDir, '.gemini')) || 
-        fs.existsSync(join(projectDir, '.agent'))) {
+    if (existsSync(join(projectDir, '.gemini')) || 
+        existsSync(join(projectDir, '.agent'))) {
         return 'antigravity';
     }
     

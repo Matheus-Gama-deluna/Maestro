@@ -15,6 +15,8 @@ import { gerarSecaoPrompts, getSkillParaFase, getSkillPath, getSkillResourcePath
 import { validarEstrutura } from "../gates/estrutura.js";
 import { normalizeProjectPath, resolveProjectPath, joinProjectPath, getServerContentRoot } from "../utils/files.js";
 import { formatSkillMessage, detectIDE, getSkillResourcePath as getIDESkillResourcePath } from "../utils/ide-paths.js";
+import { inferirContextoBalanceado } from "../utils/inferencia-contextual.js";
+import { verificarSkillCarregada } from "../utils/content-injector.js";
 
 interface ProximoArgs {
     entregavel: string;
@@ -178,6 +180,57 @@ O **usuário humano** deve decidir:
         };
     }
 
+    // Fluxo PRD-first: se ainda aguardando PRD, analisar e sugerir em um único passo
+    if (estado.status === "aguardando_prd" && estado.fase_atual === 1) {
+        const analise = classificarPRD(args.entregavel);
+        estado.classificacao_sugerida = analise;
+        estado.aguardando_classificacao = true;
+        estado.classificacao_pos_prd_confirmada = false;
+        estado.status = "ativo";
+
+        // Inferência balanceada (não assume críticos) + perguntas agrupadas
+        estado.inferencia_contextual = inferirContextoBalanceado(`${estado.nome} ${args.entregavel}`);
+
+        const estadoFile = serializarEstado(estado);
+
+        const perguntas = estado.inferencia_contextual?.perguntas_prioritarias || [];
+        const perguntasMarkdown = perguntas.length
+            ? perguntas.map((p) => `- (${p.prioridade}) ${p.pergunta}${p.valor_inferido ? `
+  - Inferido: ${p.valor_inferido} (confiança ${((p.confianca_inferencia ?? 0) * 100).toFixed(0)}%)` : ""}`).join("\n")
+            : "- Informe domínio, stack preferida e integrações em um único prompt.";
+
+        return {
+            content: [{
+                type: "text",
+                text: `# 🔍 PRD Analisado (PRD-first)
+
+| Campo | Valor |
+|-------|-------|
+| Nível sugerido | ${analise.nivel.toUpperCase()} |
+| Pontuação | ${analise.pontuacao} |
+| Critérios | ${analise.criterios.join(", ")} |
+
+## Ação obrigatória (responder em UM ÚNICO PROMPT)
+1) Confirme ou ajuste a classificação:
+\`\`\`
+confirmar_classificacao({
+  estado_json: "...",
+  diretorio: "${diretorio}",
+  nivel: "${analise.nivel}" // opcional, ajuste se necessário
+})
+\`\`\`
+2) Responda também às perguntas abaixo no MESMO prompt (evita múltiplos prompts):
+${perguntasMarkdown}
+
+> ⚠️ Não prossiga para outras fases antes de confirmar a classificação.
+> Consulte SKILL e templates em: ${getIDESkillResourcePath(getSkillParaFase(faseAtualInfo?.nome || "Produto") || "specialist-gestao-produto", 'templates', detectIDE(diretorio) || 'windsurf')}
+`,
+            }],
+            files: [{ path: `${diretorio}/${estadoFile.path}`, content: estadoFile.content }],
+            estado_atualizado: estadoFile.content,
+        };
+    }
+
     // Verificar se há bloqueio de confirmação de classificação (Pós-PRD)
     if (estado.aguardando_classificacao) {
         let msgSugestao = "";
@@ -200,7 +253,7 @@ Antes de prosseguir, você precisa confirmar a classificação do projeto.
 
 ${msgSugestao}
 
-## 🔐 Ação Necessária
+## 🔐 Ação Necessária (responder em UM ÚNICO PROMPT)
 
 Use a tool \`confirmar_classificacao\` para validar ou ajustar a complexidade.
 
@@ -210,6 +263,8 @@ confirmar_classificacao(
     diretorio: "${diretorio}"
 )
 \`\`\`
+
+Inclua no MESMO prompt qualquer ajuste de domínio/stack ou integrações críticas para evitar prompts adicionais.
 
 > ⚠️ **IMPORTANTE**: Você DEVE chamar esta tool antes de continuar.
 `,
@@ -228,6 +283,32 @@ confirmar_classificacao(
         };
     }
 
+    // Enforcement de skill + template + checklist antes de avançar
+    const ideDetectada = detectIDE(diretorio) || 'windsurf';
+    const skillObrigatoria = getSkillParaFase(faseAtual.nome);
+    if (skillObrigatoria) {
+        const skillOk = await verificarSkillCarregada(diretorio, skillObrigatoria, ideDetectada).catch(() => false);
+        if (!skillOk) {
+            return {
+                content: [{
+                    type: "text",
+                    text: `# ⛔ Skill Obrigatória Não Carregada
+
+Fase: **${faseAtual.nome}**
+Skill necessária: \`${skillObrigatoria}\`
+
+Carregue e leia a skill antes de gerar o entregável:
+1) Ler SKILL: \`${getIDESkillResourcePath(skillObrigatoria, 'reference', ideDetectada)}SKILL.md\`
+2) Templates: \`${getIDESkillResourcePath(skillObrigatoria, 'templates', ideDetectada)}\`
+3) Checklist: \`${getIDESkillResourcePath(skillObrigatoria, 'checklists', ideDetectada)}\`
+
+> Gere o entregável seguindo o template e valide com o checklist antes de chamar \`proximo\`.`,
+                }],
+                isError: true,
+            };
+        }
+    }
+
     // Tentar validação com template (novo sistema inteligente)
     const diretorioContent = getServerContentRoot();
     const tier = estado.tier_gate || "base";
@@ -239,7 +320,7 @@ confirmar_classificacao(
     let usouTemplate = false;
     
     if (validacaoTemplate.sucesso && validacaoTemplate.resultado) {
-        // Usar validação baseada em template
+        // Usar validação baseada em template (enforcement)
         usouTemplate = true;
         const resultado = validacaoTemplate.resultado;
         

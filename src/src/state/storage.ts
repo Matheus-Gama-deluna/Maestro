@@ -53,6 +53,7 @@ export function criarEstadoInicial(
         diretorio,
         nivel: "medio", // Será reclassificado após PRD
         tipo_fluxo: "novo_projeto",
+        status: "aguardando_prd",
         fase_atual: 1,
         total_fases: 10, // Será ajustado após classificação
         entregaveis: {},
