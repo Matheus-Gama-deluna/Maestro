@@ -24,6 +24,7 @@ interface ProximoArgs {
     resumo_json?: string;        // Resumo atual (opcional, cria novo se não informado)
     nome_arquivo?: string;
     diretorio: string;           // Diretório do projeto (obrigatório)
+    auto_flow?: boolean;         // Modo fluxo automático: auto-confirma classificação e avança sem bloqueios
 }
 
 /**
@@ -200,29 +201,38 @@ O **usuário humano** deve decidir:
         };
     }
 
-    // Fluxo PRD-first: se ainda aguardando PRD, analisar e sugerir em um único passo
+    // Fluxo PRD-first: se ainda aguardando PRD, analisar e AUTO-CONFIRMAR se auto_flow
     if (estado.status === "aguardando_prd" && estado.fase_atual === 1) {
         const analise = classificarPRD(args.entregavel);
         estado.classificacao_sugerida = analise;
-        estado.aguardando_classificacao = true;
-        estado.classificacao_pos_prd_confirmada = false;
         estado.status = "ativo";
 
-        // Inferência balanceada (não assume críticos) + perguntas agrupadas
-        estado.inferencia_contextual = inferirContextoBalanceado(`${estado.nome} ${args.entregavel}`);
+        // AUTO-FLOW: confirma automaticamente a classificação e continua
+        if (args.auto_flow) {
+            estado.nivel = analise.nivel;
+            estado.aguardando_classificacao = false;
+            estado.classificacao_pos_prd_confirmada = true;
+            estado.total_fases = getFluxoComStitch(analise.nivel, estado.usar_stitch).total_fases;
+            // Continua o fluxo normal abaixo (não retorna aqui)
+        } else {
+            estado.aguardando_classificacao = true;
+            estado.classificacao_pos_prd_confirmada = false;
 
-        const estadoFile = serializarEstado(estado);
+            // Inferência balanceada (não assume críticos) + perguntas agrupadas
+            estado.inferencia_contextual = inferirContextoBalanceado(`${estado.nome} ${args.entregavel}`);
 
-        const perguntas = estado.inferencia_contextual?.perguntas_prioritarias || [];
-        const perguntasMarkdown = perguntas.length
-            ? perguntas.map((p) => `- (${p.prioridade}) ${p.pergunta}${p.valor_inferido ? `
+            const estadoFile = serializarEstado(estado);
+
+            const perguntas = estado.inferencia_contextual?.perguntas_prioritarias || [];
+            const perguntasMarkdown = perguntas.length
+                ? perguntas.map((p) => `- (${p.prioridade}) ${p.pergunta}${p.valor_inferido ? `
   - Inferido: ${p.valor_inferido} (confiança ${((p.confianca_inferencia ?? 0) * 100).toFixed(0)}%)` : ""}`).join("\n")
-            : "- Informe domínio, stack preferida e integrações em um único prompt.";
+                : "- Informe domínio, stack preferida e integrações em um único prompt.";
 
-        return {
-            content: [{
-                type: "text",
-                text: `# 🔍 PRD Analisado (PRD-first)
+            return {
+                content: [{
+                    type: "text",
+                    text: `# 🔍 PRD Analisado (PRD-first)
 
 | Campo | Valor |
 |-------|-------|
@@ -245,29 +255,40 @@ ${perguntasMarkdown}
 > ⚠️ Não prossiga para outras fases antes de confirmar a classificação.
 > Consulte SKILL e templates em: ${getIDESkillResourcePath(getSkillParaFase(faseAtualInfo?.nome || "Produto") || "specialist-gestao-produto", 'templates', detectIDE(diretorio) || 'windsurf')}
 `,
-            }],
-            files: [{ path: `${diretorio}/${estadoFile.path}`, content: estadoFile.content }],
-            estado_atualizado: estadoFile.content,
-        };
+                }],
+                files: [{ path: `${diretorio}/${estadoFile.path}`, content: estadoFile.content }],
+                estado_atualizado: estadoFile.content,
+            };
+        }
     }
 
     // Verificar se há bloqueio de confirmação de classificação (Pós-PRD)
+    // AUTO-FLOW: auto-confirma e continua sem bloquear
     if (estado.aguardando_classificacao) {
-        let msgSugestao = "";
-        if (estado.classificacao_sugerida) {
-            msgSugestao = `
+        if (args.auto_flow && estado.classificacao_sugerida) {
+            // Auto-confirmar classificação
+            estado.nivel = estado.classificacao_sugerida.nivel;
+            estado.aguardando_classificacao = false;
+            estado.classificacao_pos_prd_confirmada = true;
+            estado.total_fases = getFluxoComStitch(estado.classificacao_sugerida.nivel, estado.usar_stitch).total_fases;
+            estado.classificacao_sugerida = undefined;
+            // Continua o fluxo normal (não retorna)
+        } else {
+            let msgSugestao = "";
+            if (estado.classificacao_sugerida) {
+                msgSugestao = `
 ## Sugestão da IA
 | Campo | Valor |
 |-------|-------|
 | **Nível** | ${estado.classificacao_sugerida.nivel.toUpperCase()} |
 | **Pontuação** | ${estado.classificacao_sugerida.pontuacao} |
 `;
-        }
+            }
 
-        return {
-            content: [{
-                type: "text",
-                text: `# ⛔ Confirmação de Classificação Necessária
+            return {
+                content: [{
+                    type: "text",
+                    text: `# ⛔ Confirmação de Classificação Necessária
 
 Antes de prosseguir, você precisa confirmar a classificação do projeto.
 
@@ -288,8 +309,9 @@ Inclua no MESMO prompt qualquer ajuste de domínio/stack ou integrações críti
 
 > ⚠️ **IMPORTANTE**: Você DEVE chamar esta tool antes de continuar.
 `,
-            }],
-        };
+                }],
+            };
+        }
     }
 
     const faseAtual = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
@@ -304,9 +326,10 @@ Inclua no MESMO prompt qualquer ajuste de domínio/stack ou integrações críti
     }
 
     // Enforcement de skill + template + checklist antes de avançar
+    // AUTO-FLOW: pula verificação de skill carregada (assume que IA já seguiu o template)
     const ideDetectada = detectIDE(diretorio) || 'windsurf';
     const skillObrigatoria = getSkillParaFase(faseAtual.nome);
-    if (skillObrigatoria) {
+    if (skillObrigatoria && !args.auto_flow) {
         const skillOk = await verificarSkillCarregada(diretorio, skillObrigatoria, ideDetectada).catch(() => false);
         if (!skillOk) {
             return {
@@ -775,6 +798,10 @@ export const proximoSchema = {
         diretorio: {
             type: "string",
             description: "Diretório absoluto do projeto",
+        },
+        auto_flow: {
+            type: "boolean",
+            description: "Modo fluxo automático: auto-confirma classificação, pula verificações redundantes e avança automaticamente se score >= 70 (padrão: false)",
         },
     },
     required: ["entregavel", "estado_json", "diretorio"],

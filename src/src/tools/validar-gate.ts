@@ -92,10 +92,31 @@ validar_gate(
     
     if (!entregavel) {
         // Tentar ler do arquivo de entregável da fase
-        const nomeArquivo = estado.entregaveis[numeroFase.toString()];
-        if (nomeArquivo) {
+        // Compatibilidade: proximo() salva com chave "fase_X" e caminho completo
+        // Tentamos ambas as convenções para retrocompatibilidade
+        const chaveNova = `fase_${numeroFase}`;
+        const chaveLegacy = numeroFase.toString();
+        const caminhoOuNome = estado.entregaveis[chaveNova] || estado.entregaveis[chaveLegacy];
+        
+        if (caminhoOuNome) {
             try {
-                const caminhoEntregavel = join(diretorio, ".maestro", "entregaveis", nomeArquivo);
+                // Verificar se é caminho absoluto ou relativo completo (novo formato)
+                // ou apenas nome de arquivo (formato legacy)
+                let caminhoEntregavel: string;
+                
+                if (caminhoOuNome.includes('/') || caminhoOuNome.includes('\\')) {
+                    // Novo formato: caminho completo ou relativo
+                    // Se começa com diretório, é absoluto; senão, é relativo ao projeto
+                    if (caminhoOuNome.startsWith(diretorio)) {
+                        caminhoEntregavel = caminhoOuNome;
+                    } else {
+                        caminhoEntregavel = join(diretorio, caminhoOuNome);
+                    }
+                } else {
+                    // Formato legacy: apenas nome do arquivo em .maestro/entregaveis/
+                    caminhoEntregavel = join(diretorio, ".maestro", "entregaveis", caminhoOuNome);
+                }
+                
                 entregavel = await readFile(caminhoEntregavel, "utf-8");
             } catch {
                 // Se não conseguir ler, continua sem entregável
