@@ -13,7 +13,7 @@ import { calcularQualidade } from "../gates/quality-scorer.js";
 interface PRDWriterArgs {
   estado_json: string;
   diretorio: string;
-  acao?: 'gerar' | 'validar' | 'status';
+  acao?: 'gerar' | 'validar' | 'gerar_validar' | 'status';
 }
 
 /**
@@ -203,6 +203,8 @@ export async function prdWriter(args: PRDWriterArgs): Promise<ToolResult> {
     return handleGerarPRD(onboarding, estado, diretorio);
   } else if (acao === 'validar') {
     return handleValidarPRD(onboarding, estado, diretorio);
+  } else if (acao === 'gerar_validar') {
+    return handleGerarValidarPRD(onboarding, estado, diretorio);
   } else if (acao === 'status') {
     return handleStatusPRD(onboarding);
   }
@@ -428,6 +430,144 @@ function handleStatusPRD(onboarding: OnboardingState): ToolResult {
   };
 }
 
+/**
+ * Handler: gerar e validar PRD
+ */
+function handleGerarValidarPRD(
+  onboarding: OnboardingState,
+  estado: any,
+  diretorio: string
+): ToolResult {
+  if (onboarding.brainstormStatus !== 'completed') {
+    return {
+      content: [{
+        type: "text",
+        text: "❌ **Erro**: Brainstorm não foi concluído. Complete o brainstorm antes de gerar o PRD.",
+      }],
+      isError: true,
+    };
+  }
+
+  // Gerar conteúdo do PRD
+  const prdConteudo = gerarPRDConteudo(onboarding, estado.nome);
+
+  // Validar completude
+  const checklist = {
+    'Sumário Executivo': prdConteudo.includes('Problema e Oportunidade'),
+    'Personas e JTBD': prdConteudo.includes('Personas e Jobs to Be Done'),
+    'MVP e Funcionalidades': prdConteudo.includes('MVP e Funcionalidades Priorizadas'),
+    'Métricas de Sucesso': prdConteudo.includes('Métricas de Sucesso'),
+    'Riscos e Mitigações': prdConteudo.includes('Riscos e Planos de Mitigação'),
+    'Contexto Técnico': prdConteudo.includes('Contexto Técnico'),
+    'Timeline e Recursos': prdConteudo.includes('Timeline e Recursos'),
+    'Requisitos Críticos': prdConteudo.includes('Requisitos Críticos'),
+  };
+
+  const itemsValidados = Object.values(checklist).filter((v) => v).length;
+  const totalItems = Object.keys(checklist).length;
+  const score = Math.round((itemsValidados / totalItems) * 100);
+
+  // Calcular qualidade
+  const qualidade = calcularQualidade(prdConteudo, {
+    camposObrigatorios: Object.keys(checklist),
+    secoes: Object.keys(checklist),
+  } as any);
+
+  onboarding.prdScore = qualidade.overall;
+  onboarding.prdStatus = score >= 70 ? 'validated' : 'draft';
+
+  const linhas: string[] = [];
+  linhas.push('# 📊 Validação do PRD\n');
+  linhas.push(`**Score de Completude:** ${score}/100`);
+  linhas.push(`**Score de Qualidade:** ${qualidade.overall}/100\n`);
+
+  linhas.push('## Checklist de Completude\n');
+  Object.entries(checklist).forEach(([item, valido]) => {
+    const icon = valido ? '✅' : '❌';
+    linhas.push(`${icon} ${item}`);
+  });
+
+  linhas.push(`\n**Total:** ${itemsValidados}/${totalItems} itens validados\n`);
+
+  if (score >= 70) {
+    linhas.push('✅ **PRD VALIDADO!** Score ≥ 70\n');
+    linhas.push('Próximo passo: Avançar para Fase 1 (Produto)');
+  } else {
+    linhas.push(`⚠️ **PRD INCOMPLETO** Score: ${score}/100\n`);
+    linhas.push('Recomendações:');
+    Object.entries(checklist).forEach(([item, valido]) => {
+      if (!valido) {
+        linhas.push(`- Adicionar: ${item}`);
+      }
+    });
+  }
+
+  // Atualizar estado
+  onboarding.phase = 'prd_draft';
+  onboarding.totalInteractions++;
+  onboarding.lastInteractionAt = new Date().toISOString();
+
+  const estadoAtualizado = {
+    ...estado,
+    onboarding,
+    atualizado_em: new Date().toISOString(),
+  };
+
+  const estadoFile = serializarEstado(estadoAtualizado);
+
+  const resposta = `# ✅ PRD Draft Gerado e Validado!
+
+O PRD foi consolidado a partir do discovery e brainstorm.
+
+---
+
+## 📄 Conteúdo do PRD
+
+\`\`\`markdown
+${prdConteudo.substring(0, 500)}...
+\`\`\`
+
+---
+
+## 🔍 Próximos Passos
+
+1. **Revisar PRD:** Verifique se todos os detalhes estão corretos
+2. **Ajustar se necessário:** Refine seções que precisam de melhorias
+3. **Avançar para Fase 1:** Quando validado, o PRD estará pronto para a próxima fase
+
+---
+
+## ⚡ AÇÃO OBRIGATÓRIA - Atualizar Estado
+
+**Caminho:** \`${estadoFile.path}\`
+
+\`\`\`json
+${estadoFile.content}
+\`\`\`
+
+**Arquivo PRD:** \`docs/01-produto/PRD.md\`
+
+\`\`\`markdown
+${prdConteudo}
+\`\`\`
+`;
+
+  return {
+    content: [{ type: "text", text: resposta }],
+    files: [
+      {
+        path: `${diretorio}/${estadoFile.path}`,
+        content: estadoFile.content,
+      },
+      {
+        path: `${diretorio}/docs/01-produto/PRD.md`,
+        content: prdConteudo,
+      },
+    ],
+    estado_atualizado: estadoFile.content,
+  };
+}
+
 export const prdWriterSchema = {
   type: "object",
   properties: {
@@ -441,8 +581,8 @@ export const prdWriterSchema = {
     },
     acao: {
       type: "string",
-      enum: ["gerar", "validar", "status"],
-      description: "Ação a executar",
+      enum: ["gerar", "validar", "gerar_validar", "status"],
+      description: "Ação a executar: gerar (PRD draft), validar (verifica completude), gerar_validar (gera e valida em um passo - recomendado), status (mostra informações)",
     },
   },
   required: ["estado_json", "diretorio"],

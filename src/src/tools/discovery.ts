@@ -1,4 +1,5 @@
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
+import type { OnboardingState } from "../types/onboarding.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { resolveProjectPath } from "../utils/files.js";
@@ -46,6 +47,57 @@ export interface DiscoveryRespostas {
     restricoes_tecnicas?: string[];
     restricoes_negocio?: string[];
 }
+
+export const discoverySchema = {
+    type: "object",
+    properties: {
+        estado_json: {
+            type: "string",
+            description: "Conteúdo do arquivo .maestro/estado.json",
+        },
+        diretorio: {
+            type: "string",
+            description: "Diretório absoluto do projeto",
+        },
+        respostas: {
+            type: "object",
+            description: "Respostas do questionário de discovery",
+            properties: {
+                nome_projeto: { type: "string" },
+                problema: { type: "string" },
+                publico_alvo: { type: "string" },
+                funcionalidades_principais: {
+                    type: "array",
+                    items: { type: "string" }
+                },
+                fora_escopo: {
+                    type: "array",
+                    items: { type: "string" }
+                },
+                cronograma: { type: "string" },
+                stack_preferida: { type: "string" },
+                plataformas: {
+                    type: "array",
+                    items: { type: "string" }
+                },
+                integracoes_externas: {
+                    type: "array",
+                    items: { type: "string" }
+                },
+                tamanho_time: { type: "string" },
+                experiencia_time: { type: "string" },
+                infraestrutura: { type: "string" },
+                performance_esperada: { type: "string" },
+                seguranca_compliance: {
+                    type: "array",
+                    items: { type: "string" }
+                },
+                escalabilidade: { type: "string" },
+            },
+        },
+    },
+    required: ["estado_json", "diretorio"],
+};
 
 interface DiscoveryArgs {
     estado_json: string;
@@ -105,11 +157,41 @@ export async function discovery(args: DiscoveryArgs): Promise<ToolResult> {
         };
     }
 
-    // Salvar respostas no estado
-    const estadoAtualizado = {
-        ...estado,
-        discovery: args.respostas,
-    };
+    // v3.0: ADAPTER - Usar onboarding como fonte de verdade se disponível
+    const onboarding = (estado as any).onboarding as OnboardingState | undefined;
+    
+    let estadoAtualizado: EstadoProjeto;
+    
+    if (onboarding) {
+        // NOVO FLUXO: Preencher onboarding.discoveryResponses
+        onboarding.discoveryResponses = {
+            ...onboarding.discoveryResponses,
+            ...args.respostas,
+        };
+        
+        // Marcar todos os blocos como completos (modo compatibilidade)
+        onboarding.discoveryBlocks.forEach(bloco => {
+            bloco.status = 'completed';
+        });
+        
+        onboarding.discoveryStatus = 'completed';
+        onboarding.discoveryCompletedAt = new Date().toISOString();
+        onboarding.totalInteractions++;
+        onboarding.lastInteractionAt = new Date().toISOString();
+        
+        estadoAtualizado = {
+            ...estado,
+            onboarding: onboarding as any,
+            atualizado_em: new Date().toISOString(),
+        };
+    } else {
+        // LEGACY: Comportamento antigo para retrocompatibilidade
+        // Usar cast para any para suportar campo legacy não tipado
+        estadoAtualizado = {
+            ...estado,
+        } as EstadoProjeto;
+        (estadoAtualizado as any).discovery = args.respostas;
+    }
 
     const estadoFile = serializarEstado(estadoAtualizado);
 
@@ -352,57 +434,6 @@ discovery(
 )
 \`\`\`
 
-> ⚡ **Modo Economy:** Perguntas mínimas para início rápido!
+> Modo Economy:** Perguntas mínimas para início rápido!
 `;
 }
-
-export const discoverySchema = {
-    type: "object",
-    properties: {
-        estado_json: {
-            type: "string",
-            description: "Conteúdo do arquivo .maestro/estado.json",
-        },
-        diretorio: {
-            type: "string",
-            description: "Diretório absoluto do projeto",
-        },
-        respostas: {
-            type: "object",
-            description: "Respostas do questionário de discovery",
-            properties: {
-                nome_projeto: { type: "string" },
-                problema: { type: "string" },
-                publico_alvo: { type: "string" },
-                funcionalidades_principais: {
-                    type: "array",
-                    items: { type: "string" }
-                },
-                fora_escopo: {
-                    type: "array",
-                    items: { type: "string" }
-                },
-                cronograma: { type: "string" },
-                stack_preferida: { type: "string" },
-                plataformas: {
-                    type: "array",
-                    items: { type: "string" }
-                },
-                integracoes_externas: {
-                    type: "array",
-                    items: { type: "string" }
-                },
-                tamanho_time: { type: "string" },
-                experiencia_time: { type: "string" },
-                infraestrutura: { type: "string" },
-                performance_esperada: { type: "string" },
-                seguranca_compliance: {
-                    type: "array",
-                    items: { type: "string" }
-                },
-                escalabilidade: { type: "string" },
-            },
-        },
-    },
-    required: ["estado_json", "diretorio"],
-};

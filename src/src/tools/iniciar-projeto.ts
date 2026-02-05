@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from "fs";
 import { platform } from "os";
 import { randomUUID } from "crypto";
 import type { ToolResult, TipoArtefato, NivelComplexidade, TierGate } from "../types/index.js";
+import type { OnboardingState } from "../types/onboarding.js";
 import { criarEstadoInicial, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { criarResumoInicial, serializarResumo } from "../state/memory.js";
@@ -14,6 +15,7 @@ import { resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { ensureContentInstalled, injectContentForIDE } from "../utils/content-injector.js";
 import { formatSkillMessage } from "../utils/ide-paths.js";
 import { loadUserConfig } from "../utils/config.js";
+import { gerarBlocosDiscovery, calcularProgressoDiscovery } from "../utils/discovery-adapter.js";
 
 interface IniciarProjetoArgs {
     nome: string;
@@ -21,6 +23,15 @@ interface IniciarProjetoArgs {
     diretorio: string;
     ide?: 'windsurf' | 'cursor' | 'antigravity';
     modo?: 'economy' | 'balanced' | 'quality';
+    // v3.0: Novos parâmetros de onboarding
+    auto_flow?: boolean;
+    usar_stitch?: boolean;
+    project_definition_source?: 'ja_definido' | 'brainstorm' | 'sandbox';
+    brainstorm_mode?: 'none' | 'assistido';
+    confirmar_automaticamente?: boolean;
+    // Campos opcionais para one-shot
+    tipo_artefato?: TipoArtefato;
+    nivel_complexidade?: NivelComplexidade;
 }
 
 interface ConfirmarProjetoArgs extends IniciarProjetoArgs {
@@ -28,6 +39,55 @@ interface ConfirmarProjetoArgs extends IniciarProjetoArgs {
     nivel_complexidade?: NivelComplexidade;
     ide: 'windsurf' | 'cursor' | 'antigravity';
     modo: 'economy' | 'balanced' | 'quality';
+    // Herda os novos parâmetros de IniciarProjetoArgs
+}
+
+/**
+ * Cria estado inicial de onboarding
+ */
+function criarEstadoOnboardingInicial(projectId: string, modo: 'economy' | 'balanced' | 'quality'): OnboardingState {
+    const blocosDiscovery = gerarBlocosDiscovery({
+        mode: modo,
+        skipCompletedBlocks: false,
+        prioritizeByMode: true,
+        allowBatchInput: true,
+    });
+
+    return {
+        projectId,
+        phase: 'discovery',
+        discoveryStatus: 'in_progress',
+        discoveryBlocks: blocosDiscovery,
+        discoveryResponses: {},
+        discoveryStartedAt: new Date().toISOString(),
+        brainstormStatus: 'pending',
+        brainstormSections: [],
+        prdStatus: 'pending',
+        prdScore: 0,
+        mode: modo,
+        totalInteractions: 0,
+        lastInteractionAt: new Date().toISOString(),
+    };
+}
+
+/**
+ * Formata bloco de discovery para apresentação
+ */
+function formatarBlocoDiscoverySimples(bloco: any): string {
+    const linhas: string[] = [];
+    linhas.push(`## ${bloco.title}\n`);
+    linhas.push(`${bloco.description}\n`);
+    
+    bloco.fields.forEach((field: any, idx: number) => {
+        const required = field.required ? ' *' : '';
+        linhas.push(`### ${idx + 1}. ${field.label}${required}`);
+        if (field.placeholder) {
+            linhas.push(`_${field.placeholder}_`);
+        }
+        linhas.push('');
+    });
+    
+    return linhas.join('\n');
 }
 
 /**
@@ -126,32 +186,41 @@ export async function iniciarProjeto(args: IniciarProjetoArgs): Promise<ToolResu
     const ideEfetiva = args.ide || configGlobal?.ide;
     const modoEfetivo = args.modo || configGlobal?.modo || 'balanced';
 
-    // Verificar IDE
+    // Verificar IDE - wizard curto
     if (!ideEfetiva) {
         return {
-            content: [{ type: "text", text: `# 🎯 Configuração do Projeto: ${args.nome}
+            content: [{ type: "text", text: `# 🎯 Setup do Projeto: ${args.nome}
 
-Nenhuma IDE detectada. Para evitar múltiplos prompts, envie **um único comando** com sua IDE e preferências ou rode antes o setup único:
+**Wizard de Configuração Rápida** (1 prompt, 5 decisões)
 
-1) Salvar preferências globais (recomendado, 1 vez):
+Para começar direto no discovery, responda em **um único comando**:
+
 \`\`\`
-setup_inicial({
-  ide: "windsurf",      // windsurf | cursor | antigravity
-  modo: "balanced",     // economy | balanced | quality
-  usar_stitch: false
+iniciar_projeto({
+  nome: "${args.nome}",
+  descricao: "${args.descricao || 'Descrição do projeto'}",
+  diretorio: "${args.diretorio}",
+  ide: "windsurf",              // windsurf | cursor | antigravity
+  modo: "balanced",             // economy | balanced | quality
+  auto_flow: false,             // true = avança automaticamente quando score >= 70
+  usar_stitch: false,           // true = habilita Google Stitch para prototipagem
+  project_definition_source: "ja_definido",  // ja_definido | brainstorm | sandbox
+  confirmar_automaticamente: true  // true = cria estado e inicia discovery em 1 passo
 })
 \`\`\`
 
-2) Ou informe já na abertura do projeto:
-\`\`\`
-iniciar_projeto(
-  nome: "${args.nome}",
-  descricao: "${args.descricao || ''}",
-  diretorio: "${args.diretorio}",
-  ide: "windsurf",      // windsurf | cursor | antigravity
-  modo: "${modoEfetivo}"
-)
-\`\`\`` }],
+### 📋 Sobre as opções:
+- **IDE**: Onde os rules/skills serão injetados
+- **Modo**: economy (rápido, 7 fases) | balanced (13 fases) | quality (17 fases)
+- **Auto Flow**: Auto-avança entre fases quando score >= 70
+- **Stitch**: Prototipagem rápida de UI com Google Stitch
+- **Project Definition**: 
+  - \`ja_definido\`: Você já sabe problema/público/MVP
+  - \`brainstorm\`: Quer explorar ideias primeiro
+  - \`sandbox\`: Criar cenário fictício para teste
+- **Confirmar Automaticamente**: Setup + bootstrap + discovery em 1 passo
+
+💡 **Dica**: Use \`confirmar_automaticamente: true\` para fluxo mais rápido!` }],
         };
     }
 
@@ -168,6 +237,17 @@ iniciar_projeto(
     const inferenciaNivel = inferirComplexidade(inferenciaTipo.tipo, args.descricao);
     const modoSugerido = modoEfetivo || mapearModoParaNivel(inferenciaTipo.tipo);
 
+    // 🚀 ONE-SHOT: Se confirmar_automaticamente=true, criar projeto imediatamente
+    if (args.confirmar_automaticamente === true) {
+        return await confirmarProjeto({
+            ...args,
+            ide: ideEfetiva,
+            modo: modoSugerido,
+            tipo_artefato: args.tipo_artefato || inferenciaTipo.tipo,
+            nivel_complexidade: args.nivel_complexidade || inferenciaNivel.nivel,
+        } as ConfirmarProjetoArgs);
+    }
+
     const resposta = `# 🎯 Configuração do Projeto: ${args.nome}
 
 Fluxo PRD-first habilitado. Vamos coletar PRD na próxima interação (evita retrabalho de classificação).
@@ -179,7 +259,10 @@ confirmar_projeto({
   descricao: "${args.descricao || ''}",
   diretorio: "${args.diretorio}",
   ide: "${ideEfetiva}",
-  modo: "${modoSugerido}" // economy | balanced | quality
+  modo: "${modoSugerido}", // economy | balanced | quality
+  auto_flow: ${args.auto_flow ?? false},
+  usar_stitch: ${args.usar_stitch ?? false},
+  project_definition_source: "${args.project_definition_source || 'ja_definido'}"
 })
 \`\`\`
 
@@ -189,6 +272,8 @@ confirmar_projeto({
 - Modo sugerido: \`${modoSugerido}\`
 
 Se quiser forçar tipo/complexidade, adicione no mesmo comando: \`tipo_artefato\` e \`nivel_complexidade\`.
+
+💡 **Atalho rápido**: Use \`confirmar_automaticamente: true\` no \`iniciar_projeto\` para pular esta etapa!
 `; 
 
     return {
@@ -233,7 +318,7 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
     estado.aguardando_classificacao = !estado.classificacao_confirmada;
     estado.classificacao_pos_prd_confirmada = estado.classificacao_confirmada;
     
-    // Configurar modo e otimizações
+    // Configurar modo e otimizações (v3.0 com novos campos)
     estado.config = {
         mode: args.modo,
         flow: 'principal',
@@ -248,7 +333,27 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
         frontend_first: true,
         auto_checkpoint: args.modo === 'quality',
         auto_fix: args.modo !== 'economy',
+        // v3.0: Novos campos de onboarding
+        auto_flow: args.auto_flow ?? false,
+        onboarding: {
+            enabled: true,
+            source: 'onboarding_v2',
+            project_definition_source: args.project_definition_source || 'ja_definido',
+        },
+        setup: {
+            completed: true,
+            decided_at: new Date().toISOString(),
+            decided_by: (args.tipo_artefato && args.nivel_complexidade) ? 'user' : 'mixed',
+        },
     };
+    
+    // Persistir usar_stitch no estado raiz
+    estado.usar_stitch = args.usar_stitch ?? false;
+    estado.stitch_confirmado = args.usar_stitch !== undefined;
+
+    // v3.0: Criar estado de onboarding inicial
+    const onboardingState = criarEstadoOnboardingInicial(projetoId, args.modo);
+    (estado as any).onboarding = onboardingState;
 
     // Cria resumo
     const resumo = criarResumoInicial(projetoId, args.nome, nivelFinal, 1, 10);
@@ -281,6 +386,11 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
         console.warn('Aviso: Não foi possível criar histórico/SYSTEM.md:', error);
     }
 
+    // v3.0: Obter primeiro bloco do discovery
+    const progresso = calcularProgressoDiscovery(onboardingState.discoveryBlocks);
+    const primeiroBloco = progresso.proximoBloco;
+    const blocoFormatado = primeiroBloco ? formatarBlocoDiscoverySimples(primeiroBloco) : '';
+
     const resposta = `# 🚀 Projeto Iniciado: ${args.nome}
 
 **Configuração**
@@ -288,6 +398,9 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 - Complexidade: \`${nivelFinal}\` (pode ser ajustado após PRD)
 - Tier: **${tier?.toUpperCase() || 'N/A'}**
 - Modo: **${args.modo?.toUpperCase() || 'BALANCED'}** ${getModoDescription(args.modo || 'balanced')}
+- Auto Flow: **${args.auto_flow ? 'SIM' : 'NÃO'}** ${args.auto_flow ? '(avança automaticamente quando score >= 70)' : ''}
+- Usar Stitch: **${args.usar_stitch ? 'SIM' : 'NÃO'}**
+- Definição: **${args.project_definition_source || 'ja_definido'}**
 
 | Campo | Valor |
 |-------|-------|
@@ -331,35 +444,51 @@ ${(() => {
     return formatSkillMessage(skillInicial, args.ide) + "\n\n---\n";
 })()}
 
-## 📍 Próximo Passo: Discovery
+## � Kickstart: Discovery Guiado (Bloco 1/${progresso.total})
 
 ${args.modo === 'economy' ? 
-'**Modo Economy:** Vamos coletar apenas informações essenciais para começar rapidamente.' :
+'**Modo Economy:** Perguntas mínimas para início rápido.' :
 args.modo === 'quality' ?
-'**Modo Quality:** Vamos coletar informações detalhadas para garantir máxima qualidade.' :
-'**Modo Balanced:** Vamos coletar informações moderadas para equilibrar velocidade e qualidade.'}
+'**Modo Quality:** Perguntas detalhadas para máxima qualidade.' :
+'**Modo Balanced:** Perguntas moderadas para equilíbrio velocidade/qualidade.'}
 
-O processo de **Discovery** será conduzido através da ferramenta MCP \`discovery\` ou pelo especialista skill ativado. Ele irá gerar um questionário agrupado adaptado ao modo selecionado e coletar as informações necessárias para o projeto.
+**Progresso:** ${progresso.completados}/${progresso.total} blocos (${progresso.percentual}%)
 
-Após a coleta, todos os especialistas terão o contexto completo para trabalhar!
-
----
-
-## 🎨 Prototipagem Rápida com Google Stitch (Opcional)
-
-Se desejar, você pode usar o **Google Stitch** para prototipagem de UI após a fase de UX Design.
-
-> [Mais sobre Google Stitch](https://stitch.withgoogle.com)
+${blocoFormatado}
 
 ---
 
-## � Próximos Passos
+## 📝 Como Responder
 
-O projeto foi inicializado no Tier **${tier?.toUpperCase() || 'N/A'}**.
+Preencha os campos acima e use o **onboarding_orchestrator** para continuar:
 
-Você pode iniciar a Fase 1 (Produto) diretamente ou usar o Google Stitch para prototipagem rápida.
-${gerarSecaoPrompts("Produto")}
-${gerarSecaoExemplo(detectarStack(args.nome, args.descricao))}
+\`\`\`
+onboarding_orchestrator({
+    estado_json: "<conteúdo do estado.json que você acabou de criar>",
+    diretorio: "${diretorio}",
+    acao: "proximo_bloco",
+    respostas_bloco: {
+        "campo_id": "valor",
+        "outro_campo": "valor"
+    }
+})
+\`\`\`
+
+💡 **Dica:** Quanto mais detalhes você fornecer agora, menos perguntas serão feitas depois!
+
+**Tempo estimado para este bloco:** ${primeiroBloco?.estimatedTime || 5} minutos
+
+---
+
+## 🎯 Fluxo Completo
+
+1. ✅ **Setup concluído** - Projeto configurado
+2. 🔄 **Discovery em andamento** - Coletando informações (bloco 1/${progresso.total})
+3. ⏳ **Brainstorm** - Após completar discovery
+4. ⏳ **PRD** - Consolidação final
+5. ⏳ **Fase 1 (Produto)** - Início do desenvolvimento
+
+${args.usar_stitch ? '\n> 🎨 **Google Stitch habilitado** - Disponível para prototipagem após UX Design\n' : ''}
 `;
 
     return {
@@ -379,7 +508,12 @@ export const iniciarProjetoSchema = {
         descricao: { type: "string", description: "Descrição para análise" },
         diretorio: { type: "string", description: "Diretório absoluto" },
         ide: { type: "string", enum: ['windsurf', 'cursor', 'antigravity'], description: "IDE alvo para injection" },
-        modo: { type: "string", enum: ['economy', 'balanced', 'quality'], description: "Modo de execução: economy (rápido), balanced (equilibrado), quality (máxima qualidade)" }
+        modo: { type: "string", enum: ['economy', 'balanced', 'quality'], description: "Modo de execução: economy (rápido), balanced (equilibrado), quality (máxima qualidade)" },
+        auto_flow: { type: "boolean", description: "Auto-avança entre fases quando score >= 70" },
+        usar_stitch: { type: "boolean", description: "Habilita Google Stitch para prototipagem de UI" },
+        project_definition_source: { type: "string", enum: ['ja_definido', 'brainstorm', 'sandbox'], description: "Fonte da definição do projeto" },
+        brainstorm_mode: { type: "string", enum: ['none', 'assistido'], description: "Modo de brainstorm" },
+        confirmar_automaticamente: { type: "boolean", description: "Criar estado e iniciar discovery em 1 passo" }
     },
     required: ["nome", "diretorio"],
 };
@@ -393,7 +527,11 @@ export const confirmarProjetoSchema = {
         tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] },
         nivel_complexidade: { type: "string", enum: ["simples", "medio", "complexo"] },
         ide: { type: "string", enum: ['windsurf', 'cursor', 'antigravity'], description: "IDE alvo para injection" },
-        modo: { type: "string", enum: ['economy', 'balanced', 'quality'], description: "Modo de execução" }
+        modo: { type: "string", enum: ['economy', 'balanced', 'quality'], description: "Modo de execução" },
+        auto_flow: { type: "boolean", description: "Auto-avança entre fases quando score >= 70" },
+        usar_stitch: { type: "boolean", description: "Habilita Google Stitch para prototipagem de UI" },
+        project_definition_source: { type: "string", enum: ['ja_definido', 'brainstorm', 'sandbox'], description: "Fonte da definição do projeto" },
+        brainstorm_mode: { type: "string", enum: ['none', 'assistido'], description: "Modo de brainstorm" }
     },
     required: ["nome", "diretorio", "ide", "modo"],
 };

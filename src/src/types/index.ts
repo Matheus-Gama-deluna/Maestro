@@ -4,6 +4,9 @@ export type NivelComplexidade = "simples" | "medio" | "complexo";
 // Tipos de fluxo
 export type TipoFluxo = "novo_projeto" | "feature" | "bug" | "refatoracao";
 
+// Fonte de definição do projeto (v3.0 - onboarding)
+export type ProjectDefinitionSource = "ja_definido" | "brainstorm" | "sandbox";
+
 // Tipos de história (Frontend First)
 export type TipoHistoria = "contrato" | "frontend" | "backend" | "integracao";
 
@@ -64,6 +67,18 @@ export interface EstadoProjeto {
         frontend_first: boolean;
         auto_checkpoint: boolean;
         auto_fix: boolean;
+        // v3.0: Novos campos de onboarding
+        auto_flow?: boolean;  // Auto-avanço quando score >= 70
+        onboarding?: {
+            enabled: boolean;  // Se usa onboarding_orchestrator como caminho principal
+            source: 'onboarding_v2' | 'legacy_discovery';
+            project_definition_source?: 'ja_definido' | 'brainstorm' | 'sandbox';
+        };
+        setup?: {
+            completed: boolean;
+            decided_at: string;
+            decided_by: 'user' | 'inferred' | 'mixed';
+        };
     };
 
     // v2.0: Sistema de tarefas
