@@ -1,12 +1,17 @@
 /**
- * Router Centralizado do Maestro MCP
+ * Router Centralizado do Maestro MCP v5
  * 
  * Ponto ÚNICO de roteamento para todas as tools.
  * Ambos entry points (stdio.ts e index.ts) usam este router.
- * Elimina divergência de parâmetros e tools entre entry points.
+ * 
+ * v5: Separação PUBLIC (8 tools) vs LEGACY (37+ tools).
+ * - getRegisteredTools() retorna apenas PUBLIC tools
+ * - routeToolCall() aceita AMBAS (backward compatible)
+ * - Middlewares aplicados automaticamente
  */
 
 import type { ToolResult } from "./types/index.js";
+import { applyMiddlewares, applyLightMiddlewares, applyPersistenceMiddlewares } from "./middleware/index.js";
 
 // === IMPORTS DE TOOLS ===
 
@@ -89,6 +94,12 @@ import {
 // Entry point inteligente
 import { maestroTool, maestroToolSchema } from "./tools/maestro-tool.js";
 
+// v5: Tools consolidadas
+import { avancar, avancarSchema } from "./tools/consolidated/avancar.js";
+import { validar, validarSchema } from "./tools/consolidated/validar.js";
+import { checkpoint, checkpointSchema } from "./tools/consolidated/checkpoint-tool.js";
+import { analisar, analisarSchema } from "./tools/consolidated/analisar.js";
+
 // === DEFINIÇÃO DE TOOL ===
 
 interface ToolDefinition {
@@ -98,63 +109,107 @@ interface ToolDefinition {
     handler: (args: Record<string, unknown>) => Promise<ToolResult>;
 }
 
-// === REGISTRY ===
+// ============================================================
+// PUBLIC TOOLS — Expostas para a IA (superfície reduzida)
+// ============================================================
 
-const toolRegistry: ToolDefinition[] = [
-    // ──── ENTRY POINT INTELIGENTE ────
+const publicTools: ToolDefinition[] = [
     {
         name: "maestro",
-        description: "🎯 Entry point inteligente do Maestro. Detecta contexto do projeto automaticamente e guia o próximo passo. Use esta tool quando não souber qual tool usar — ela analisa o estado e recomenda a ação correta.",
+        description: "🎯 Entry point inteligente do Maestro. Detecta contexto do projeto automaticamente e guia o próximo passo. Use esta tool quando não souber qual tool usar.",
         inputSchema: maestroToolSchema,
-        handler: (a) => maestroTool(a as any),
+        handler: applyLightMiddlewares("maestro", (a) => maestroTool(a as any)),
     },
+    {
+        name: "avancar",
+        description: "⏭️ Avança no fluxo do projeto. Em onboarding: processa próximo bloco. Em desenvolvimento: submete entregável e avança fase. Detecta contexto automaticamente.",
+        inputSchema: avancarSchema,
+        handler: applyLightMiddlewares("avancar", (a) => avancar(a as any)),
+    },
+    {
+        name: "status",
+        description: "📊 Retorna status completo do projeto com progresso, fase atual e próximos passos.",
+        inputSchema: statusSchema,
+        handler: applyMiddlewares("status", (a) => status(a as any)),
+    },
+    {
+        name: "validar",
+        description: "✅ Valida gate, entregável ou compliance. Tipo auto-detectado ou especificado via parâmetro 'tipo'.",
+        inputSchema: validarSchema,
+        handler: applyMiddlewares("validar", (a) => validar(a as any)),
+    },
+    {
+        name: "contexto",
+        description: "🧠 Retorna contexto acumulado do projeto (ADRs, padrões, decisões, knowledge base).",
+        inputSchema: contextoSchema,
+        handler: applyMiddlewares("contexto", (a) => contexto(a as any)),
+    },
+    {
+        name: "salvar",
+        description: "💾 Salva conteúdo (rascunho, anexo ou entregável) sem avançar de fase.",
+        inputSchema: salvarSchema,
+        handler: applyPersistenceMiddlewares("salvar", (a) => salvar(a as any)),
+    },
+    {
+        name: "checkpoint",
+        description: "🔒 Gerencia checkpoints: criar, rollback total/parcial ou listar. Usa parâmetro 'acao'.",
+        inputSchema: checkpointSchema,
+        handler: applyPersistenceMiddlewares("checkpoint", (a) => checkpoint(a as any)),
+    },
+    {
+        name: "analisar",
+        description: "🔍 Analisa código: segurança, qualidade, performance, dependências ou relatório completo. Usa parâmetro 'tipo'.",
+        inputSchema: analisarSchema,
+        handler: applyMiddlewares("analisar", (a) => analisar(a as any)),
+    },
+];
 
-    // ──── CORE ────
+// ============================================================
+// LEGACY TOOLS — Aceitas no routeToolCall mas NÃO listadas
+// Backward compatible com v4 e anteriores
+// ============================================================
+
+const legacyTools: ToolDefinition[] = [
+    // ──── CORE LEGACY ────
     {
         name: "setup_inicial",
-        description: "Salva configuração global única do usuário (IDE, modo, preferências). Evita múltiplos prompts em projetos futuros.",
+        description: "[Interno] Salva configuração global. Use 'maestro' como entry point.",
         inputSchema: setupInicialSchema,
         handler: (a) => setupInicial(a as any),
     },
     {
         name: "iniciar_projeto",
-        description: "Inicia um novo projeto com o Maestro. Retorna perguntas ou cria arquivos dependendo dos parâmetros. Requer diretorio.",
+        description: "[Interno] Inicia novo projeto. Use 'maestro' como entry point.",
         inputSchema: iniciarProjetoSchema,
         handler: (a) => iniciarProjeto(a as any),
     },
     {
         name: "confirmar_projeto",
-        description: "Confirma criação do projeto com tipo e complexidade. Injeta conteúdo automaticamente.",
+        description: "[Interno] Confirma criação do projeto.",
         inputSchema: confirmarProjetoSchema,
         handler: (a) => confirmarProjeto(a as any),
     },
     {
         name: "confirmar_stitch",
-        description: "Confirma se o projeto usará prototipagem com Google Stitch. Deve ser chamada após iniciar_projeto.",
+        description: "[Interno] Confirma uso de prototipagem Stitch.",
         inputSchema: confirmarStitchSchema,
         handler: (a) => confirmarStitch(a as any),
     },
     {
         name: "carregar_projeto",
-        description: "Carrega um projeto existente. Requer estado_json e diretorio.",
+        description: "[Interno] Carrega projeto existente. Use 'maestro' como entry point.",
         inputSchema: carregarProjetoSchema,
         handler: (a) => carregarProjeto(a as any),
     },
     {
         name: "proximo",
-        description: "Valida entregável e avança para próxima fase. Requer entregavel, estado_json e diretorio.",
+        description: "[Interno] Avança fase. Use 'avancar' como alternativa consolidada.",
         inputSchema: proximoSchema,
-        handler: (a) => proximo(a as any),
-    },
-    {
-        name: "status",
-        description: "Retorna status completo do projeto. Requer estado_json e diretorio.",
-        inputSchema: statusSchema,
-        handler: (a) => status(a as any),
+        handler: applyLightMiddlewares("proximo", (a) => proximo(a as any)),
     },
     {
         name: "validar_gate",
-        description: "Valida checklist de saída da fase. Requer estado_json e diretorio.",
+        description: "[Interno] Valida gate. Use 'validar' como alternativa consolidada.",
         inputSchema: validarGateSchema,
         handler: (a) => validarGate(a as any),
     },
@@ -164,35 +219,21 @@ const toolRegistry: ToolDefinition[] = [
         inputSchema: { type: "object", properties: { acao: { type: "string", enum: ["aprovar", "rejeitar"] }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["acao", "estado_json", "diretorio"] },
         handler: (a) => aprovarGate(a as any),
     },
-
-    // ──── V1.0 ────
     {
         name: "classificar",
-        description: "Reclassifica complexidade do projeto. Requer estado_json e diretorio.",
+        description: "[Interno] Reclassifica complexidade.",
         inputSchema: classificarSchema,
         handler: (a) => classificar(a as any),
     },
     {
-        name: "contexto",
-        description: "Retorna contexto acumulado do projeto. Requer estado_json e diretorio.",
-        inputSchema: contextoSchema,
-        handler: (a) => contexto(a as any),
-    },
-    {
-        name: "salvar",
-        description: "Salva conteúdo sem avançar de fase. Requer conteudo, tipo, estado_json e diretorio.",
-        inputSchema: salvarSchema,
-        handler: (a) => salvar(a as any),
-    },
-    {
         name: "confirmar_classificacao",
-        description: "Confirma e efetiva a reclassificação após PRD. Requer estado_json e diretorio.",
+        description: "[Interno] Confirma reclassificação após PRD.",
         inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" }, nivel: { type: "string", enum: ["simples", "medio", "complexo"] }, tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] } }, required: ["estado_json", "diretorio"] },
         handler: (a) => confirmarClassificacao(a as any),
     },
     {
         name: "implementar_historia",
-        description: "Orquestra implementação de história em blocos (Frontend First).",
+        description: "[Interno] Implementação Frontend First.",
         inputSchema: implementarHistoriaSchema,
         handler: (a) => implementarHistoria(a as any),
     },
@@ -200,45 +241,45 @@ const toolRegistry: ToolDefinition[] = [
     // ──── FLUXOS ALTERNATIVOS ────
     {
         name: "nova_feature",
-        description: "Inicia fluxo de desenvolvimento de nova feature (6 fases).",
+        description: "[Interno] Fluxo de nova feature.",
         inputSchema: novaFeatureSchema,
         handler: (a) => novaFeature(a as any),
     },
     {
         name: "corrigir_bug",
-        description: "Inicia fluxo de correção de bug (5 fases).",
+        description: "[Interno] Fluxo de correção de bug.",
         inputSchema: corrigirBugSchema,
         handler: (a) => corrigirBug(a as any),
     },
     {
         name: "refatorar",
-        description: "Inicia fluxo de refatoração de código legado (6 fases).",
+        description: "[Interno] Fluxo de refatoração.",
         inputSchema: refatorarSchema,
         handler: (a) => refatorar(a as any),
     },
 
-    // ──── ANÁLISE ────
+    // ──── ANÁLISE LEGACY ────
     {
         name: "analisar_seguranca",
-        description: "Analisa código em busca de vulnerabilidades OWASP Top 10.",
+        description: "[Interno] Use 'analisar' com tipo='seguranca'.",
         inputSchema: analisarSegurancaSchema,
         handler: (a) => analisarSeguranca(a as any),
     },
     {
         name: "analisar_qualidade",
-        description: "Analisa qualidade do código, complexidade e padrões.",
+        description: "[Interno] Use 'analisar' com tipo='qualidade'.",
         inputSchema: analisarQualidadeSchema,
         handler: (a) => analisarQualidade(a as any),
     },
     {
         name: "analisar_performance",
-        description: "Detecta problemas de performance e anti-patterns.",
+        description: "[Interno] Use 'analisar' com tipo='performance'.",
         inputSchema: analisarPerformanceSchema,
         handler: (a) => analisarPerformance(a as any),
     },
     {
         name: "gerar_relatorio",
-        description: "Gera relatório consolidado de todas as análises com score.",
+        description: "[Interno] Use 'analisar' com tipo='completo'.",
         inputSchema: gerarRelatorioSchema,
         handler: (a) => gerarRelatorio(a as any),
     },
@@ -246,7 +287,7 @@ const toolRegistry: ToolDefinition[] = [
     // ──── MEMÓRIA ────
     {
         name: "atualizar_codebase",
-        description: "Atualiza informações do codebase para memória do projeto.",
+        description: "[Interno] Atualiza informações do codebase.",
         inputSchema: atualizarCodebaseSchema,
         handler: (a) => atualizarCodebase(a as any),
     },
@@ -254,7 +295,7 @@ const toolRegistry: ToolDefinition[] = [
     // ──── QUALIDADE ────
     {
         name: "avaliar_entregavel",
-        description: "Avalia qualidade do entregável com score e sugestões. Use antes de proximo().",
+        description: "[Interno] Use 'validar' com tipo='entregavel'.",
         inputSchema: avaliarEntregavelSchema,
         handler: (a) => avaliarEntregavel(a as any),
     },
@@ -270,7 +311,7 @@ const toolRegistry: ToolDefinition[] = [
     // ──── DISCOVERY ────
     {
         name: "discovery",
-        description: "Coleta informações iniciais agrupadas para reduzir prompts. Retorna questionário ou salva respostas.",
+        description: "[Interno] Use 'avancar' para fluxo de onboarding.",
         inputSchema: discoverySchema,
         handler: (a) => discovery(a as any),
     },
@@ -278,133 +319,139 @@ const toolRegistry: ToolDefinition[] = [
     // ──── ONBOARDING OTIMIZADO ────
     {
         name: "onboarding_orchestrator",
-        description: "Orquestra fluxo de onboarding otimizado (discovery adaptativo → brainstorm → PRD). Reduz prompts e integra coleta de contexto.",
+        description: "[Interno] Use 'avancar' para fluxo de onboarding.",
         inputSchema: onboardingOrchestratorSchema,
         handler: (a) => onboardingOrchestrator(a as any),
     },
     {
         name: "brainstorm",
-        description: "Brainstorm assistido com prompts estruturados. Consolida respostas em insights para o PRD.",
+        description: "[Interno] Use 'avancar' para brainstorm.",
         inputSchema: brainstormSchema,
         handler: (a) => brainstorm(a as any),
     },
     {
         name: "prd_writer",
-        description: "Gera, valida e consolida PRD a partir do discovery e brainstorm. Calcula score de completude.",
+        description: "[Interno] Use 'avancar' para geração de PRD.",
         inputSchema: prdWriterSchema,
         handler: (a) => prdWriter(a as any),
     },
     {
         name: "next_steps_dashboard",
-        description: "Apresenta dashboard consolidado com progresso, insights e próximas ações recomendadas.",
+        description: "[Interno] Use 'maestro' para dashboard.",
         inputSchema: nextStepsDashboardSchema,
         handler: (a) => nextStepsDashboard(a as any),
     },
 
-    // ──── FASE 1: KNOWLEDGE BASE ────
+    // ──── KNOWLEDGE BASE ────
     {
         name: "record_adr",
-        description: "Registra Architecture Decision Record com decisão, contexto, alternativas e consequências",
+        description: "Registra Architecture Decision Record.",
         inputSchema: recordADRSchema,
         handler: (a) => recordADR(a as any),
     },
     {
         name: "record_pattern",
-        description: "Registra padrão identificado com contexto, problema e solução",
+        description: "Registra padrão identificado.",
         inputSchema: recordPatternSchema,
         handler: (a) => recordPattern(a as any),
     },
     {
         name: "get_context",
-        description: "Retorna contexto relevante para fase específica (ADRs, padrões, decisões)",
+        description: "[Interno] Use 'contexto' como alternativa consolidada.",
         inputSchema: getContextSchema,
         handler: (a) => getContext(a as any),
     },
     {
         name: "search_knowledge",
-        description: "Busca na base de conhecimento por query",
+        description: "Busca na base de conhecimento.",
         inputSchema: searchKnowledgeSchema,
         handler: (a) => searchKnowledge(a as any),
     },
 
-    // ──── FASE 1: CHECKPOINT ────
+    // ──── CHECKPOINT LEGACY ────
     {
         name: "create_checkpoint",
-        description: "Cria checkpoint do projeto antes de mudanças arriscadas",
+        description: "[Interno] Use 'checkpoint' com acao='criar'.",
         inputSchema: createCheckpointSchema,
         handler: (a) => createCheckpoint(a as any),
     },
     {
         name: "rollback_total",
-        description: "Rollback total para um checkpoint",
+        description: "[Interno] Use 'checkpoint' com acao='rollback'.",
         inputSchema: rollbackTotalSchema,
         handler: (a) => rollbackTotal(a as any),
     },
     {
         name: "rollback_partial",
-        description: "Rollback parcial (apenas módulos específicos)",
+        description: "[Interno] Use 'checkpoint' com acao='rollback_parcial'.",
         inputSchema: rollbackPartialSchema,
         handler: (a) => rollbackPartial(a as any),
     },
     {
         name: "list_checkpoints",
-        description: "Lista todos os checkpoints disponíveis",
+        description: "[Interno] Use 'checkpoint' com acao='listar'.",
         inputSchema: listCheckpointsSchema,
         handler: (a) => listCheckpoints(a as any),
     },
 
-    // ──── FASE 1: VALIDATION ────
+    // ──── VALIDATION LEGACY ────
     {
         name: "validate_dependencies",
-        description: "Valida dependências e detecta hallucinations",
+        description: "[Interno] Use 'analisar' com tipo='dependencias'.",
         inputSchema: validateDependenciesSchema,
         handler: (a) => validateDependencies(a as any),
     },
     {
         name: "validate_security",
-        description: "Valida segurança contra OWASP Top 10",
+        description: "[Interno] Use 'analisar' com tipo='seguranca'.",
         inputSchema: validateSecuritySchema,
         handler: (a) => validateSecurity(a as any),
     },
     {
         name: "check_compliance",
-        description: "Verifica compliance (LGPD, PCI-DSS, HIPAA)",
+        description: "[Interno] Use 'validar' com tipo='compliance'.",
         inputSchema: checkComplianceSchema,
         handler: (a) => checkCompliance(a as any),
     },
 
-    // ──── FASE 1: RISK, AUTOFIX, DISCOVERY ────
+    // ──── MISC LEGACY ────
     {
         name: "evaluate_risk",
-        description: "Avalia risco de uma operação",
+        description: "Avalia risco de uma operação.",
         inputSchema: evaluateRiskSchema,
         handler: (a) => evaluateRisk(a as any),
     },
     {
         name: "auto_fix",
-        description: "Tenta corrigir automaticamente erros de código",
+        description: "Tenta corrigir automaticamente erros de código.",
         inputSchema: autoFixSchema,
         handler: (a) => autoFix(a as any),
     },
     {
         name: "discover_codebase",
-        description: "Analisa codebase e detecta arquitetura/stack",
+        description: "Analisa codebase e detecta arquitetura/stack.",
         inputSchema: discoverCodebaseSchema,
         handler: (a) => discoverCodebase(a as any),
     },
 ];
+
+// Mapa completo para lookup rápido (public + legacy)
+const allToolsMap = new Map<string, ToolDefinition>();
+for (const tool of publicTools) allToolsMap.set(tool.name, tool);
+for (const tool of legacyTools) allToolsMap.set(tool.name, tool);
 
 // === API PÚBLICA ===
 
 /**
  * Executa uma tool pelo nome com os argumentos fornecidos.
  * Ponto ÚNICO de execução - usado por stdio.ts e index.ts.
+ * Aceita TODAS as tools (public + legacy) para backward compatibility.
  */
 export async function routeToolCall(name: string, rawArgs: Record<string, unknown>): Promise<ToolResult> {
-    const tool = toolRegistry.find(t => t.name === name);
+    const tool = allToolsMap.get(name);
     if (!tool) {
         return {
-            content: [{ type: "text", text: `❌ Tool não encontrada: ${name}` }],
+            content: [{ type: "text", text: `❌ Tool não encontrada: ${name}\n\nTools disponíveis: ${publicTools.map(t => t.name).join(", ")}` }],
             isError: true,
         };
     }
@@ -420,11 +467,12 @@ export async function routeToolCall(name: string, rawArgs: Record<string, unknow
 }
 
 /**
- * Retorna lista de todas as tools registradas no formato MCP.
+ * Retorna lista de tools PÚBLICAS no formato MCP.
+ * v5: Apenas 8 tools consolidadas (reduz superfície cognitiva).
  * Ponto ÚNICO de listagem - usado por stdio.ts e index.ts.
  */
 export function getRegisteredTools(): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> {
-    return toolRegistry.map(t => ({
+    return publicTools.map(t => ({
         name: t.name,
         description: t.description,
         inputSchema: t.inputSchema,
@@ -432,8 +480,27 @@ export function getRegisteredTools(): Array<{ name: string; description: string;
 }
 
 /**
- * Retorna quantidade de tools registradas.
+ * Retorna lista de TODAS as tools (public + legacy) no formato MCP.
+ * Útil para diagnóstico e testes.
+ */
+export function getAllTools(): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> {
+    return [...publicTools, ...legacyTools].map(t => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema,
+    }));
+}
+
+/**
+ * Retorna quantidade de tools públicas.
  */
 export function getToolCount(): number {
-    return toolRegistry.length;
+    return publicTools.length;
+}
+
+/**
+ * Retorna quantidade total de tools (public + legacy).
+ */
+export function getTotalToolCount(): number {
+    return allToolsMap.size;
 }

@@ -5,7 +5,8 @@
  * Uso: node dist/stdio.js [diretorio]
  * Ou via npx após publicar no npm
  * 
- * Se nenhum diretório for fornecido, usa o diretório de trabalho atual
+ * v5: Skills como MCP Resources, MCP Prompts capability,
+ *     tools consolidadas (8 públicas + legadas backward-compatible)
  * 
  * NOTA: Usa router centralizado (router.ts) para roteamento de tools.
  * Não duplicar switch/case aqui - todas as tools são registradas no router.
@@ -17,6 +18,8 @@ import {
     ReadResourceRequestSchema,
     ListToolsRequestSchema,
     CallToolRequestSchema,
+    ListPromptsRequestSchema,
+    GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 import {
@@ -31,30 +34,75 @@ import {
 } from "./utils/files.js";
 
 import { routeToolCall, getRegisteredTools, getToolCount } from "./router.js";
+import { ContentResolverService } from "./services/content-resolver.service.js";
+import { SkillLoaderService } from "./services/skill-loader.service.js";
+import { createStateService } from "./services/state.service.js";
+import { getSpecialistPersona } from "./services/specialist.service.js";
+import { getFaseComStitch } from "./flows/types.js";
+import { getSkillParaFase } from "./utils/prompt-mapper.js";
 
 // Criar servidor MCP
 const server = new Server(
     {
         name: "mcp-maestro",
-        version: "4.0.0",
+        version: "5.0.0",
     },
     {
         capabilities: {
             resources: {},
             tools: {},
+            prompts: {},
         },
     }
 );
 
-// ==================== RESOURCES ====================
+// ==================== RESOURCES (v5: Skills expandidas) ====================
 
 server.setRequestHandler(ListResourcesRequestSchema, async () => {
     const especialistas = await listarEspecialistas();
     const templates = await listarTemplates();
     const guias = await listarGuias();
 
+    // v5: Listar skills como resources estruturados
+    const contentResolver = new ContentResolverService(projectsDir);
+    const skills = await contentResolver.listAvailableSkills();
+
+    const skillResources = [];
+    for (const skillName of skills) {
+        // SKILL.md principal
+        skillResources.push({
+            uri: `maestro://skills/${skillName}/SKILL.md`,
+            name: `Skill: ${skillName}`,
+            mimeType: "text/markdown",
+        });
+
+        // Templates da skill
+        const skillTemplates = await contentResolver.listSkillResources(skillName, "templates");
+        for (const t of skillTemplates) {
+            skillResources.push({
+                uri: `maestro://skills/${skillName}/templates/${t}`,
+                name: `${skillName} Template: ${t}`,
+                mimeType: "text/markdown",
+            });
+        }
+
+        // Checklists da skill
+        const checklists = await contentResolver.listSkillResources(skillName, "checklists");
+        for (const c of checklists) {
+            skillResources.push({
+                uri: `maestro://skills/${skillName}/checklists/${c}`,
+                name: `${skillName} Checklist: ${c}`,
+                mimeType: "text/markdown",
+            });
+        }
+    }
+
     return {
         resources: [
+            // v5: Skills estruturadas (prioridade)
+            ...skillResources,
+
+            // Legacy: especialistas, templates, guias
             ...especialistas.map((e) => ({
                 uri: `maestro://especialista/${encodeURIComponent(e)}`,
                 name: `Especialista: ${e}`,
@@ -82,6 +130,31 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const { uri } = request.params;
 
+    // v5: Skills como resources
+    if (uri.startsWith("maestro://skills/")) {
+        const path = uri.replace("maestro://skills/", "");
+        const parts = path.split("/");
+        const skillName = parts[0];
+        const contentResolver = new ContentResolverService(projectsDir);
+
+        if (parts.length === 2 && parts[1] === "SKILL.md") {
+            // maestro://skills/{skill}/SKILL.md
+            const content = await contentResolver.readSkillFile(skillName, "SKILL.md");
+            if (!content) throw new Error(`SKILL.md não encontrado: ${skillName}`);
+            return { contents: [{ uri, mimeType: "text/markdown", text: content }] };
+        }
+
+        if (parts.length === 3) {
+            // maestro://skills/{skill}/{tipo}/{arquivo}
+            const tipo = parts[1] as "templates" | "checklists" | "examples" | "reference";
+            const arquivo = parts[2];
+            const content = await contentResolver.readSkillResource(skillName, tipo, arquivo);
+            if (!content) throw new Error(`Resource não encontrado: ${uri}`);
+            return { contents: [{ uri, mimeType: "text/markdown", text: content }] };
+        }
+    }
+
+    // Legacy: especialistas
     if (uri.startsWith("maestro://especialista/")) {
         const nome = decodeURIComponent(uri.replace("maestro://especialista/", ""));
         const conteudo = await lerEspecialista(nome);
@@ -108,41 +181,203 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     }
 
     if (uri === "maestro://system-prompt") {
-        const conteudo = `# Maestro - Instruções para IA (Modo Stateless)
+        const conteudo = `# Maestro v5 — Instruções para IA
 
-Você está usando o Maestro, um guia de desenvolvimento assistido por IA.
+Você está usando o Maestro v5, um orquestrador de desenvolvimento assistido por IA.
 
-## Modo Stateless
+## Modo Híbrido (v5)
 
-Este MCP opera em modo stateless. A IA deve:
-1. Ler arquivos de estado do projeto (.maestro/estado.json)
-2. Passar o conteúdo como parâmetro nas chamadas de tools
-3. Salvar os arquivos retornados no campo \`files\` das respostas
+O Maestro v5 opera em modo híbrido:
+- **Estado carregado automaticamente** de .maestro/estado.json (não precisa passar como parâmetro)
+- **Skills injetadas ativamente** nas respostas das tools (não precisa ler manualmente)
+- **Persistência automática** — o MCP salva estado e arquivos diretamente
+- **Fallback stateless** — estado_json como parâmetro ainda aceito para compatibilidade
 
 ## Comportamentos Automáticos
 
 Quando o usuário disser "próximo", "avançar", "terminei" ou "pronto":
-1. Leia .maestro/estado.json do projeto
-2. Identifique o entregável desenvolvido
-3. Chame \`proximo\` passando entregavel, estado_json e diretorio
-4. Salve os arquivos retornados
+1. Chame \`avancar(diretorio: "<path>")\`
+2. O Maestro detecta contexto automaticamente
+3. O contexto do especialista já vem incluído na resposta
+4. Siga as instruções do especialista e template retornados
 
-## Tools Disponíveis (Stateless)
+## Tools Disponíveis (v5 Consolidadas)
 
-- \`iniciar_projeto(nome, diretorio)\` - Inicia novo projeto
-- \`carregar_projeto(estado_json, diretorio)\` - Carrega projeto existente
-- \`proximo(entregavel, estado_json, diretorio)\` - Salva e avança fase
-- \`status(estado_json, diretorio)\` - Retorna estado atual
-- \`validar_gate(estado_json, diretorio)\` - Valida checklist
-- \`classificar(estado_json, diretorio)\` - Reclassifica projeto
-- \`contexto(estado_json, diretorio)\` - Retorna contexto
-- \`salvar(conteudo, tipo, estado_json, diretorio)\` - Salva rascunhos/anexos
+| Tool | Descrição |
+|------|-----------|
+| \`maestro(diretorio)\` | Entry point inteligente — detecta contexto e guia |
+| \`avancar(diretorio, entregavel?)\` | Avança fase (onboarding ou desenvolvimento) |
+| \`status(diretorio)\` | Status completo do projeto |
+| \`validar(diretorio, tipo?)\` | Valida gate, entregável ou compliance |
+| \`contexto(diretorio)\` | Contexto acumulado (ADRs, padrões) |
+| \`salvar(diretorio, conteudo, tipo)\` | Salva rascunhos/anexos |
+| \`checkpoint(diretorio, acao)\` | Gerencia checkpoints e rollbacks |
+| \`analisar(diretorio, tipo?)\` | Análise de código (segurança, qualidade, etc.) |
+
+> **Nota:** Tools legadas (proximo, validar_gate, etc.) ainda funcionam para backward compatibility.
 `;
         return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
     }
 
     throw new Error(`Resource não encontrado: ${uri}`);
 });
+
+// ==================== PROMPTS (v5: System Prompt Automático) ====================
+
+server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    return {
+        prompts: [
+            {
+                name: "maestro-specialist",
+                description: "Persona + instruções do especialista da fase atual do projeto",
+                arguments: [
+                    {
+                        name: "diretorio",
+                        description: "Diretório do projeto",
+                        required: true,
+                    },
+                ],
+            },
+            {
+                name: "maestro-context",
+                description: "Contexto completo do projeto para a sessão de trabalho",
+                arguments: [
+                    {
+                        name: "diretorio",
+                        description: "Diretório do projeto",
+                        required: true,
+                    },
+                ],
+            },
+        ],
+    };
+});
+
+server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const { name, arguments: promptArgs } = request.params;
+    const diretorio = (promptArgs as any)?.diretorio || projectsDir;
+
+    if (name === "maestro-specialist") {
+        return await buildSpecialistPrompt(diretorio);
+    }
+
+    if (name === "maestro-context") {
+        return await buildContextPrompt(diretorio);
+    }
+
+    throw new Error(`Prompt não encontrado: ${name}`);
+});
+
+/**
+ * Constrói prompt dinâmico do especialista da fase atual.
+ */
+async function buildSpecialistPrompt(diretorio: string) {
+    const stateService = createStateService(diretorio);
+    const estado = await stateService.load();
+
+    if (!estado) {
+        return {
+            description: "Nenhum projeto encontrado",
+            messages: [{
+                role: "user" as const,
+                content: { type: "text" as const, text: "Nenhum projeto ativo neste diretório. Use `maestro(diretorio)` para começar." },
+            }],
+        };
+    }
+
+    const faseInfo = getFaseComStitch(estado.nivel as any, estado.fase_atual, estado.usar_stitch);
+    if (!faseInfo) {
+        return {
+            description: `Projeto: ${estado.nome}`,
+            messages: [{
+                role: "user" as const,
+                content: { type: "text" as const, text: `Projeto ${estado.nome} — fase ${estado.fase_atual} não encontrada no fluxo.` },
+            }],
+        };
+    }
+
+    const mode = (estado.config?.mode || "balanced") as "economy" | "balanced" | "quality";
+    const contentResolver = new ContentResolverService(diretorio);
+    const skillLoader = new SkillLoaderService(contentResolver);
+
+    try {
+        const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, mode);
+
+        if (contextPkg) {
+            return {
+                description: `Especialista: ${contextPkg.specialist?.name || faseInfo.nome} — Fase ${estado.fase_atual}/${estado.total_fases}`,
+                messages: [{
+                    role: "user" as const,
+                    content: {
+                        type: "text" as const,
+                        text: `# Especialista da Fase: ${faseInfo.nome}\n\n${skillLoader.formatAsMarkdown(contextPkg)}`,
+                    },
+                }],
+            };
+        }
+    } catch (error) {
+        console.warn("[Prompt] Falha ao carregar skill:", error);
+    }
+
+    // Fallback: persona básica
+    const specialist = getSpecialistPersona(faseInfo.nome);
+    return {
+        description: `Especialista: ${specialist?.name || faseInfo.nome}`,
+        messages: [{
+            role: "user" as const,
+            content: {
+                type: "text" as const,
+                text: specialist
+                    ? `# ${specialist.name}\n\n**Tom:** ${specialist.tone}\n**Expertise:** ${specialist.expertise.join(", ")}\n**Instruções:** ${specialist.instructions}`
+                    : `Fase ${estado.fase_atual}: ${faseInfo.nome}`,
+            },
+        }],
+    };
+}
+
+/**
+ * Constrói prompt de contexto completo do projeto.
+ */
+async function buildContextPrompt(diretorio: string) {
+    const stateService = createStateService(diretorio);
+    const estado = await stateService.load();
+
+    if (!estado) {
+        return {
+            description: "Nenhum projeto encontrado",
+            messages: [{
+                role: "user" as const,
+                content: { type: "text" as const, text: "Nenhum projeto ativo neste diretório." },
+            }],
+        };
+    }
+
+    const faseInfo = getFaseComStitch(estado.nivel as any, estado.fase_atual, estado.usar_stitch);
+
+    const contextText = `# Contexto do Projeto: ${estado.nome}
+
+## Estado
+| Campo | Valor |
+|-------|-------|
+| **Nível** | ${estado.nivel.toUpperCase()} |
+| **Fase Atual** | ${estado.fase_atual}/${estado.total_fases} — ${faseInfo?.nome || "N/A"} |
+| **Gates Validados** | ${estado.gates_validados?.join(", ") || "nenhum"} |
+
+## Entregáveis Salvos
+${Object.entries(estado.entregaveis || {}).map(([k, v]) => `- **${k}:** ${v}`).join("\n") || "Nenhum ainda."}
+
+## Próximo Passo
+Trabalhe com o especialista **${faseInfo?.especialista || "N/A"}** para gerar: **${faseInfo?.entregavel_esperado || "N/A"}**
+`;
+
+    return {
+        description: `Projeto: ${estado.nome} — Fase ${estado.fase_atual}/${estado.total_fases}`,
+        messages: [{
+            role: "user" as const,
+            content: { type: "text" as const, text: contextText },
+        }],
+    };
+}
 
 // ==================== TOOLS (via Router Centralizado) ====================
 
@@ -167,7 +402,7 @@ setProjectDirectory(projectsDir);
 async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error(`MCP Maestro (stdio) iniciado - Modo Stateless`);
+    console.error(`MCP Maestro v5 (stdio) iniciado — ${getToolCount()} tools públicas`);
     console.error(`Diretório de projetos: ${projectsDir}`);
 }
 

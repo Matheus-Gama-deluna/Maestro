@@ -16,6 +16,8 @@ import { parsearEstado } from "../state/storage.js";
 import { existsSync } from "fs";
 import { join } from "path";
 import { readFile } from "fs/promises";
+import { ContentResolverService } from "../services/content-resolver.service.js";
+import { SkillLoaderService } from "../services/skill-loader.service.js";
 
 interface MaestroArgs {
     diretorio: string;
@@ -82,6 +84,22 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
     const statusEmoji = inOnboarding ? "🚀" : "📍";
     const phaseLabel = inOnboarding ? "Onboarding" : `Fase ${estado.fase_atual}/${estado.total_fases}`;
 
+    // Injeção ativa v5: contexto resumido do especialista
+    let specialistContext = "";
+    if (!inOnboarding && faseInfo) {
+        try {
+            const contentResolver = new ContentResolverService(args.diretorio);
+            const skillLoader = new SkillLoaderService(contentResolver);
+            // Usar modo economy para manter resposta concisa no maestro
+            const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, "economy");
+            if (contextPkg) {
+                specialistContext = `\n---\n\n${skillLoader.formatAsMarkdown(contextPkg)}\n`;
+            }
+        } catch {
+            // Fallback silencioso — sem injeção ativa
+        }
+    }
+
     const resposta = `# ${statusEmoji} Maestro — ${estado.nome}
 
 ## Estado Atual
@@ -112,7 +130,7 @@ ${nextStep.auto_execute ? "> 🤖 Esta ação pode ser executada automaticamente
 ## 📊 Progresso do Fluxo
 
 ${generateProgressBar(estado)}
-`;
+${specialistContext}`;
 
     return {
         content: [{ type: "text", text: resposta }],

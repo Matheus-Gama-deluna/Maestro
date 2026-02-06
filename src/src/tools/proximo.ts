@@ -19,6 +19,8 @@ import { normalizeProjectPath, resolveProjectPath, joinProjectPath, getServerCon
 import { formatSkillMessage, detectIDE, getSkillResourcePath as getIDESkillResourcePath } from "../utils/ide-paths.js";
 import { inferirContextoBalanceado } from "../utils/inferencia-contextual.js";
 import { verificarSkillCarregada } from "../utils/content-injector.js";
+import { ContentResolverService } from "../services/content-resolver.service.js";
+import { SkillLoaderService } from "../services/skill-loader.service.js";
 
 interface ProximoArgs {
     entregavel: string;
@@ -687,32 +689,31 @@ confirmar_classificacao(
         // Aqui apenas registramos que passou.
     }
 
-    // Gerar informações da próxima skill
+    // Gerar informações da próxima skill — INJEÇÃO ATIVA v5
     const proximaSkillInfo = await (async () => {
         if (!proximaFase) return "";
         
         const proximaSkill = getSkillParaFase(proximaFase.nome);
         if (!proximaSkill) return "";
         
-        // Detectar IDE do estado ou do diretório
-        const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
+        // Detectar modo do projeto
+        const mode = (estado.config?.mode || "balanced") as "economy" | "balanced" | "quality";
         
-        let templatesInfo = "";
         try {
-            const { readdir } = await import("fs/promises");
-            const templatesPath = getSkillResourcePath(proximaSkill, diretorio, 'templates');
+            // Injeção ativa: carregar e incluir conteúdo real da skill na resposta
+            const contentResolver = new ContentResolverService(diretorio);
+            const skillLoader = new SkillLoaderService(contentResolver);
+            const contextPackage = await skillLoader.loadForPhase(proximaFase.nome, mode);
             
-            if (existsSync(templatesPath)) {
-                const templates = await readdir(templatesPath);
-                if (templates.length > 0) {
-                    const templatesRelPath = getIDESkillResourcePath(proximaSkill, 'templates', ide);
-                    templatesInfo = `\n\n📋 **Templates Disponíveis**:\n${templates.map((t: string) => `- \`${templatesRelPath}${t}\``).join("\n")}`;
-                }
+            if (contextPackage) {
+                return `\n\n---\n\n# 🧠 Contexto do Especialista — ${proximaFase.nome}\n\n${skillLoader.formatAsMarkdown(contextPackage)}\n`;
             }
         } catch (error) {
-            // Silenciosamente ignorar erro de leitura
+            console.warn("[proximo] Falha ao carregar skill ativa, usando fallback:", error);
         }
         
+        // Fallback: referência textual (compatibilidade v4)
+        const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
         return `
 
 ## 🤖 Próximo Especialista
@@ -723,7 +724,7 @@ ${formatSkillMessage(proximaSkill, ide)}
 > 1. Ative a skill: \`@${proximaSkill}\`
 > 2. Leia SKILL.md para entender a fase
 > 3. Consulte o template apropriado
-> 4. Siga o checklist de validação${templatesInfo}
+> 4. Siga o checklist de validação
 `;
     })();
 
