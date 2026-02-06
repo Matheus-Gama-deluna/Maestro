@@ -68,8 +68,19 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
         estado = await stateService.load();
     }
 
-    // Sem projeto: guiar para criação
+    // Sem projeto: guiar para criação ou executar ação se fornecida
     if (!estado) {
+        // Se acao for setup_inicial, executar diretamente
+        if (args.acao === "setup_inicial") {
+            const { setupInicial } = await import("./setup-inicial.js");
+            return setupInicial({
+                ide: args.respostas?.ide as any,
+                modo: args.respostas?.modo as any,
+                usar_stitch: args.respostas?.usar_stitch as boolean | undefined,
+                preferencias_stack: args.respostas?.preferencias_stack as any,
+                team_size: args.respostas?.team_size as any,
+            });
+        }
         return handleNoProject(args.diretorio);
     }
 
