@@ -208,15 +208,16 @@ return {
 - O `TOOLS_AS_RESOURCES` no `index.ts` reimpleta funcionalidade que deveria estar no router
 - O `getToolDocumentation()` é uma implementação ad-hoc que deveria ser resource padronizado
 
-**Checklist Marco 0:**
-- [ ] Criar `router.ts` com registry Zod
-- [ ] Migrar `stdio.ts` para usar router
-- [ ] Migrar `index.ts` para usar router
-- [ ] Extrair duplicações para services/
-- [ ] Corrigir persistência em handlers intermediários
-- [ ] Remover código morto
-- [ ] Unificar versões (package.json root + src)
-- [ ] Verificar todos os testes existentes passam
+**Checklist Marco 0:** (Atualizado 06/02/2026 — v3.0.0)
+- [x] Criar `router.ts` com registry — **M-003** (44 tools, `routeToolCall()`, `getRegisteredTools()`)
+- [x] Migrar `stdio.ts` para usar router — **M-004** (~420 linhas removidas)
+- [x] Migrar `index.ts` para usar router — **M-005** (parâmetros truncados corrigidos)
+- [x] Extrair duplicações para services/ — **M-002** (`onboarding.service.ts`)
+- [x] Corrigir persistência em handlers intermediários — **M-006** (todo handler retorna `estado_atualizado`)
+- [ ] Remover código morto — `server.ts`, `TOOLS_AS_RESOURCES` ainda existem
+- [x] Unificar versões (package.json root + src) — **M-011** (v3.0.0)
+- [x] Verificar todos os testes existentes passam — **222 passed, 4 skipped**
+- [ ] Migrar validação para Zod real (`.parse()`) no router — Usa schemas JSON, delegado às tools
 
 ---
 
@@ -414,13 +415,18 @@ server.setRequestHandler(GetPromptRequestSchema, async (req) => {
 });
 ```
 
-**Checklist Marco 1:**
-- [ ] Definir e implementar `MaestroResponse` completo
+**Checklist Marco 1:** (Atualizado 06/02/2026 — v3.0.0)
+- [x] Definir `MaestroResponse` com `NextAction`, `SpecialistPersona`, `FlowProgress` — **M-001**
+- [ ] Implementar `state_patch` (delta ao invés de estado completo)
 - [ ] Implementar Flow Engine com state machine
-- [ ] Consolidar tools (meta: 8 tools)
+- [ ] Consolidar tools (meta: 8 tools) — Atualmente 44 tools
 - [ ] Implementar tool `maestro` como entry point inteligente
 - [ ] Implementar persistência ativa (gravar no filesystem)
-- [ ] Adicionar `next_action` em todos os retornos
+- [x] Adicionar `next_action` em tools de onboarding (8 tools) — **M-008/M-009/M-010**
+- [ ] Adicionar `next_action` em tools restantes (~36 tools)
+- [x] Adicionar `specialist_persona` em `confirmar_projeto` — **M-008**
+- [ ] Expandir `specialist_persona` para todas as fases
+- [x] Adicionar `progress` em retornos de onboarding — **M-008/M-009/M-010**
 - [ ] Implementar prompts MCP para system prompt automático
 - [ ] Migrar workflows markdown para flow definitions
 
@@ -531,14 +537,14 @@ interface Inferencia {
 }
 ```
 
-**Checklist Marco 2:**
+**Checklist Marco 2:** (Atualizado 06/02/2026 — v3.0.0)
 - [ ] Implementar smart defaults baseados no config global
 - [ ] Implementar modo conversa livre (NLP para extract)
 - [ ] Criar 6 templates de projeto
 - [ ] Implementar resumos executivos entre blocos
 - [ ] Adicionar confidence score nas inferências
 - [ ] Reduzir fluxo de onboarding para máximo 3 interações
-- [ ] Implementar brainstorm antes de discovery (Caminho B)
+- [x] Implementar brainstorm antes de discovery (Caminho B) — **M-007** (guard removido, aviso visual)
 
 ---
 
@@ -615,12 +621,12 @@ class FlowError extends MaestroError { ... }
 
 Quando um erro tem `recovery`, a IA sabe exatamente como corrigi-lo.
 
-**Checklist Marco 3:**
+**Checklist Marco 3:** (Atualizado 06/02/2026 — v3.0.0)
 - [ ] Escrever testes para router (100% coverage)
 - [ ] Escrever testes para flow engine (100% coverage)
 - [ ] Escrever testes para services (80%+ coverage)
 - [ ] Configurar CI com GitHub Actions
-- [ ] Unificar versionamento
+- [x] Unificar versionamento — **M-011** (v3.0.0)
 - [ ] Gerar documentação de API automática
 - [ ] Implementar error handling estruturado
 - [ ] Atualizar README com nova arquitetura
@@ -814,21 +820,23 @@ A cada passo, o sistema funciona. Nenhum big-bang de migração.
 
 ### Indicadores Quantitativos
 
-| Métrica | Hoje | Marco 0 | Marco 1 | Marco 2 | Marco 3 |
-|---------|------|---------|---------|---------|---------|
-| **Tools expostas** | 30+ | 30 (mesmas) | 8 | 8 | 8 |
-| **Entry points divergentes** | 2 | 1 router | 1 | 1 | 1 |
-| **Prompts até PRD** | 10-15 | 10-15 | 5-7 | 2-3 | 2-3 |
-| **Test coverage** | ~5% | ~20% | ~50% | ~60% | ~80% |
-| **Modelos que funcionam bem** | 2-3 | 2-3 | 5+ | 8+ | 10+ |
-| **Tempo onboarding** | 30min+ | 30min | 15min | 5-10min | 5min |
+| Métrica | Pré-v3 | v3.0.0 (Atual) | Meta Marco 1 | Meta Marco 2 | Meta Marco 3 |
+|---------|--------|---------------|-------------|-------------|-------------|
+| **Tools expostas** | 30+ | 44 (unificadas) | 8 | 8 | 8 |
+| **Entry points divergentes** | 2 | **1 router** ✅ | 1 | 1 | 1 |
+| **Prompts até PRD** | 10-15 | 8-12 | 5-7 | 2-3 | 2-3 |
+| **Test coverage** | ~5% | ~5% (sem novos testes) | ~50% | ~60% | ~80% |
+| **Modelos que funcionam bem** | 2-3 | 3-4 | 5+ | 8+ | 10+ |
+| **Tempo onboarding** | 30min+ | ~25min | 15min | 5-10min | 5min |
+| **Tools com next_action** | 0 | **8** ✅ | 44 | 44 | 44 |
+| **Bugs estruturais abertos** | 5 | **1** ✅ | 0 | 0 | 0 |
 
 ### Indicadores Qualitativos
 
-- **Marco 0**: "O sistema não tem bugs conhecidos no fluxo principal"
-- **Marco 1**: "A IA sabe o que fazer sem ler instruções textuais"
-- **Marco 2**: "Um desenvolvedor sem documentação consegue usar o Maestro em 5 min"
-- **Marco 3**: "O Maestro tem qualidade profissional para ser usado em times"
+- **Marco 0**: "O sistema não tem bugs conhecidos no fluxo principal" — **✅ 85% atingido** (falta código morto e Zod)
+- **Marco 1**: "A IA sabe o que fazer sem ler instruções textuais" — ⏳ Parcial (8/44 tools com next_action)
+- **Marco 2**: "Um desenvolvedor sem documentação consegue usar o Maestro em 5 min" — ⏳ Não atingido
+- **Marco 3**: "O Maestro tem qualidade profissional para ser usado em times" — ⏳ Não atingido
 
 ---
 

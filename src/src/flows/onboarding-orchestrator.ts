@@ -15,64 +15,22 @@ import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { resolveProjectPath } from "../utils/files.js";
 import {
-  gerarBlocosDiscovery,
   calcularProgressoDiscovery,
   validarBlocoCompleto,
   extrairRespostasDiscovery,
   gerarResumoDiscovery,
 } from "../utils/discovery-adapter.js";
+import {
+  criarEstadoOnboardingInicial,
+  obterEstadoOnboarding,
+  salvarEstadoOnboarding,
+} from "../services/onboarding.service.js";
 
 interface OnboardingOrchestratorArgs {
   estado_json: string;
   diretorio: string;
   acao?: 'iniciar' | 'proximo_bloco' | 'status' | 'resumo';
   respostas_bloco?: Record<string, any>;
-}
-
-/**
- * Cria estado inicial de onboarding
- */
-function criarEstadoOnboarding(projectId: string, modo: 'economy' | 'balanced' | 'quality'): OnboardingState {
-  const blocosDiscovery = gerarBlocosDiscovery({
-    mode: modo,
-    skipCompletedBlocks: false,
-    prioritizeByMode: true,
-    allowBatchInput: true,
-  });
-
-  return {
-    projectId,
-    phase: 'discovery',
-    discoveryStatus: 'in_progress',
-    discoveryBlocks: blocosDiscovery,
-    discoveryResponses: {},
-    discoveryStartedAt: new Date().toISOString(),
-    brainstormStatus: 'pending',
-    brainstormSections: [],
-    prdStatus: 'pending',
-    prdScore: 0,
-    mode: modo,
-    totalInteractions: 0,
-    lastInteractionAt: new Date().toISOString(),
-  };
-}
-
-/**
- * Obtém estado de onboarding do estado do projeto
- */
-function obterEstadoOnboarding(estado: EstadoProjeto): OnboardingState | null {
-  return (estado as any).onboarding || null;
-}
-
-/**
- * Salva estado de onboarding no estado do projeto
- */
-function salvarEstadoOnboarding(estado: EstadoProjeto, onboarding: OnboardingState): EstadoProjeto {
-  return {
-    ...estado,
-    onboarding: onboarding as any,
-    atualizado_em: new Date().toISOString(),
-  };
 }
 
 /**
@@ -149,7 +107,7 @@ export async function onboardingOrchestrator(args: OnboardingOrchestratorArgs): 
   let onboarding = obterEstadoOnboarding(estado);
   if (!onboarding) {
     const modo = (estado.config?.mode || 'balanced') as 'economy' | 'balanced' | 'quality';
-    onboarding = criarEstadoOnboarding(estado.projeto_id, modo);
+    onboarding = criarEstadoOnboardingInicial(estado.projeto_id, modo);
   }
 
   // Processar ação
@@ -188,13 +146,36 @@ function handleIniciar(
         type: "text",
         text: "✅ **Discovery já concluído!**\n\nTodos os blocos foram preenchidos. Próximo passo: brainstorm.",
       }],
+      next_action: {
+        tool: "brainstorm",
+        description: "Iniciar brainstorm assistido após discovery completo",
+        args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "iniciar" },
+        requires_user_input: false,
+        auto_execute: true,
+      },
+      progress: {
+        current_phase: "discovery",
+        total_phases: 4,
+        completed_phases: 1,
+        percentage: 25,
+      },
     };
   }
 
   onboarding.totalInteractions++;
   onboarding.lastInteractionAt = new Date().toISOString();
 
+  // Persistir estado atualizado (interação contada)
+  const estadoAtualizado = salvarEstadoOnboarding(estado, onboarding);
+  const estadoFile = serializarEstado(estadoAtualizado);
+
   const blocoFormatado = formatarBlocoDiscovery(progresso.proximoBloco);
+
+  // Gerar template de args com os IDs dos campos do bloco
+  const camposTemplate: Record<string, string> = {};
+  progresso.proximoBloco.fields.forEach(f => {
+    camposTemplate[f.id] = f.placeholder || `<${f.label}>`;
+  });
 
   const resposta = `# 🚀 Kickstart Guiado - Discovery Interativo
 
@@ -208,34 +189,36 @@ ${blocoFormatado}
 
 ---
 
-## 📝 Como Responder
-
-Preencha os campos acima e envie as respostas usando:
-
-\`\`\`
-onboarding_orchestrator(
-    estado_json: "...",
-    diretorio: "...",
-    acao: "proximo_bloco",
-    respostas_bloco: {
-        "campo_id": "valor",
-        "outro_campo": ["valor1", "valor2"]
-    }
-)
-\`\`\`
-
 **💡 Dica:** Quanto mais detalhes você fornecer agora, menos perguntas serão feitas depois!
-
----
 
 **Tempo estimado para este bloco:** ${progresso.proximoBloco.estimatedTime} minutos
 `;
 
   return {
-    content: [{
-      type: "text",
-      text: resposta,
+    content: [{ type: "text", text: resposta }],
+    files: [{
+      path: `${diretorio}/${estadoFile.path}`,
+      content: estadoFile.content,
     }],
+    estado_atualizado: estadoFile.content,
+    next_action: {
+      tool: "onboarding_orchestrator",
+      description: `Coletar respostas do bloco "${progresso.proximoBloco.title}" e enviar`,
+      args_template: {
+        estado_json: "{{estado_json}}",
+        diretorio: diretorio,
+        acao: "proximo_bloco",
+        respostas_bloco: camposTemplate,
+      },
+      requires_user_input: true,
+      user_prompt: `Preencha as informações do bloco "${progresso.proximoBloco.title}"`,
+    },
+    progress: {
+      current_phase: "discovery",
+      total_phases: 4,
+      completed_phases: 0,
+      percentage: progresso.percentual,
+    },
   };
 }
 
@@ -303,6 +286,9 @@ function handleProximoBloco(
   // Calcular progresso
   const progresso = calcularProgressoDiscovery(onboarding.discoveryBlocks);
 
+  // SEMPRE persistir estado intermediário (FIX: antes só persistia no final)
+  const estadoAtualizado = salvarEstadoOnboarding(estado, onboarding);
+
   // Se todos os blocos obrigatórios foram completados, marcar discovery como completo
   const todosObrigatoriosCompletos = onboarding.discoveryBlocks
     .filter((b) => b.required)
@@ -312,9 +298,9 @@ function handleProximoBloco(
     onboarding.discoveryStatus = 'completed';
     onboarding.discoveryCompletedAt = new Date().toISOString();
 
-    // Salvar estado
-    const estadoAtualizado = salvarEstadoOnboarding(estado, onboarding);
-    const estadoFile = serializarEstado(estadoAtualizado);
+    // Salvar estado final do discovery
+    const estadoFinal = salvarEstadoOnboarding(estado, onboarding);
+    const estadoFile = serializarEstado(estadoFinal);
 
     const resumo = gerarResumoDiscovery(onboarding.discoveryResponses);
 
@@ -328,25 +314,7 @@ ${resumo}
 
 Todas as informações foram coletadas com sucesso! Agora vamos para o **Brainstorm Assistido**.
 
-**Ações recomendadas:**
-1. Revisar o resumo acima
-2. Iniciar brainstorm estruturado
-3. Consolidar insights em PRD draft
-4. Validar completude
-
 **Tempo estimado:** 10-15 minutos
-
----
-
-## ⚡ AÇÃO OBRIGATÓRIA - Atualizar Estado
-
-**Caminho:** \`${estadoFile.path}\`
-
-\`\`\`json
-${estadoFile.content}
-\`\`\`
-
-Use: \`onboarding_orchestrator(estado_json: "...", diretorio: "${diretorio}", acao: "status")\` para ver o progresso.
 `;
 
     return {
@@ -356,12 +324,52 @@ Use: \`onboarding_orchestrator(estado_json: "...", diretorio: "${diretorio}", ac
         content: estadoFile.content,
       }],
       estado_atualizado: estadoFile.content,
+      next_action: {
+        tool: "brainstorm",
+        description: "Iniciar brainstorm assistido com dados do discovery",
+        args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "iniciar" },
+        requires_user_input: false,
+        auto_execute: true,
+      },
+      progress: {
+        current_phase: "discovery",
+        total_phases: 4,
+        completed_phases: 1,
+        percentage: 25,
+      },
     };
   }
 
-  // Continuar para próximo bloco
+  // Continuar para próximo bloco - AGORA COM PERSISTÊNCIA
+  const estadoFile = serializarEstado(estadoAtualizado);
+
   if (progresso.proximoBloco) {
     const blocoFormatado = formatarBlocoDiscovery(progresso.proximoBloco);
+
+    // Gerar template de args com os IDs dos campos do próximo bloco
+    const camposTemplate: Record<string, string> = {};
+    progresso.proximoBloco.fields.forEach(f => {
+      camposTemplate[f.id] = f.placeholder || `<${f.label}>`;
+    });
+
+    // S4.2: Resumo executivo do que já foi coletado
+    const respostasColetadas = Object.entries(onboarding.discoveryResponses || {});
+    let resumoExecutivo = "";
+    if (respostasColetadas.length > 0) {
+      const itens = respostasColetadas.slice(-6).map(([key, val]) => {
+        const valor = typeof val === 'string' ? val.slice(0, 80) : JSON.stringify(val).slice(0, 80);
+        return `- **${key}:** ${valor}${(typeof val === 'string' && val.length > 80) ? '...' : ''}`;
+      });
+      resumoExecutivo = `## 📋 Resumo até agora
+
+${itens.join("\n")}
+
+> ✅ Está correto? Se precisar corrigir algo, informe antes de continuar.
+
+---
+
+`;
+    }
 
     const resposta = `# ✅ Bloco Concluído!
 
@@ -375,7 +383,7 @@ ${progresso.completados}/${progresso.total} blocos concluídos (${progresso.perc
 
 ---
 
-## 🔄 Próximo Bloco
+${resumoExecutivo}## 🔄 Próximo Bloco
 
 ${blocoFormatado}
 
@@ -385,10 +393,30 @@ ${blocoFormatado}
 `;
 
     return {
-      content: [{
-        type: "text",
-        text: resposta,
+      content: [{ type: "text", text: resposta }],
+      files: [{
+        path: `${diretorio}/${estadoFile.path}`,
+        content: estadoFile.content,
       }],
+      estado_atualizado: estadoFile.content,
+      next_action: {
+        tool: "onboarding_orchestrator",
+        description: `Coletar respostas do bloco "${progresso.proximoBloco.title}" e enviar`,
+        args_template: {
+          estado_json: "{{estado_json}}",
+          diretorio: diretorio,
+          acao: "proximo_bloco",
+          respostas_bloco: camposTemplate,
+        },
+        requires_user_input: true,
+        user_prompt: `Preencha as informações do bloco "${progresso.proximoBloco.title}"`,
+      },
+      progress: {
+        current_phase: "discovery",
+        total_phases: 4,
+        completed_phases: 0,
+        percentage: progresso.percentual,
+      },
     };
   }
 
@@ -397,6 +425,18 @@ ${blocoFormatado}
       type: "text",
       text: "✅ **Discovery concluído!** Todos os blocos foram preenchidos.",
     }],
+    files: [{
+      path: `${diretorio}/${estadoFile.path}`,
+      content: estadoFile.content,
+    }],
+    estado_atualizado: estadoFile.content,
+    next_action: {
+      tool: "brainstorm",
+      description: "Iniciar brainstorm assistido",
+      args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "iniciar" },
+      requires_user_input: false,
+      auto_execute: true,
+    },
   };
 }
 

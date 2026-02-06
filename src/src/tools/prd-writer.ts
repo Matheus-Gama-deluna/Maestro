@@ -304,6 +304,19 @@ ${prdConteudo}
       },
     ],
     estado_atualizado: estadoFile.content,
+    next_action: {
+      tool: "prd_writer",
+      description: "Validar completude do PRD gerado",
+      args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "validar" },
+      requires_user_input: false,
+      auto_execute: true,
+    },
+    progress: {
+      current_phase: "prd_draft",
+      total_phases: 4,
+      completed_phases: 2,
+      percentage: 60,
+    },
   };
 }
 

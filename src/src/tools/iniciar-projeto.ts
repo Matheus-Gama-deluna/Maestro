@@ -15,7 +15,12 @@ import { resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { ensureContentInstalled, injectContentForIDE } from "../utils/content-injector.js";
 import { formatSkillMessage } from "../utils/ide-paths.js";
 import { loadUserConfig } from "../utils/config.js";
-import { gerarBlocosDiscovery, calcularProgressoDiscovery } from "../utils/discovery-adapter.js";
+import { calcularProgressoDiscovery } from "../utils/discovery-adapter.js";
+import { criarEstadoOnboardingInicial } from "../services/onboarding.service.js";
+import type { NextAction, FlowProgress } from "../types/response.js";
+import { listTemplatesFormatted, getTemplate } from "../data/project-templates.js";
+import { getSmartDefaults, formatSmartDefaultsSummary } from "../utils/smart-defaults.js";
+import { getSpecialistPersona } from "../services/specialist.service.js";
 
 interface IniciarProjetoArgs {
     nome: string;
@@ -32,6 +37,8 @@ interface IniciarProjetoArgs {
     // Campos opcionais para one-shot
     tipo_artefato?: TipoArtefato;
     nivel_complexidade?: NivelComplexidade;
+    // v4.0: Template de projeto para onboarding rápido
+    template?: string;
 }
 
 interface ConfirmarProjetoArgs extends IniciarProjetoArgs {
@@ -40,34 +47,6 @@ interface ConfirmarProjetoArgs extends IniciarProjetoArgs {
     ide: 'windsurf' | 'cursor' | 'antigravity';
     modo: 'economy' | 'balanced' | 'quality';
     // Herda os novos parâmetros de IniciarProjetoArgs
-}
-
-/**
- * Cria estado inicial de onboarding
- */
-function criarEstadoOnboardingInicial(projectId: string, modo: 'economy' | 'balanced' | 'quality'): OnboardingState {
-    const blocosDiscovery = gerarBlocosDiscovery({
-        mode: modo,
-        skipCompletedBlocks: false,
-        prioritizeByMode: true,
-        allowBatchInput: true,
-    });
-
-    return {
-        projectId,
-        phase: 'discovery',
-        discoveryStatus: 'in_progress',
-        discoveryBlocks: blocosDiscovery,
-        discoveryResponses: {},
-        discoveryStartedAt: new Date().toISOString(),
-        brainstormStatus: 'pending',
-        brainstormSections: [],
-        prdStatus: 'pending',
-        prdScore: 0,
-        mode: modo,
-        totalInteractions: 0,
-        lastInteractionAt: new Date().toISOString(),
-    };
 }
 
 /**
@@ -237,6 +216,32 @@ iniciar_projeto({
     const inferenciaNivel = inferirComplexidade(inferenciaTipo.tipo, args.descricao);
     const modoSugerido = modoEfetivo || mapearModoParaNivel(inferenciaTipo.tipo);
 
+    // S4.1: Carregar smart defaults do config global
+    const smartDefaults = await getSmartDefaults();
+
+    // S4.4: Calcular confidence score
+    let confidenceScore = 0;
+    confidenceScore += args.descricao ? 20 : 0;
+    confidenceScore += args.tipo_artefato ? 15 : (inferenciaTipo.tipo !== "product" ? 10 : 5);
+    confidenceScore += args.nivel_complexidade ? 15 : (inferenciaNivel.nivel !== "medio" ? 10 : 5);
+    confidenceScore += smartDefaults.confianca > 30 ? 15 : 0;
+    confidenceScore += args.template ? 20 : 0;
+    confidenceScore = Math.min(confidenceScore, 95);
+
+    // S2.2: Se template fornecido, aplicar pré-configuração
+    if (args.template) {
+        const tmpl = getTemplate(args.template);
+        if (tmpl) {
+            return await confirmarProjeto({
+                ...args,
+                ide: ideEfetiva,
+                modo: modoSugerido,
+                tipo_artefato: args.tipo_artefato || tmpl.tipo_artefato,
+                nivel_complexidade: args.nivel_complexidade || tmpl.nivel_complexidade,
+            } as ConfirmarProjetoArgs);
+        }
+    }
+
     // 🚀 ONE-SHOT: Se confirmar_automaticamente=true, criar projeto imediatamente
     if (args.confirmar_automaticamente === true) {
         return await confirmarProjeto({
@@ -248,36 +253,77 @@ iniciar_projeto({
         } as ConfirmarProjetoArgs);
     }
 
+    // S4.1: Formatar smart defaults
+    const defaultsSummary = smartDefaults.confianca > 0
+        ? `\n### 🧠 Smart Defaults (confiança: ${smartDefaults.confianca}%)\n\n${formatSmartDefaultsSummary(smartDefaults)}\n`
+        : "";
+
+    // S4.3: Seção de templates disponíveis
+    const templatesSection = `
+### 📦 Templates Disponíveis (atalho rápido)
+
+${listTemplatesFormatted()}
+
+> Use \`template: "id-do-template"\` para pré-configurar o projeto automaticamente.
+`;
+
     const resposta = `# 🎯 Configuração do Projeto: ${args.nome}
 
-Fluxo PRD-first habilitado. Vamos coletar PRD na próxima interação (evita retrabalho de classificação).
+## 📊 Confidence Score: ${confidenceScore}%
 
-👉 Envie **um único prompt** para confirmar e já começar em modo discovery + PRD:
+${"█".repeat(Math.floor(confidenceScore / 10))}${"░".repeat(10 - Math.floor(confidenceScore / 10))} ${confidenceScore >= 70 ? "✅ Alta confiança" : confidenceScore >= 40 ? "⚠️ Confiança moderada" : "🔍 Precisa mais informações"}
+
+### Sugestões automáticas
+| Campo | Valor | Confiança |
+|-------|-------|-----------|
+| **Tipo** | \`${inferenciaTipo.tipo}\` | ${args.tipo_artefato ? "✅ Definido" : inferenciaTipo.razao} |
+| **Complexidade** | \`${inferenciaNivel.nivel}\` | ${args.nivel_complexidade ? "✅ Definido" : inferenciaNivel.razao} |
+| **Modo** | \`${modoSugerido}\` ${getModoDescription(modoSugerido)} | ${args.modo ? "✅ Definido" : "Inferido"} |
+${defaultsSummary}
+
+---
+
+${templatesSection}
+
+---
+
+## 🚀 Confirmar e Iniciar
+
 \`\`\`
 confirmar_projeto({
   nome: "${args.nome}",
   descricao: "${args.descricao || ''}",
   diretorio: "${args.diretorio}",
   ide: "${ideEfetiva}",
-  modo: "${modoSugerido}", // economy | balanced | quality
+  modo: "${modoSugerido}",
   auto_flow: ${args.auto_flow ?? false},
   usar_stitch: ${args.usar_stitch ?? false},
   project_definition_source: "${args.project_definition_source || 'ja_definido'}"
 })
 \`\`\`
 
-### Sugestões automáticas
-- Tipo sugerido: \`${inferenciaTipo.tipo}\` (${inferenciaTipo.razao})
-- Complexidade sugerida: \`${inferenciaNivel.nivel}\` (${inferenciaNivel.razao})
-- Modo sugerido: \`${modoSugerido}\`
-
-Se quiser forçar tipo/complexidade, adicione no mesmo comando: \`tipo_artefato\` e \`nivel_complexidade\`.
-
-💡 **Atalho rápido**: Use \`confirmar_automaticamente: true\` no \`iniciar_projeto\` para pular esta etapa!
+💡 **Atalho**: Use \`confirmar_automaticamente: true\` para pular esta etapa!
 `; 
+
+    const next_action: NextAction = {
+        tool: "confirmar_projeto",
+        description: "Confirmar criação do projeto com as configurações sugeridas",
+        args_template: {
+            nome: args.nome,
+            descricao: args.descricao || "",
+            diretorio: args.diretorio,
+            ide: ideEfetiva,
+            modo: modoSugerido,
+            tipo_artefato: inferenciaTipo.tipo,
+            nivel_complexidade: inferenciaNivel.nivel,
+        },
+        requires_user_input: true,
+        user_prompt: `Confirme as configurações acima ou ajuste tipo/complexidade antes de criar o projeto.`,
+    };
 
     return {
         content: [{ type: "text", text: resposta }],
+        next_action,
     };
 }
 
@@ -491,6 +537,14 @@ onboarding_orchestrator({
 ${args.usar_stitch ? '\n> 🎨 **Google Stitch habilitado** - Disponível para prototipagem após UX Design\n' : ''}
 `;
 
+    // Gerar template de args com os IDs dos campos do primeiro bloco
+    const camposTemplate: Record<string, string> = {};
+    if (primeiroBloco) {
+        primeiroBloco.fields.forEach((f: any) => {
+            camposTemplate[f.id] = f.placeholder || `<${f.label}>`;
+        });
+    }
+
     return {
         content: [{ type: "text", text: resposta }],
         files: [
@@ -498,6 +552,32 @@ ${args.usar_stitch ? '\n> 🎨 **Google Stitch habilitado** - Disponível para p
             ...resumoFiles.map(f => ({ path: `${diretorio}/${f.path}`, content: f.content }))
         ],
         estado_atualizado: estadoFile.content,
+        next_action: {
+            tool: "onboarding_orchestrator",
+            description: "Coletar respostas do primeiro bloco do discovery e enviar",
+            args_template: {
+                estado_json: "{{estado_json}}",
+                diretorio: diretorio,
+                acao: "proximo_bloco",
+                respostas_bloco: camposTemplate,
+            },
+            requires_user_input: true,
+            user_prompt: primeiroBloco
+                ? `Preencha as informações do bloco "${primeiroBloco.title}"`
+                : "Responda às perguntas do discovery",
+        },
+        specialist_persona: {
+            name: "Gestão de Produto",
+            tone: "Consultivo e estratégico",
+            expertise: ["Product Management", "PRD", "Discovery", "User Research"],
+            instructions: "Guie o usuário através do discovery de forma conversacional. Faça perguntas de follow-up quando as respostas forem vagas.",
+        },
+        progress: {
+            current_phase: "setup",
+            total_phases: 4,
+            completed_phases: 0,
+            percentage: 0,
+        },
     };
 }
 

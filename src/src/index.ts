@@ -2,17 +2,12 @@
 import express, { Response } from "express";
 import cors from "cors";
 import { randomUUID } from "crypto";
-import { createMcpServer } from "./server.js";
-
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
-
-// Criar servidor MCP
-const mcpServer = createMcpServer();
 
 // Interface para sessões SSE
 interface SseSession {
@@ -41,7 +36,7 @@ app.get("/health", (req, res) => {
     res.json({
         status: "ok",
         server: "mcp-maestro",
-        version: "1.0.0",
+        version: "3.0.0",
         sessions: sessions.size,
     });
 });
@@ -52,7 +47,7 @@ app.get("/health", (req, res) => {
 app.get("/", (req, res) => {
     res.json({
         name: "MCP Maestro",
-        version: "1.0.0",
+        version: "3.0.0",
         description: "Model Context Protocol server for Maestro development guide",
         endpoints: {
             health: "GET /health",
@@ -113,7 +108,7 @@ app.get("/mcp", (req, res) => {
         // Não é SSE, retornar info do endpoint
         res.json({
             name: "MCP Maestro",
-            version: "1.0.0",
+            version: "3.0.0",
             transport: "streamable-http",
             endpoints: {
                 sse: "GET /mcp (Accept: text/event-stream)",
@@ -300,7 +295,7 @@ async function handleMcpRequest(request: {
             case "initialize": {
                 result = {
                     protocolVersion: "2024-11-05",
-                    serverInfo: { name: "mcp-maestro", version: "1.0.0" },
+                    serverInfo: { name: "mcp-maestro", version: "4.0.0" },
                     capabilities: { resources: {}, tools: {}, prompts: {} },
                 };
                 break;
@@ -342,126 +337,32 @@ import {
     lerPrompt,
 } from "./utils/files.js";
 
-import { iniciarProjeto, confirmarProjeto } from "./tools/iniciar-projeto.js";
-import { carregarProjeto } from "./tools/carregar-projeto.js";
-import { proximo } from "./tools/proximo.js";
-import { status } from "./tools/status.js";
-import { validarGate } from "./tools/validar-gate.js";
-import { classificar } from "./tools/classificar.js";
-import { contexto } from "./tools/contexto.js";
-import { salvar } from "./tools/salvar.js";
-import { implementarHistoria } from "./tools/implementar-historia.js";
-import { novaFeature, corrigirBug, refatorar } from "./tools/fluxos-alternativos.js";
-import { aprovarGate } from "./tools/aprovar-gate.js";
-import { confirmarClassificacao } from "./tools/confirmar-classificacao.js";
-import { discovery } from "./tools/discovery.js";
+import { routeToolCall, getRegisteredTools, getToolCount } from "./router.js";
 
-// Definição das tools para exibição como resources no seletor @mcp:maestro:
-const TOOLS_AS_RESOURCES = [
-    { name: "iniciar_projeto", emoji: "🚀", desc: "Inicia novo projeto (Analisa e Sugere)", params: "nome, diretorio, [descricao]" },
-    { name: "confirmar_projeto", emoji: "✅", desc: "Confirma criação com tipo definido", params: "nome, diretorio, tipo_artefato, nivel_complexidade" },
-    { name: "carregar_projeto", emoji: "📂", desc: "Carrega projeto existente", params: "estado_json, diretorio" },
-    { name: "proximo", emoji: "➡️", desc: "Salva entregável e avança fase", params: "entregavel, estado_json, diretorio" },
-    { name: "status", emoji: "📊", desc: "Retorna status do projeto", params: "estado_json, diretorio" },
-    { name: "validar_gate", emoji: "✅", desc: "Valida checklist de saída", params: "estado_json, diretorio, [fase], [entregavel]" },
-    { name: "classificar", emoji: "📏", desc: "Reclassifica complexidade", params: "estado_json, diretorio, [prd], [nivel]" },
-    { name: "contexto", emoji: "📋", desc: "Retorna contexto acumulado", params: "estado_json, diretorio" },
-    { name: "salvar", emoji: "💾", desc: "Salva rascunhos/anexos", params: "conteudo, tipo, estado_json, diretorio" },
-    { name: "implementar_historia", emoji: "📝", desc: "Orquestra implementação de história", params: "[historia_id], [modo]" },
-    { name: "nova_feature", emoji: "✨", desc: "Inicia fluxo de nova feature", params: "descricao, [impacto_estimado]" },
-    { name: "corrigir_bug", emoji: "🐛", desc: "Inicia fluxo de correção de bug", params: "descricao, [severidade], [ticket_id]" },
-    { name: "refatorar", emoji: "♻️", desc: "Inicia fluxo de refatoração", params: "area, motivo" },
-    { name: "aprovar_gate", emoji: "🔐", desc: "USUÁRIO: Aprova/rejeita gate pendente", params: "acao, estado_json, diretorio" },
-    { name: "confirmar_classificacao", emoji: "🧐", desc: "Confirma reclassificação pós-PRD", params: "estado_json, diretorio, [nivel]" },
-];
-
-// Gera instrução de execução para uma tool
+// Gera documentação de uma tool a partir do registry do router
 function getToolDocumentation(toolName: string): string {
-    const tool = TOOLS_AS_RESOURCES.find(t => t.name === toolName);
+    const tools = getRegisteredTools();
+    const tool = tools.find(t => t.name === toolName);
     if (!tool) return `Tool não encontrada: ${toolName}`;
 
-    // Instruções específicas por tool
-    const instrucoes: Record<string, string> = {
-        iniciar_projeto: `Pergunte ao usuário:
-1. Nome do projeto
-2. Descrição breve (opcional)
-3. Diretório (padrão: diretório atual)
+    return `## 🎯 ${tool.name}
 
-Depois execute \`mcp_maestro_iniciar_projeto\` com esses dados.
-A tool retornará uma sugestão de classificação. Peça confirmação ao usuário.`,
-
-        confirmar_projeto: `Use APÓS \`iniciar_projeto\` ter retornado uma sugestão.
-Execute \`mcp_maestro_confirmar_projeto\` com os dados confirmados pelo usuário (tipo e nível).
-Isso criará efetivamente os arquivos do projeto.`,
-
-        carregar_projeto: `Procure o arquivo \`.maestro/estado.json\` no diretório atual.
-Se encontrar, leia o conteúdo e execute \`mcp_maestro_carregar_projeto\`.
-Se não encontrar, avise o usuário que não há projeto Maestro neste diretório.`,
-
-        status: `Procure o arquivo \`.maestro/estado.json\` no diretório atual.
-Se encontrar, leia o conteúdo e execute \`mcp_maestro_status\`.
-Mostre: fase atual, especialista, progresso e próximos passos.`,
-
-        proximo: `1. Leia o arquivo \`.maestro/estado.json\`
-2. Compile o entregável da fase atual baseado na conversa
-3. Execute \`mcp_maestro_proximo\` com o entregável
-4. Salve o novo estado no arquivo`,
-
-        validar_gate: `1. Leia o arquivo \`.maestro/estado.json\`
-2. Execute \`mcp_maestro_validar_gate\`
-3. Mostre o resultado do checklist`,
-
-        classificar: `1. Leia o arquivo \`.maestro/estado.json\`
-2. Execute \`mcp_maestro_classificar\` com o nível desejado
-3. Atualize o arquivo de estado`,
-
-        contexto: `1. Leia o arquivo \`.maestro/estado.json\`
-2. Execute \`mcp_maestro_contexto\`
-3. Mostre o contexto acumulado do projeto`,
-
-        salvar: `Use quando o usuário quiser salvar um rascunho ou anexo.
-Execute \`mcp_maestro_salvar\` com o conteúdo e tipo.`,
-
-        implementar_historia: `Use para implementar uma história do backlog.
-Execute \`mcp_maestro_implementar_historia\` com o ID da história.`,
-
-        nova_feature: `Pergunte a descrição da feature e impacto estimado.
-Execute \`mcp_maestro_nova_feature\`.`,
-
-        corrigir_bug: `Pergunte a descrição do bug e severidade.
-Execute \`mcp_maestro_corrigir_bug\`.`,
-
-        refatorar: `Pergunte a área e motivo da refatoração.
-Execute \`mcp_maestro_refatorar\`.`,
-
-        confirmar_classificacao: `Use quando o projeto estiver aguardando confirmação de classificação.
-Execute \`mcp_maestro_confirmar_classificacao\`.
-Mostre o resultado.`,
-    };
-
-    return `## 🎯 EXECUTE AGORA: ${tool.emoji} ${tool.name}
-
-${tool.desc}
-
-### Parâmetros
-\`${tool.params}\`
-
-### Instruções
-${instrucoes[toolName] || `Execute \`mcp_maestro_${toolName}\` com os parâmetros necessários.`}
+${tool.description}
 
 ---
-**AÇÃO REQUERIDA**: Execute a tool acima imediatamente. Se precisar de informações do usuário, pergunte primeiro.
+**AÇÃO REQUERIDA**: Execute a tool acima com os parâmetros necessários.
 `;
 }
 
 async function getResourcesList() {
-    // Expõe apenas as tools no seletor @mcp:maestro:
+    // Expõe as tools registradas no router como resources no seletor @mcp:maestro:
     // Especialistas, templates e guias continuam acessíveis via URI direta
+    const tools = getRegisteredTools();
     return {
-        resources: TOOLS_AS_RESOURCES.map((t) => ({
+        resources: tools.map((t) => ({
             uri: `maestro://tool/${t.name}`,
-            name: `${t.emoji} ${t.name}`,
-            description: t.desc,
+            name: t.name,
+            description: t.description,
             mimeType: "text/markdown",
         })),
     };
@@ -594,73 +495,11 @@ Quando bloqueado:
 }
 
 async function getToolsList() {
-    return {
-        tools: [
-            // Core (Stateless) - requer estado_json e diretorio
-            { name: "iniciar_projeto", description: "Analisa novo projeto e sugere classificação (stateless). NÃO CRIA ARQUIVOS.", inputSchema: { type: "object", properties: { nome: { type: "string" }, descricao: { type: "string" }, diretorio: { type: "string" }, ide: { type: "string", enum: ["windsurf", "cursor", "antigravity"] } }, required: ["nome", "diretorio"] } },
-            { name: "confirmar_projeto", description: "Cria efetivamente o projeto com classificação confirmada.", inputSchema: { type: "object", properties: { nome: { type: "string" }, descricao: { type: "string" }, diretorio: { type: "string" }, tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] }, nivel_complexidade: { type: "string", enum: ["simples", "medio", "complexo"] }, ide: { type: "string", enum: ["windsurf", "cursor", "antigravity"] } }, required: ["nome", "diretorio", "tipo_artefato", "nivel_complexidade", "ide"] } },
-            { name: "carregar_projeto", description: "Carrega projeto existente (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
-            { name: "proximo", description: "Salva entregável e avança fase (stateless). Use auto_flow:true para fluxo contínuo sem bloqueios.", inputSchema: { type: "object", properties: { entregavel: { type: "string" }, estado_json: { type: "string" }, diretorio: { type: "string" }, auto_flow: { type: "boolean", description: "Modo fluxo automático: auto-confirma classificação e avança sem bloqueios" } }, required: ["entregavel", "estado_json", "diretorio"] } },
-            { name: "status", description: "Retorna status do projeto (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
-            { name: "validar_gate", description: "Valida checklist de saída (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { fase: { type: "number" }, entregavel: { type: "string" }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
-            { name: "aprovar_gate", description: "🔐 EXCLUSIVO DO USUÁRIO. Aprova ou rejeita avanço com pendências. IA NÃO deve chamar automaticamente.", inputSchema: { type: "object", properties: { acao: { type: "string", enum: ["aprovar", "rejeitar"] }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["acao", "estado_json", "diretorio"] } },
-            // V1.0 (Stateless)
-            { name: "classificar", description: "Reclassifica complexidade (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { prd: { type: "string" }, nivel: { type: "string", enum: ["simples", "medio", "complexo"] }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
-            { name: "contexto", description: "Retorna contexto do projeto (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["estado_json", "diretorio"] } },
-            { name: "salvar", description: "Salva conteúdo (stateless). Requer estado_json.", inputSchema: { type: "object", properties: { conteudo: { type: "string" }, tipo: { type: "string", enum: ["rascunho", "anexo", "entregavel"] }, estado_json: { type: "string" }, diretorio: { type: "string" } }, required: ["conteudo", "tipo", "estado_json", "diretorio"] } },
-            { name: "implementar_historia", description: "Orquestra implementação de história", inputSchema: { type: "object", properties: { historia_id: { type: "string" }, modo: { type: "string", enum: ["analisar", "iniciar", "proximo_bloco"] } } } },
-            // Fluxos Alternativos
-            { name: "nova_feature", description: "Inicia fluxo de nova feature", inputSchema: { type: "object", properties: { descricao: { type: "string" }, impacto_estimado: { type: "string", enum: ["baixo", "medio", "alto"] } }, required: ["descricao"] } },
-            { name: "corrigir_bug", description: "Inicia fluxo de correção de bug", inputSchema: { type: "object", properties: { descricao: { type: "string" }, severidade: { type: "string", enum: ["critica", "alta", "media", "baixa"] }, ticket_id: { type: "string" } }, required: ["descricao"] } },
-            { name: "refatorar", description: "Inicia fluxo de refatoração", inputSchema: { type: "object", properties: { area: { type: "string" }, motivo: { type: "string" } }, required: ["area", "motivo"] } },
-            { name: "confirmar_classificacao", description: "Confirma e efetiva a reclassificação após PRD", inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" }, nivel: { type: "string", enum: ["simples", "medio", "complexo"] }, tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] } }, required: ["estado_json", "diretorio"] } },
-            { name: "discovery", description: "Coleta informações iniciais agrupadas para reduzir perguntas durante o projeto. Gera questionário adaptado ao modo selecionado.", inputSchema: { type: "object", properties: { estado_json: { type: "string", description: "Conteúdo do arquivo .maestro/estado.json" }, diretorio: { type: "string", description: "Diretório absoluto do projeto" }, respostas: { type: "object", description: "Respostas do questionário (opcional - se omitido, retorna o questionário)" } }, required: ["estado_json", "diretorio"] } },
-        ],
-    };
+    return { tools: getRegisteredTools() };
 }
 
 async function callTool(name: string, args?: Record<string, unknown>) {
-    const a = args || {};
-    try {
-        switch (name) {
-            case "iniciar_projeto":
-                return await iniciarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string, ide: a.ide as "windsurf" | "cursor" | "antigravity" | undefined, modo: a.modo as "economy" | "balanced" | "quality" | undefined });
-            case "confirmar_projeto":
-                return await confirmarProjeto({ nome: a.nome as string, descricao: a.descricao as string | undefined, diretorio: a.diretorio as string, tipo_artefato: a.tipo_artefato as any, nivel_complexidade: a.nivel_complexidade as any, ide: a.ide as any, modo: a.modo as any });
-            case "carregar_projeto":
-                return await carregarProjeto({ estado_json: a.estado_json as string, diretorio: a.diretorio as string });
-            case "proximo":
-                return await proximo({ entregavel: a.entregavel as string, estado_json: a.estado_json as string, nome_arquivo: a.nome_arquivo as string | undefined, diretorio: a.diretorio as string, auto_flow: a.auto_flow as boolean | undefined });
-            case "status":
-                return await status({ estado_json: a.estado_json as string, diretorio: a.diretorio as string });
-            case "validar_gate":
-                return await validarGate({ fase: a.fase as number | undefined, entregavel: a.entregavel as string | undefined, estado_json: a.estado_json as string, diretorio: a.diretorio as string });
-            case "classificar":
-                return await classificar({ prd: a.prd as string | undefined, nivel: a.nivel as "simples" | "medio" | "complexo" | undefined, estado_json: a.estado_json as string, diretorio: a.diretorio as string });
-            case "contexto":
-                return await contexto({ estado_json: a.estado_json as string, diretorio: a.diretorio as string });
-            case "salvar":
-                return await salvar({ conteudo: a.conteudo as string, tipo: a.tipo as "rascunho" | "anexo" | "entregavel", estado_json: a.estado_json as string, nome_arquivo: a.nome_arquivo as string | undefined, diretorio: a.diretorio as string });
-            case "implementar_historia":
-                return await implementarHistoria({ historia_id: a.historia_id as string | undefined, modo: a.modo as "analisar" | "iniciar" | "proximo_bloco" | undefined });
-            case "nova_feature":
-                return await novaFeature({ descricao: a.descricao as string, impacto_estimado: a.impacto_estimado as "baixo" | "medio" | "alto" | undefined });
-            case "corrigir_bug":
-                return await corrigirBug({ descricao: a.descricao as string, severidade: a.severidade as "critica" | "alta" | "media" | "baixa" | undefined, ticket_id: a.ticket_id as string | undefined });
-            case "refatorar":
-                return await refatorar({ area: a.area as string, motivo: a.motivo as string });
-            case "aprovar_gate":
-                return await aprovarGate({ acao: a.acao as "aprovar" | "rejeitar", estado_json: a.estado_json as string, diretorio: a.diretorio as string });
-            case "confirmar_classificacao":
-                return await confirmarClassificacao({ estado_json: a.estado_json as string, diretorio: a.diretorio as string, nivel: a.nivel as any, tipo_artefato: a.tipo_artefato as any });
-            case "discovery":
-                return await discovery({ estado_json: a.estado_json as string, diretorio: a.diretorio as string, respostas: a.respostas as any });
-            default:
-                return { content: [{ type: "text", text: `Tool não encontrada: ${name}` }], isError: true };
-        }
-    } catch (error) {
-        return { content: [{ type: "text", text: `Erro: ${String(error)}` }], isError: true };
-    }
+    return await routeToolCall(name, args || {});
 }
 
 // ============================================
@@ -670,7 +509,7 @@ async function callTool(name: string, args?: Record<string, unknown>) {
 app.listen(PORT, () => {
     console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║                    MCP MAESTRO v1.0.0                      ║
+║                    MCP MAESTRO v3.0.0                      ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  🚀 Server running on http://localhost:${PORT}              ║
 ║                                                             ║

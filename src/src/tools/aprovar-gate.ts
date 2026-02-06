@@ -1,9 +1,12 @@
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
+import type { NextAction, FlowProgress } from "../types/response.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { logEvent, EventTypes } from "../utils/history.js";
 import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
 import { resolve } from "path";
+import { getFaseComStitch } from "../flows/types.js";
+import { getSpecialistPersona } from "../services/specialist.service.js";
 
 interface AprovarGateArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -135,6 +138,24 @@ O projeto deve primeiro:
         // Serializar estado
         const estadoFile = serializarEstado(estado);
 
+        const faseAtual = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
+        const specialist = faseAtual ? getSpecialistPersona(faseAtual.nome) : null;
+
+        const next_action: NextAction = {
+            tool: "proximo",
+            description: `Gerar entregável e avançar para fase ${estado.fase_atual} (${faseAtual?.nome || 'próxima'})`,
+            args_template: { entregavel: "{{conteudo_do_entregavel}}", estado_json: "{{estado_json}}", diretorio },
+            requires_user_input: true,
+            user_prompt: `Gate aprovado. Agora gere o entregável: ${faseAtual?.entregavel_esperado || 'da fase atual'}`,
+        };
+
+        const progress: FlowProgress = {
+            current_phase: faseAtual?.nome || `Fase ${estado.fase_atual}`,
+            total_phases: estado.total_fases,
+            completed_phases: estado.gates_validados.length,
+            percentage: Math.round((estado.gates_validados.length / estado.total_fases) * 100),
+        };
+
         return {
             content: [{
                 type: "text",
@@ -171,6 +192,9 @@ ${estadoFile.content}
                 content: estadoFile.content
             }],
             estado_atualizado: estadoFile.content,
+            next_action,
+            specialist_persona: specialist || undefined,
+            progress,
         };
     } else {
         // Rejeitar - limpar flags e manter na fase atual
@@ -180,6 +204,16 @@ ${estadoFile.content}
 
         // Serializar estado
         const estadoFile = serializarEstado(estado);
+
+        const faseAtualRej = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
+
+        const next_action_rej: NextAction = {
+            tool: "validar_gate",
+            description: "Validar o entregável corrigido antes de tentar avançar novamente",
+            args_template: { entregavel: "{{entregavel_corrigido}}", estado_json: "{{estado_json}}", diretorio },
+            requires_user_input: true,
+            user_prompt: "Corrija os itens pendentes e valide novamente antes de avançar.",
+        };
 
         return {
             content: [{
@@ -211,6 +245,13 @@ ${estadoFile.content}
                 content: estadoFile.content
             }],
             estado_atualizado: estadoFile.content,
+            next_action: next_action_rej,
+            progress: {
+                current_phase: faseAtualRej?.nome || `Fase ${estado.fase_atual}`,
+                total_phases: estado.total_fases,
+                completed_phases: estado.gates_validados.length,
+                percentage: Math.round((estado.gates_validados.length / estado.total_fases) * 100),
+            },
         };
     }
 }

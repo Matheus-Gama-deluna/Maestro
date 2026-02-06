@@ -1,3 +1,5 @@
+import type { NextAction, SpecialistPersona, FlowProgress } from "./response.js";
+
 // Níveis de complexidade do projeto
 export type NivelComplexidade = "simples" | "medio" | "complexo";
 
@@ -185,7 +187,13 @@ export interface ToolResult {
     }>;
     /** Updated state JSON string */
     estado_atualizado?: string;
+    /** Instrução programática do próximo passo */
+    next_action?: NextAction;
+    /** Persona de especialista ativa */
+    specialist_persona?: SpecialistPersona;
+    /** Progresso do fluxo */
+    progress?: FlowProgress;
 }
 
 // Re-export response types
-export { FileToSave, MaestroToolResult, createFileToSave, formatFilesInstruction } from "./response.js";
+export { FileToSave, MaestroToolResult, NextAction, SpecialistPersona, FlowProgress, createFileToSave, formatFilesInstruction } from "./response.js";

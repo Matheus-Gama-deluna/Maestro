@@ -1,11 +1,13 @@
 import type { ToolResult, NivelComplexidade, EstadoProjeto, TipoArtefato } from "../types/index.js";
+import type { NextAction, FlowProgress } from "../types/response.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { classificarPRD, descreverNivel } from "../flows/classifier.js";
-import { getFluxo } from "../flows/types.js";
+import { getFluxo, getFaseComStitch } from "../flows/types.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { normalizeProjectPath, resolveProjectPath } from "../utils/files.js";
 import { resolve } from "path";
 import { determinarTierGate, descreverTier } from "../gates/tiers.js";
+import { getSpecialistPersona } from "../services/specialist.service.js";
 
 interface ClassificarArgs {
     prd?: string;
@@ -129,6 +131,24 @@ ${estadoFile.content}
 \`\`\`
 `;
 
+    const faseAtual = getFaseComStitch(novoNivel, estado.fase_atual, estado.usar_stitch);
+    const specialist = faseAtual ? getSpecialistPersona(faseAtual.nome) : null;
+
+    const next_action: NextAction = {
+        tool: "proximo",
+        description: `Gerar entregável da fase ${estado.fase_atual} (${faseAtual?.nome || 'atual'}) com a nova classificação`,
+        args_template: { entregavel: "{{conteudo_do_entregavel}}", estado_json: "{{estado_json}}", diretorio },
+        requires_user_input: true,
+        user_prompt: `Projeto reclassificado para ${novoNivel.toUpperCase()}. Gere o entregável: ${faseAtual?.entregavel_esperado || 'da fase'}`,
+    };
+
+    const progress: FlowProgress = {
+        current_phase: faseAtual?.nome || `Fase ${estado.fase_atual}`,
+        total_phases: estado.total_fases,
+        completed_phases: estado.gates_validados.length,
+        percentage: Math.round((estado.gates_validados.length / estado.total_fases) * 100),
+    };
+
     return {
         content: [{ type: "text", text: resposta }],
         files: [{
@@ -136,6 +156,9 @@ ${estadoFile.content}
             content: estadoFile.content
         }],
         estado_atualizado: estadoFile.content,
+        next_action,
+        specialist_persona: specialist || undefined,
+        progress,
     };
 }
 

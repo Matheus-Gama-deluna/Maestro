@@ -16,6 +16,52 @@ export interface FileToSave {
 }
 
 /**
+ * Instrução programática do próximo passo para a IA
+ */
+export interface NextAction {
+    /** Nome da tool a chamar */
+    tool: string;
+    /** Descrição do que fazer */
+    description: string;
+    /** Template de argumentos para a próxima chamada */
+    args_template: Record<string, unknown>;
+    /** Se precisa de input do usuário antes de executar */
+    requires_user_input: boolean;
+    /** Pergunta para fazer ao usuário (se requires_user_input=true) */
+    user_prompt?: string;
+    /** Se true, IA pode executar sem perguntar ao usuário */
+    auto_execute?: boolean;
+}
+
+/**
+ * Persona de especialista que a IA deve assumir
+ */
+export interface SpecialistPersona {
+    /** Nome do especialista */
+    name: string;
+    /** Tom de comunicação */
+    tone: string;
+    /** Áreas de expertise */
+    expertise: string[];
+    /** Instruções de comportamento */
+    instructions: string;
+}
+
+/**
+ * Progresso atual do fluxo
+ */
+export interface FlowProgress {
+    /** Nome da fase atual */
+    current_phase: string;
+    /** Total de fases no fluxo */
+    total_phases: number;
+    /** Fases já completadas */
+    completed_phases: number;
+    /** Percentual de conclusão */
+    percentage: number;
+}
+
+/**
  * Extended tool result with files to save
  */
 export interface MaestroToolResult {
@@ -25,6 +71,12 @@ export interface MaestroToolResult {
     files?: FileToSave[];
     /** Updated state JSON (for convenience) */
     estado_atualizado?: string;
+    /** Instrução programática do próximo passo */
+    next_action?: NextAction;
+    /** Persona de especialista ativa */
+    specialist_persona?: SpecialistPersona;
+    /** Progresso do fluxo */
+    progress?: FlowProgress;
 }
 
 /**

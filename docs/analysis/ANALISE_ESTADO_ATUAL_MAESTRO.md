@@ -2,7 +2,8 @@
 
 **Data:** 06/02/2026  
 **Autor:** Especialista em MCP, Engenharia de Software e Desenvolvimento com IA  
-**Versão Analisada:** v2.6.2 (src/package.json) / v2.1.0 (root package.json)
+**Versão Original Analisada:** v2.6.2 / v2.1.0  
+**Atualizado em:** 06/02/2026 — Pós implementação v3.0.0 (ver seção 10)
 
 ---
 
@@ -352,3 +353,118 @@ O sistema funciona em cenários felizes com IDEs que usam modelos fortes (Windsu
 ---
 
 *Próximo documento: [ROADMAP_MELHORIAS_MAESTRO.md](../roadmap/ROADMAP_MELHORIAS_MAESTRO.md) - Plano de evolução com prioridades, arquitetura-alvo e implementação.*
+
+---
+
+## 10. Reavaliação Pós-v3.0.0 (06/02/2026)
+
+### 10.1 O que mudou
+
+A versão 3.0.0 implementou os Marcos 0 (Estabilização) e parte do Marco 1 (Orquestração Real) do roadmap. As mudanças foram documentadas em [CONTROLE_IMPLEMENTACAO.md](../implementation/CONTROLE_IMPLEMENTACAO.md).
+
+**Mudanças estruturais:**
+- **Router centralizado** (`router.ts`) — ponto único de roteamento para 44 tools
+- **Entry points unificados** — `stdio.ts` e `index.ts` delegam ao router
+- **Serviço compartilhado de onboarding** — `onboarding.service.ts` elimina duplicação
+- **Persistência intermediária** — todo handler retorna `estado_atualizado` e `files[]`
+- **Contrato estruturado** — tipos `NextAction`, `SpecialistPersona`, `FlowProgress` definidos
+- **next_action em 8 tools** — fluxo de onboarding completo é orquestrado programaticamente
+- **Brainstorm desbloqueado** — Caminho B habilitado (brainstorm sem discovery completo)
+- **Versão unificada** — `3.0.0` em todo o sistema
+
+### 10.2 Reavaliação do Scorecard
+
+| Dimensão | Score v2.x | Score v3.0.0 | Δ | Justificativa |
+|----------|-----------|-------------|---|---------------|
+| **Estrutura de fases e gates** | 8/10 | 8/10 | = | Sem mudança direta |
+| **Conteúdo especialista** | 9/10 | 9/10 | = | Sem mudança direta |
+| **Orquestração real** | 3/10 | **5/10** | +2 | `next_action` em 8 tools de onboarding, fluxo programático setup→discovery→brainstorm→PRD |
+| **Independência do modelo** | 3/10 | **4.5/10** | +1.5 | Contratos estruturados reduzem dependência de interpretação textual, mas ainda faltam flow engine e consolidação |
+| **Fluxo de onboarding** | 5/10 | **6.5/10** | +1.5 | Persistência corrigida, Caminho B habilitado, next_action guia o fluxo |
+| **Persistência de estado** | 5/10 | **6.5/10** | +1.5 | Estado intermediário agora persistido em todo bloco; ainda depende da IA salvar |
+| **Qualidade de código** | 4/10 | **6.5/10** | +2.5 | Router elimina duplicação de roteamento, serviço compartilhado, ~500 linhas de código morto removidas |
+| **Testabilidade** | 2/10 | **3/10** | +1 | Build e 222 testes passam; novo código ainda sem testes dedicados |
+| **Experiência do desenvolvedor** | 3/10 | **4/10** | +1 | Paridade de tools entre transports, next_action orienta a IA |
+
+**Score médio ponderado: ~5.9/10** (vs 4.5/10 antes) — **Melhora de +1.4 pontos**
+
+### 10.3 Problemas Críticos — Status Atualizado
+
+| # | Problema Original | Severidade | Status v3.0.0 |
+|---|-------------------|-----------|---------------|
+| 4.1 | Ausência de Orquestração Real | CRÍTICO | **Parcialmente resolvido** — `next_action` implementado em 8 tools de onboarding. Falta flow engine, consolidação de tools, e `next_action` nas ~36 tools restantes. |
+| 4.2 | Entry Points Divergentes | CRÍTICO | **✅ Resolvido** — Router centralizado com 44 tools. Ambos entry points usam `routeToolCall()`. |
+| 4.3 | Perda de Estado Intermediário | CRÍTICO | **✅ Resolvido** — `handleProximoBloco` e `handleIniciar` sempre retornam `estado_atualizado` e `files[]`. |
+| 4.4 | Duplicação de Código | ALTO | **✅ Resolvido** — `criarEstadoOnboardingInicial` centralizado em `onboarding.service.ts`. |
+| 4.5 | server.ts Morto | ALTO | **⏳ Pendente** — `server.ts` e `TOOLS_AS_RESOURCES` ainda existem. |
+| 4.6 | Brainstorm Bloqueado | MÉDIO | **✅ Resolvido** — Guard removido, aviso visual quando discovery incompleto. |
+| 4.7 | Validação PRD Superficial | MÉDIO | **⏳ Pendente** — Mesma validação por substring. |
+| 4.8 | Excesso de Tools | MÉDIO | **⏳ Pendente** — Agora são 44 tools (pior numericamente, mas consistentes). |
+| 4.9 | Versões Inconsistentes | BAIXO | **✅ Resolvido** — Unificado em `3.0.0`. |
+
+### 10.4 Novos Problemas Identificados
+
+| # | Problema | Severidade | Descrição |
+|---|---------|-----------|-----------|
+| N1 | Router sem validação Zod real | MÉDIO | O router usa schemas JSON para ListTools mas não faz `.parse()` com Zod nos args. Validação é delegada às tools individualmente. |
+| N2 | `specialist_persona` em apenas 1 tool | BAIXO | O tipo existe mas só `confirmar_projeto` popula. Valor reduzido sem adoção ampla. |
+| N3 | `next_action` ausente em tools não-onboarding | MÉDIO | `proximo`, `status`, `classificar`, `salvar`, `contexto` etc. não retornam `next_action`. O fluxo pós-PRD fica sem orquestração. |
+| N4 | `iniciar_projeto` ainda usa inferência automática | MÉDIO | O plano previa perguntas conversacionais ao invés de inferir tipo/complexidade. Não implementado. |
+
+### 10.5 Arquitetura Atualizada
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     IDE (Windsurf/Cursor/AG)            │
+│                          ↕ MCP Protocol                 │
+├─────────────────────────────────────────────────────────┤
+│  Entry Points (UNIFICADOS via Router)          [v3.0.0] │
+│  ┌──────────────┐  ┌──────────────┐                     │
+│  │  stdio.ts     │  │  index.ts    │                     │
+│  │  (STDIO/npx)  │  │  (HTTP/SSE)  │                     │
+│  └──────┬───────┘  └──────┬───────┘                     │
+│         └────────┬─────────┘                             │
+│                  ↓                                       │
+│  ┌─────────────────────────────────┐           [v3.0.0] │
+│  │     Router Centralizado         │                     │
+│  │     router.ts (44 tools)        │                     │
+│  │     routeToolCall() + registry  │                     │
+│  └─────────────┬───────────────────┘                     │
+│                ↓                                         │
+│  ┌─────────────────────────────────────┐                │
+│  │     Services Layer                  │       [v3.0.0] │
+│  │  ┌──────────────────────────┐       │                │
+│  │  │ onboarding.service.ts    │       │                │
+│  │  │ (estado compartilhado)   │       │                │
+│  │  └──────────────────────────┘       │                │
+│  └─────────────┬───────────────────────┘                │
+│                ↓                                         │
+│  ┌─────────────────────────────────────┐                │
+│  │     Tools Layer (44 tools)          │                │
+│  │  tools/*.ts + flows/*.ts            │                │
+│  │  Retornam: content + next_action    │       [v3.0.0] │
+│  │  + specialist_persona + progress    │                │
+│  └─────────────┬───────────────────────┘                │
+│                ↓                                         │
+│  ┌─────────────────────────────────────┐                │
+│  │      Core + State + Utils + Types   │                │
+│  └─────────────────────────────────────┘                │
+│  ┌─────────────────────────────────────┐                │
+│  │   Content (374 skills, workflows)   │                │
+│  └─────────────────────────────────────┘                │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 10.6 Resumo: Onde Estamos Agora
+
+**O Maestro v3.0.0 tem uma base técnica sólida.** Os problemas estruturais críticos (entry points divergentes, perda de estado, duplicação, parâmetros truncados) foram resolvidos. A fundação para orquestração real está pronta com o contrato `MaestroResponse` e `next_action`.
+
+**O que falta para atingir o objetivo de "orquestrador ativo":**
+1. **Flow Engine** — codificar transições de fase como state machine (Marco 1.2)
+2. **Consolidação de Tools** — reduzir de 44 para ~8 tools (Marco 1.3)
+3. **Persistência Ativa** — MCP gravar no filesystem (Marco 1.4)
+4. **iniciar_projeto conversacional** — perguntas em blocos ao invés de inferência (Plano Fase 1)
+5. **next_action em TODAS as tools** — não apenas as 8 de onboarding
+6. **Smart Defaults e Templates** — reduzir fricção do onboarding (Marco 2)
+
+Ver plano detalhado: [PROXIMOS_PASSOS_V3.md](../implementation/PROXIMOS_PASSOS_V3.md)

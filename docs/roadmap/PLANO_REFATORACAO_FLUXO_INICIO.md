@@ -1,5 +1,34 @@
 # Plano de Refatoração: Fluxo de Início de Projeto no Maestro
 
+> **Status atualizado em 06/02/2026 — Pós v3.0.0**
+>
+> Este plano foi parcialmente implementado na versão 3.0.0. A seção de análise técnica (bugs e ideias) ao final foi a base para as implementações realizadas. Abaixo um resumo do que foi feito:
+>
+> | Item | Status | Ref |
+> |------|--------|-----|
+> | Bug: parâmetros não repassados em entry points | ✅ Resolvido | Router centralizado (M-003/M-004/M-005) |
+> | Bug: duplicação `criarEstadoOnboarding` | ✅ Resolvido | Serviço compartilhado (M-002) |
+> | Bug: `confirmar_projeto` ausente em `index.ts` | ✅ Resolvido | Router com 44 tools (M-003) |
+> | Bug: brainstorm exige `discoveryStatus === 'completed'` | ✅ Resolvido | Guard removido (M-007) |
+> | Bug: `handleProximoBloco` não persiste estado intermediário | ✅ Resolvido | Persistência em todo retorno (M-006) |
+> | Fase 0: `next_action` em `setup_inicial` | ✅ Implementado | M-008 |
+> | Fase 2: `next_action` em tools de onboarding | ✅ Implementado | M-008/M-009/M-010 |
+> | Ideia 1: `specialist_persona` | ✅ Tipo definido + usado em `confirmar_projeto` | M-001/M-008 |
+> | Ideia 6: Adapter pattern (router centralizado) | ✅ Implementado | M-003 |
+> | Ideia 8: Persistência intermediária via `files[]` | ✅ Implementado | M-006 |
+> | Fase 1: `iniciar_projeto` conversacional | ⏳ Pendente | Ainda usa inferência automática |
+> | Fase 3: Internalizar `confirmar_projeto` | ⏳ Pendente | Ainda é tool pública |
+> | Fase 5: Orchestrator como hub central | ⏳ Pendente | |
+> | Ideia 2: Smart Defaults | ⏳ Pendente | |
+> | Ideia 3: Resumo Executivo | ⏳ Pendente | |
+> | Ideia 4: Projeto Template | ⏳ Pendente | |
+> | Ideia 5: Confidence Score | ⏳ Pendente | |
+> | Ideia 7: Conversa Livre | ⏳ Pendente | |
+>
+> Ver próximos passos detalhados em: [PROXIMOS_PASSOS_V3.md](../implementation/PROXIMOS_PASSOS_V3.md)
+
+---
+
 ## Fase 0: Setup Inicial (Pré-requisito)
 
 ### Contexto

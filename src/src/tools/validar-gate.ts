@@ -1,4 +1,5 @@
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
+import type { NextAction, FlowProgress } from "../types/response.js";
 import { parsearEstado } from "../state/storage.js";
 import { getFase } from "../flows/types.js";
 import { validarGate as validarGateCore, formatarResultadoGate, validarGateComTemplate } from "../gates/validator.js";
@@ -12,6 +13,7 @@ import { getSkillParaFase } from "../utils/prompt-mapper.js";
 import { getSkillResourcePath, detectIDE } from "../utils/ide-paths.js";
 import { readFile } from "fs/promises";
 import { join } from "path";
+import { getSpecialistPersona } from "../services/specialist.service.js";
 
 interface ValidarGateArgs {
     fase?: number;
@@ -199,9 +201,36 @@ validar_gate(
             : "⚠️ **Complete os itens pendentes** ou use `proximo(entregavel: \"...\", estado_json: \"...\", confirmar_usuario: true)` para forçar avanço.";
     }
 
+    const specialist = fase ? getSpecialistPersona(fase.nome) : null;
+    const isValid = resposta.includes("✅ **Você pode avançar");
+
+    const next_action: NextAction = isValid ? {
+        tool: "proximo",
+        description: `Gate validado. Avançar com o entregável da fase ${numeroFase} (${fase.nome})`,
+        args_template: { entregavel: "{{conteudo_do_entregavel}}", estado_json: "{{estado_json}}", diretorio },
+        requires_user_input: false,
+        auto_execute: false,
+    } : {
+        tool: "proximo",
+        description: "Complete os itens pendentes e tente avançar novamente",
+        args_template: { entregavel: "{{entregavel_corrigido}}", estado_json: "{{estado_json}}", diretorio },
+        requires_user_input: true,
+        user_prompt: "Corrija os itens pendentes no entregável e tente novamente.",
+    };
+
+    const progress: FlowProgress = {
+        current_phase: fase?.nome || `Fase ${numeroFase}`,
+        total_phases: estado.total_fases,
+        completed_phases: estado.gates_validados.length,
+        percentage: Math.round((estado.gates_validados.length / estado.total_fases) * 100),
+    };
+
     return {
         content: [{ type: "text", text: resposta }],
         estado_atualizado: args.estado_json,
+        next_action,
+        specialist_persona: specialist || undefined,
+        progress,
     };
 }
 

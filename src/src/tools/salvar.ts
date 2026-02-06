@@ -1,5 +1,6 @@
 import { join, resolve } from "path";
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
+import type { NextAction } from "../types/response.js";
 import { parsearEstado } from "../state/storage.js";
 import { normalizeProjectPath, resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { setCurrentDirectory } from "../state/context.js";
@@ -155,12 +156,26 @@ ${args.conteudo.slice(0, 500)}${args.conteudo.length > 500 ? "\n... [conteúdo c
 - Para verificar status: \`status(estado_json: "...")\`
 `;
 
+    const next_action: NextAction = args.tipo === "entregavel" ? {
+        tool: "proximo",
+        description: "Validar e avançar com o entregável salvo",
+        args_template: { entregavel: args.conteudo.slice(0, 100) + "...", estado_json: "{{estado_json}}", diretorio },
+        requires_user_input: false,
+        auto_execute: false,
+    } : {
+        tool: "status",
+        description: "Verificar status atual do projeto",
+        args_template: { estado_json: "{{estado_json}}", diretorio },
+        requires_user_input: false,
+    };
+
     return {
         content: [{ type: "text", text: resposta }],
         files: [{
             path: targetPath,
             content: args.conteudo
         }],
+        next_action,
     };
 }
 

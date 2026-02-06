@@ -62,6 +62,18 @@ Configuração persistida em: \`${getConfigPath()}\`
 
 > Suas preferências serão usadas automaticamente ao iniciar projetos.`,
         }],
+        next_action: {
+            tool: "iniciar_projeto",
+            description: "Iniciar um novo projeto com as preferências salvas",
+            args_template: {
+                nome: "<nome_do_projeto>",
+                diretorio: "<diretorio_do_projeto>",
+                ide: payload.ide,
+                modo: payload.modo,
+            },
+            requires_user_input: true,
+            user_prompt: "Qual o nome e diretório do projeto que deseja iniciar?",
+        },
     };
 }
 

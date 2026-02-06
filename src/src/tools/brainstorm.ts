@@ -219,18 +219,11 @@ export async function brainstorm(args: BrainstormArgs): Promise<ToolResult> {
     };
   }
 
-  if (onboarding.discoveryStatus !== 'completed') {
-    return {
-      content: [{
-        type: "text",
-        text: "❌ **Erro**: Discovery não foi concluído. Complete o discovery antes de iniciar brainstorm.",
-      }],
-      isError: true,
-    };
-  }
+  // Caminho B: permitir brainstorm exploratório mesmo sem discovery completo
+  const discoveryIncompleto = onboarding.discoveryStatus !== 'completed';
 
   if (acao === 'iniciar') {
-    return handleIniciarBrainstorm(onboarding, estado, diretorio);
+    return handleIniciarBrainstorm(onboarding, estado, diretorio, discoveryIncompleto);
   } else if (acao === 'proximo_secao') {
     return handleProximaSecao(onboarding, estado, diretorio, args.resposta_secao);
   } else if (acao === 'status') {
@@ -252,7 +245,8 @@ export async function brainstorm(args: BrainstormArgs): Promise<ToolResult> {
 function handleIniciarBrainstorm(
   onboarding: OnboardingState,
   estado: any,
-  diretorio: string
+  diretorio: string,
+  discoveryIncompleto: boolean = false
 ): ToolResult {
   // Gerar seções de brainstorm
   if (onboarding.brainstormSections.length === 0) {
@@ -272,6 +266,13 @@ function handleIniciarBrainstorm(
         type: "text",
         text: "✅ **Brainstorm já concluído!** Todas as seções foram preenchidas.",
       }],
+      next_action: {
+        tool: "prd_writer",
+        description: "Gerar PRD a partir do brainstorm e discovery",
+        args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "gerar_validar" },
+        requires_user_input: false,
+        auto_execute: true,
+      },
     };
   }
 
@@ -279,38 +280,44 @@ function handleIniciarBrainstorm(
   const progresso = onboarding.brainstormSections.filter((s) => s.status === 'completed').length;
   const total = onboarding.brainstormSections.length;
 
+  const avisoDiscovery = discoveryIncompleto
+    ? `\n> ⚠️ **Modo Exploratório**: Discovery não foi concluído. Algumas seções podem ter dados incompletos. Você pode voltar ao discovery depois.\n`
+    : '';
+
   const resposta = `# 🧠 Brainstorm Assistido
 
 **Projeto:** ${estado.nome}  
 **Progresso:** ${progresso}/${total} seções (${Math.round((progresso / total) * 100)}%)
-
+${avisoDiscovery}
 ---
 
 ${secaoFormatada}
 
 ---
 
-## 📝 Como Responder
-
-Responda ao prompt acima e envie usando:
-
-\`\`\`
-brainstorm(
-    estado_json: "...",
-    diretorio: "...",
-    acao: "proximo_secao",
-    resposta_secao: "Sua resposta aqui..."
-)
-\`\`\`
-
 **Tempo estimado:** 10-15 minutos para esta seção
 `;
 
   return {
-    content: [{
-      type: "text",
-      text: resposta,
-    }],
+    content: [{ type: "text", text: resposta }],
+    next_action: {
+      tool: "brainstorm",
+      description: `Responder à seção "${proximaSecao.title}" do brainstorm`,
+      args_template: {
+        estado_json: "{{estado_json}}",
+        diretorio: diretorio,
+        acao: "proximo_secao",
+        resposta_secao: `<Resposta para: ${proximaSecao.title}>`,
+      },
+      requires_user_input: true,
+      user_prompt: proximaSecao.prompt,
+    },
+    progress: {
+      current_phase: "brainstorm",
+      total_phases: 4,
+      completed_phases: 1,
+      percentage: Math.round(25 + (progresso / total) * 25),
+    },
   };
 }
 
@@ -356,11 +363,20 @@ function handleProximaSecao(
   const completadas = onboarding.brainstormSections.filter((s) => s.status === 'completed').length;
   const total = onboarding.brainstormSections.length;
 
+  // Persistir estado atualizado
+  (estado as any).onboarding = onboarding;
+  estado.atualizado_em = new Date().toISOString();
+  const estadoFile = serializarEstado(estado);
+
   // Verificar se todas as seções foram completadas
   if (completadas === total) {
     onboarding.brainstormStatus = 'completed';
     onboarding.brainstormCompletedAt = new Date().toISOString();
     onboarding.phase = 'prd_draft';
+
+    // Re-serializar com status final
+    (estado as any).onboarding = onboarding;
+    const estadoFileFinal = serializarEstado(estado);
 
     const resposta = `# ✅ Brainstorm Concluído!
 
@@ -372,11 +388,7 @@ Todas as seções foram preenchidas com sucesso.
 
 **Seções completadas:** ${completadas}/${total}
 
-1. ✅ Problema e Oportunidade
-2. ✅ Personas e Jobs to Be Done
-3. ✅ MVP e Funcionalidades Priorizadas
-4. ✅ Métricas de Sucesso
-5. ✅ Riscos e Mitigações
+${onboarding.brainstormSections.map((s, i) => `${i + 1}. ✅ ${s.title}`).join('\n')}
 
 ---
 
@@ -384,16 +396,26 @@ Todas as seções foram preenchidas com sucesso.
 
 Agora vamos consolidar todos os insights em um **PRD Draft** estruturado.
 
-Use: \`prd_writer(estado_json: "...", diretorio: "...", acao: "gerar")\` para criar o PRD.
-
 **Tempo estimado:** 5-10 minutos
 `;
 
     return {
-      content: [{
-        type: "text",
-        text: resposta,
-      }],
+      content: [{ type: "text", text: resposta }],
+      files: [{ path: `${diretorio}/${estadoFileFinal.path}`, content: estadoFileFinal.content }],
+      estado_atualizado: estadoFileFinal.content,
+      next_action: {
+        tool: "prd_writer",
+        description: "Gerar PRD a partir do brainstorm e discovery",
+        args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "gerar_validar" },
+        requires_user_input: false,
+        auto_execute: true,
+      },
+      progress: {
+        current_phase: "brainstorm",
+        total_phases: 4,
+        completed_phases: 2,
+        percentage: 50,
+      },
     };
   }
 
@@ -425,18 +447,41 @@ ${secaoFormatada}
 `;
 
     return {
-      content: [{
-        type: "text",
-        text: resposta,
-      }],
+      content: [{ type: "text", text: resposta }],
+      files: [{ path: `${diretorio}/${estadoFile.path}`, content: estadoFile.content }],
+      estado_atualizado: estadoFile.content,
+      next_action: {
+        tool: "brainstorm",
+        description: `Responder à seção "${proximaSecao.title}"`,
+        args_template: {
+          estado_json: "{{estado_json}}",
+          diretorio: diretorio,
+          acao: "proximo_secao",
+          resposta_secao: `<Resposta para: ${proximaSecao.title}>`,
+        },
+        requires_user_input: true,
+        user_prompt: proximaSecao.prompt,
+      },
+      progress: {
+        current_phase: "brainstorm",
+        total_phases: 4,
+        completed_phases: 1,
+        percentage: Math.round(25 + (completadas / total) * 25),
+      },
     };
   }
 
   return {
-    content: [{
-      type: "text",
-      text: "✅ **Brainstorm concluído!** Todas as seções foram preenchidas.",
-    }],
+    content: [{ type: "text", text: "✅ **Brainstorm concluído!** Todas as seções foram preenchidas." }],
+    files: [{ path: `${diretorio}/${estadoFile.path}`, content: estadoFile.content }],
+    estado_atualizado: estadoFile.content,
+    next_action: {
+      tool: "prd_writer",
+      description: "Gerar PRD a partir do brainstorm e discovery",
+      args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "gerar_validar" },
+      requires_user_input: false,
+      auto_execute: true,
+    },
   };
 }
 

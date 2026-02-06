@@ -9,7 +9,9 @@ import { setCurrentDirectory } from "../state/context.js";
 import { parsearResumo, serializarResumo, criarResumoInicial, extrairResumoEntregavel } from "../state/memory.js";
 import { gerarInstrucaoProximaFase } from "../utils/instructions.js";
 import type { EntregavelResumo, ProjectSummary } from "../types/memory.js";
+import type { NextAction, FlowProgress } from "../types/response.js";
 import { logEvent, EventTypes } from "../utils/history.js";
+import { getSpecialistPersona } from "../services/specialist.service.js";
 import { gerarSystemMd } from "../utils/system-md.js";
 import { gerarSecaoPrompts, getSkillParaFase, getSkillPath, getSkillResourcePath } from "../utils/prompt-mapper.js";
 import { validarEstrutura } from "../gates/estrutura.js";
@@ -766,10 +768,35 @@ ${estadoFile.content}
 (conteúdo no campo files)
 `;
 
+    const specialist = proximaFase ? getSpecialistPersona(proximaFase.nome) : null;
+
+    const next_action: NextAction = proximaFase ? {
+        tool: "validar_gate",
+        description: `Validar checklist de sa\u00edda da fase ${estado.fase_atual} (${proximaFase.nome})`,
+        args_template: { estado_json: "{{estado_json}}", diretorio },
+        requires_user_input: true,
+        user_prompt: `Fase ${faseAnterior} conclu\u00edda! Agora trabalhe com ${proximaFase.especialista} para gerar: ${proximaFase.entregavel_esperado}`,
+    } : {
+        tool: "status",
+        description: "Projeto conclu\u00eddo! Ver status final",
+        args_template: { estado_json: "{{estado_json}}", diretorio },
+        requires_user_input: false,
+    };
+
+    const progress: FlowProgress = {
+        current_phase: proximaFase?.nome || "Conclu\u00eddo",
+        total_phases: estado.total_fases,
+        completed_phases: estado.gates_validados.length,
+        percentage: Math.round((estado.gates_validados.length / estado.total_fases) * 100),
+    };
+
     return {
         content: [{ type: "text", text: resposta }],
         files: filesToSave,
         estado_atualizado: estadoFile.content,
+        next_action,
+        specialist_persona: specialist || undefined,
+        progress,
     };
 }
 
