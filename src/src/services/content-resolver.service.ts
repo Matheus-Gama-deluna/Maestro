@@ -232,6 +232,85 @@ export class ContentResolverService {
     clearCache(): void {
         this.cache.clear();
     }
+
+    // === Version Management (v5: Sprint D.3) ===
+
+    /**
+     * Lê o manifesto de versão do conteúdo (.version.json).
+     * Retorna null se não encontrado.
+     */
+    async readVersionManifest(source: "project" | "server" = "project"): Promise<Record<string, unknown> | null> {
+        const root = source === "project" ? this.projectContentRoot : this.serverContentRoot;
+        const versionPath = join(root, ".version.json");
+        
+        try {
+            if (!existsSync(versionPath)) return null;
+            const content = await readFile(versionPath, "utf-8");
+            return JSON.parse(content);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Verifica se o conteúdo local está desatualizado comparado ao servidor.
+     * Retorna objeto com informações de compatibilidade.
+     */
+    async checkVersionCompatibility(): Promise<{
+        hasProjectContent: boolean;
+        projectVersion: string | null;
+        serverVersion: string | null;
+        isCompatible: boolean;
+        needsUpdate: boolean;
+        message: string;
+    }> {
+        const projectManifest = await this.readVersionManifest("project");
+        const serverManifest = await this.readVersionManifest("server");
+
+        const projectVersion = projectManifest?.version as string | null;
+        const serverVersion = serverManifest?.version as string | null;
+        const hasProjectContent = this.hasProjectContent();
+
+        if (!hasProjectContent) {
+            return {
+                hasProjectContent: false,
+                projectVersion: null,
+                serverVersion,
+                isCompatible: true,
+                needsUpdate: false,
+                message: "Usando conteúdo do servidor (builtin).",
+            };
+        }
+
+        if (!projectVersion || !serverVersion) {
+            return {
+                hasProjectContent: true,
+                projectVersion,
+                serverVersion,
+                isCompatible: true,
+                needsUpdate: false,
+                message: "Sem informação de versão disponível.",
+            };
+        }
+
+        // Comparar versões major.minor.patch
+        const [pMajor, pMinor] = projectVersion.split(".").map(Number);
+        const [sMajor, sMinor] = serverVersion.split(".").map(Number);
+
+        const isCompatible = pMajor === sMajor;
+        const needsUpdate = pMinor < sMinor || (pMajor < sMajor);
+
+        return {
+            hasProjectContent: true,
+            projectVersion,
+            serverVersion,
+            isCompatible,
+            needsUpdate,
+            message: needsUpdate
+                ? `Conteúdo local desatualizado (${projectVersion} vs ${serverVersion}). Execute 'npx @maestro-ai/cli' para atualizar.`
+                : `Conteúdo local atualizado (${projectVersion}).`,
+        };
+    }
 }
 
 /**

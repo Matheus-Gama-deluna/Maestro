@@ -1,0 +1,16 @@
+{
+  "version": "5.0.0",
+  "hash": "auto-generated",
+  "injected_at": "2026-02-06T00:00:00.000Z",
+  "source": "builtin",
+  "content_version": "1.0",
+  "compatibility": {
+    "min_server_version": "5.0.0",
+    "max_server_version": "5.x"
+  },
+  "checksums": {
+    "skills_count": 0,
+    "templates_count": 0,
+    "rules_count": 0
+  }
+}

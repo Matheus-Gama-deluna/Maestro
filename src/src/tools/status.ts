@@ -1,6 +1,4 @@
-
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
-import type { NextAction, FlowProgress } from "../types/response.js";
 import { parsearEstado } from "../state/storage.js";
 import { existsSync } from "fs";
 import { join, resolve } from "path";
@@ -155,46 +153,13 @@ ${Object.keys(estado.entregaveis).length > 0
 
     const specialist = faseAtual ? getSpecialistPersona(faseAtual.nome) : null;
 
-    let next_action: NextAction;
-    if (estado.aguardando_aprovacao) {
-        next_action = {
-            tool: "aprovar_gate",
-            description: "Projeto aguardando aprovação do usuário para avançar",
-            args_template: { acao: "aprovar", estado_json: "{{estado_json}}", diretorio: args.diretorio },
-            requires_user_input: true,
-            user_prompt: "O projeto está bloqueado. Deseja aprovar ou rejeitar o avanço?",
-        };
-    } else if (estado.aguardando_classificacao) {
-        next_action = {
-            tool: "confirmar_classificacao",
-            description: "Confirmar classificação pós-PRD antes de avançar",
-            args_template: { estado_json: "{{estado_json}}", diretorio: args.diretorio },
-            requires_user_input: true,
-            user_prompt: "Confirme a classificação sugerida para o projeto.",
-        };
-    } else {
-        next_action = {
-            tool: "proximo",
-            description: `Gerar entregável da fase ${estado.fase_atual} (${faseAtual?.nome || 'atual'}) e avançar`,
-            args_template: { entregavel: "{{conteudo_do_entregavel}}", estado_json: "{{estado_json}}", diretorio: args.diretorio },
-            requires_user_input: true,
-            user_prompt: `Trabalhe com o especialista ${faseAtual?.especialista || 'da fase'} para gerar: ${faseAtual?.entregavel_esperado || 'entregável'}`,
-        };
-    }
-
-    const progress: FlowProgress = {
-        current_phase: faseAtual?.nome || `Fase ${estado.fase_atual}`,
-        total_phases: estado.total_fases,
-        completed_phases: estado.gates_validados.length,
-        percentage: progresso,
-    };
-
+    // v5: next_action e progress são calculados automaticamente pelo middleware flow-engine.middleware.ts
+    // Retornamos apenas estado_atualizado e specialist_persona para o middleware processar
     return {
         content: [{ type: "text", text: resposta }],
         estado_atualizado: args.estado_json,
-        next_action,
         specialist_persona: specialist || undefined,
-        progress,
+        // next_action e progress serão adicionados pelo middleware withFlowEngine
     };
 }
 

@@ -77,12 +77,14 @@ export const GATE_CHECKLISTS: Record<number, string[]> = {
  * @param entregavel - Conteúdo do entregável
  * @param tier - Tier de validação
  * @param diretorioContent - Diretório base do content (ex: d:/Sistemas/Maestro/content)
+ * @param checklistItems - Checklist opcional da skill para validação adicional
  */
 export function validarGateComTemplate(
     fase: Fase,
     entregavel: string,
     tier: TierGate = "base",
-    diretorioContent?: string
+    diretorioContent?: string,
+    checklistItems?: string[]
 ): { sucesso: boolean; resultado?: any; resultadoLegacy?: GateResultado; erro?: string } {
     const skillNome = getSkillParaFase(fase.nome);
     
@@ -107,6 +109,16 @@ export function validarGateComTemplate(
     // Validar contra template
     const resultado = validarContraTemplate(entregavel, templateStructure, tier);
     
+    // v5: Se tem checklistItems da skill, validar também contra eles
+    let resultadoChecklist: GateResultado | undefined;
+    if (checklistItems && checklistItems.length > 0) {
+        resultadoChecklist = validarGateComChecklist(entregavel, checklistItems);
+        // Merge resultados: se template OU checklist está válido, considera válido
+        if (!resultado.valido && resultadoChecklist.valido) {
+            resultado.valido = true;
+        }
+    }
+    
     // Calcular qualidade
     const qualidade = calcularQualidade(entregavel, templateStructure, tier);
     
@@ -117,6 +129,7 @@ export function validarGateComTemplate(
             qualidade,
             templateUsado: templatePath,
             skillNome,
+            checklistValidado: resultadoChecklist,
         },
     };
 }
@@ -187,8 +200,29 @@ export function validarGate(
 
 
 /**
- * Verifica se um item do checklist está presente no entregável
+ * Valida entregável contra checklist da skill
  */
+function validarGateComChecklist(entregavel: string, checklist: string[]): GateResultado {
+    const validados: string[] = [];
+    const pendentes: string[] = [];
+    const sugestoes: string[] = [];
+
+    for (const item of checklist) {
+        if (verificarItem(item, entregavel)) {
+            validados.push(item);
+        } else {
+            pendentes.push(item);
+            sugestoes.push(gerarSugestao(item));
+        }
+    }
+
+    return {
+        valido: pendentes.length === 0,
+        itens_validados: validados,
+        itens_pendentes: pendentes,
+        sugestoes,
+    };
+}
 function verificarItem(item: string, entregavel: string): boolean {
     // Extrai palavras-chave do item
     const keywords = item

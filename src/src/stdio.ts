@@ -249,6 +249,17 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
                     },
                 ],
             },
+            {
+                name: "maestro-template",
+                description: "Template do entregável esperado para a fase atual",
+                arguments: [
+                    {
+                        name: "diretorio",
+                        description: "Diretório do projeto",
+                        required: true,
+                    },
+                ],
+            },
         ],
     };
 });
@@ -263,6 +274,10 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
 
     if (name === "maestro-context") {
         return await buildContextPrompt(diretorio);
+    }
+
+    if (name === "maestro-template") {
+        return await buildTemplatePrompt(diretorio);
     }
 
     throw new Error(`Prompt não encontrado: ${name}`);
@@ -375,6 +390,91 @@ Trabalhe com o especialista **${faseInfo?.especialista || "N/A"}** para gerar: *
         messages: [{
             role: "user" as const,
             content: { type: "text" as const, text: contextText },
+        }],
+    };
+}
+
+/**
+ * Constrói prompt do template da fase atual.
+ */
+async function buildTemplatePrompt(diretorio: string) {
+    const stateService = createStateService(diretorio);
+    const estado = await stateService.load();
+
+    if (!estado) {
+        return {
+            description: "Nenhum projeto encontrado",
+            messages: [{
+                role: "user" as const,
+                content: { type: "text" as const, text: "Nenhum projeto ativo neste diretório." },
+            }],
+        };
+    }
+
+    const faseInfo = getFaseComStitch(estado.nivel as any, estado.fase_atual, estado.usar_stitch);
+    if (!faseInfo) {
+        return {
+            description: `Projeto: ${estado.nome}`,
+            messages: [{
+                role: "user" as const,
+                content: { type: "text" as const, text: `Projeto ${estado.nome} — fase ${estado.fase_atual} não encontrada.` },
+            }],
+        };
+    }
+
+    const contentResolver = new ContentResolverService(diretorio);
+    const skillLoader = new SkillLoaderService(contentResolver);
+
+    try {
+        const templateContent = await skillLoader.loadTemplate(faseInfo.nome);
+
+        if (templateContent) {
+            return {
+                description: `Template: ${faseInfo.entregavel_esperado || faseInfo.nome}`,
+                messages: [{
+                    role: "user" as const,
+                    content: {
+                        type: "text" as const,
+                        text: `# Template do Entregável: ${faseInfo.entregavel_esperado || faseInfo.nome}
+
+## Fase ${estado.fase_atual}/${estado.total_fases}: ${faseInfo.nome}
+
+Use este template como base para gerar o entregável:
+
+---
+
+${templateContent}
+
+---
+
+> 💡 Dica: Preencha todas as seções marcadas com [...] ou indicadores de conteúdo.`,
+                    },
+                }],
+            };
+        }
+    } catch (error) {
+        console.warn("[Prompt] Falha ao carregar template:", error);
+    }
+
+    // Fallback: estrutura básica
+    return {
+        description: `Template: ${faseInfo.entregavel_esperado || faseInfo.nome}`,
+        messages: [{
+            role: "user" as const,
+            content: {
+                type: "text" as const,
+                text: `# Template do Entregável: ${faseInfo.entregavel_esperado || faseInfo.nome}
+
+## Fase ${estado.fase_atual}/${estado.total_fases}: ${faseInfo.nome}
+
+### Estrutura Esperada
+
+${faseInfo.gate_checklist.map((item, i) => `${i + 1}. ${item}`).join("\n")}
+
+---
+
+> ℹ️ Template específico não disponível. Use a lista acima como guia.`,
+            },
         }],
     };
 }
