@@ -11,7 +11,7 @@
  */
 
 import type { ToolResult } from "./types/index.js";
-import { applyMiddlewares, applyLightMiddlewares, applyPersistenceMiddlewares } from "./middleware/index.js";
+import { applyMiddlewares, applyLightMiddlewares, applySmartMiddlewares, applyPersistenceMiddlewares } from "./middleware/index.js";
 
 // === IMPORTS DE TOOLS ===
 
@@ -118,13 +118,13 @@ const publicTools: ToolDefinition[] = [
         name: "maestro",
         description: "🎯 Entry point inteligente do Maestro. Detecta contexto do projeto automaticamente e guia o próximo passo. Use esta tool quando não souber qual tool usar.",
         inputSchema: maestroToolSchema,
-        handler: applyLightMiddlewares("maestro", (a) => maestroTool(a as any)),
+        handler: applySmartMiddlewares("maestro", (a) => maestroTool(a as any)),
     },
     {
         name: "avancar",
         description: "⏭️ Avança no fluxo do projeto. Em onboarding: processa próximo bloco. Em desenvolvimento: submete entregável e avança fase. Detecta contexto automaticamente.",
         inputSchema: avancarSchema,
-        handler: applyLightMiddlewares("avancar", (a) => avancar(a as any)),
+        handler: applySmartMiddlewares("avancar", (a) => avancar(a as any)),
     },
     {
         name: "status",
@@ -447,6 +447,36 @@ for (const tool of legacyTools) allToolsMap.set(tool.name, tool);
  * Ponto ÚNICO de execução - usado por stdio.ts e index.ts.
  * Aceita TODAS as tools (public + legacy) para backward compatibility.
  */
+// Mapa de redirecionamento para deprecation warnings
+const legacyRedirects: Record<string, string> = {
+    "proximo": "avancar",
+    "setup_inicial": "maestro",
+    "iniciar_projeto": "maestro",
+    "carregar_projeto": "maestro",
+    "validar_gate": "validar(tipo: 'gate')",
+    "avaliar_entregavel": "validar(tipo: 'entregavel')",
+    "check_compliance": "validar(tipo: 'compliance')",
+    "analisar_seguranca": "analisar(tipo: 'seguranca')",
+    "analisar_qualidade": "analisar(tipo: 'qualidade')",
+    "analisar_performance": "analisar(tipo: 'performance')",
+    "gerar_relatorio": "analisar(tipo: 'completo')",
+    "validate_dependencies": "analisar(tipo: 'dependencias')",
+    "validate_security": "analisar(tipo: 'seguranca')",
+    "create_checkpoint": "checkpoint(acao: 'criar')",
+    "rollback_total": "checkpoint(acao: 'rollback')",
+    "rollback_partial": "checkpoint(acao: 'rollback_parcial')",
+    "list_checkpoints": "checkpoint(acao: 'listar')",
+    "get_context": "contexto",
+    "onboarding_orchestrator": "avancar",
+    "brainstorm": "avancar",
+    "prd_writer": "avancar",
+    "next_steps_dashboard": "maestro",
+    "discovery": "avancar",
+};
+
+// Set para lookup rápido de nomes públicos
+const publicToolNames = new Set(publicTools.map(t => t.name));
+
 export async function routeToolCall(name: string, rawArgs: Record<string, unknown>): Promise<ToolResult> {
     const tool = allToolsMap.get(name);
     if (!tool) {
@@ -456,8 +486,21 @@ export async function routeToolCall(name: string, rawArgs: Record<string, unknow
         };
     }
 
+    const isLegacy = !publicToolNames.has(name);
+
     try {
-        return await tool.handler(rawArgs);
+        const result = await tool.handler(rawArgs);
+
+        // v5.1: Deprecation warning para tools legadas
+        if (isLegacy) {
+            const redirect = legacyRedirects[name] || "maestro";
+            result.content.push({
+                type: "text" as const,
+                text: `\n---\n> ⚠️ **Deprecation:** \`${name}\` será removida na v6. Use \`${redirect}\` como alternativa.`,
+            });
+        }
+
+        return result;
     } catch (error) {
         return {
             content: [{ type: "text", text: `❌ Erro ao executar ${name}: ${String(error)}` }],

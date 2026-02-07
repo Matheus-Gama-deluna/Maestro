@@ -13,6 +13,7 @@
  */
 
 import type { ToolResult } from "../../types/index.js";
+import { formatError } from "../../utils/response-formatter.js";
 import { analisarSeguranca } from "../analise/seguranca.js";
 import { analisarQualidade } from "../analise/qualidade.js";
 import { analisarPerformance } from "../analise/performance.js";
@@ -34,10 +35,7 @@ interface AnalisarArgs {
 export async function analisar(args: AnalisarArgs): Promise<ToolResult> {
     if (!args.diretorio) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Parâmetro `diretorio` é obrigatório.",
-            }],
+            content: formatError("analisar", "Parâmetro `diretorio` é obrigatório."),
             isError: true,
         };
     }

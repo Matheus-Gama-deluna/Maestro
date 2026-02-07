@@ -10,6 +10,7 @@
  */
 
 import type { ToolResult } from "../../types/index.js";
+import { formatError } from "../../utils/response-formatter.js";
 import { validarGate } from "../validar-gate.js";
 import { avaliarEntregavel } from "../avaliar-entregavel.js";
 import { checkCompliance } from "../fase1/validation.tools.js";
@@ -31,10 +32,7 @@ interface ValidarArgs {
 export async function validar(args: ValidarArgs): Promise<ToolResult> {
     if (!args.diretorio) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Parâmetro `diretorio` é obrigatório.",
-            }],
+            content: formatError("validar", "Parâmetro `diretorio` é obrigatório."),
             isError: true,
         };
     }

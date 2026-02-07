@@ -36,7 +36,7 @@ app.get("/health", (req, res) => {
     res.json({
         status: "ok",
         server: "mcp-maestro",
-        version: "3.0.0",
+        version: MAESTRO_VERSION,
         sessions: sessions.size,
     });
 });
@@ -47,7 +47,7 @@ app.get("/health", (req, res) => {
 app.get("/", (req, res) => {
     res.json({
         name: "MCP Maestro",
-        version: "3.0.0",
+        version: MAESTRO_VERSION,
         description: "Model Context Protocol server for Maestro development guide",
         endpoints: {
             health: "GET /health",
@@ -108,7 +108,7 @@ app.get("/mcp", (req, res) => {
         // Não é SSE, retornar info do endpoint
         res.json({
             name: "MCP Maestro",
-            version: "3.0.0",
+            version: MAESTRO_VERSION,
             transport: "streamable-http",
             endpoints: {
                 sse: "GET /mcp (Accept: text/event-stream)",
@@ -293,11 +293,29 @@ async function handleMcpRequest(request: {
             }
 
             case "initialize": {
+                // Capturar capabilities do client
+                if (params) {
+                    captureClientCapabilities(params);
+                }
                 result = {
-                    protocolVersion: "2024-11-05",
-                    serverInfo: { name: "mcp-maestro", version: "4.0.0" },
+                    protocolVersion: SUPPORTED_PROTOCOL_VERSION,
+                    serverInfo: { name: MAESTRO_NAME, version: MAESTRO_VERSION },
                     capabilities: { resources: {}, tools: {}, prompts: {} },
                 };
+                break;
+            }
+
+            case "prompts/list": {
+                result = await getPromptsList();
+                break;
+            }
+
+            case "prompts/get": {
+                const { name: promptName, arguments: promptArgs } = params as {
+                    name: string;
+                    arguments?: Record<string, string>;
+                };
+                result = await getPromptContent(promptName, promptArgs);
                 break;
             }
 
@@ -337,6 +355,9 @@ import {
     lerPrompt,
 } from "./utils/files.js";
 
+import { MAESTRO_NAME, MAESTRO_VERSION, SUPPORTED_PROTOCOL_VERSION } from "./constants.js";
+import { captureClientCapabilities } from "./services/client-capabilities.service.js";
+
 import { routeToolCall, getRegisteredTools, getToolCount } from "./router.js";
 
 // Gera documentação de uma tool a partir do registry do router
@@ -355,16 +376,39 @@ ${tool.description}
 }
 
 async function getResourcesList() {
-    // Expõe as tools registradas no router como resources no seletor @mcp:maestro:
-    // Especialistas, templates e guias continuam acessíveis via URI direta
-    const tools = getRegisteredTools();
+    // v5.1: Expor especialistas, templates e guias (não tools)
+    // Alinhado com stdio.ts para paridade funcional
+    const especialistas = await listarEspecialistas();
+    const templates = await listarTemplates();
+    const guias = await listarGuias();
+
     return {
-        resources: tools.map((t) => ({
-            uri: `maestro://tool/${t.name}`,
-            name: t.name,
-            description: t.description,
-            mimeType: "text/markdown",
-        })),
+        resources: [
+            ...especialistas.map((e) => ({
+                uri: `maestro://especialista/${encodeURIComponent(e)}`,
+                name: `Especialista: ${e}`,
+                mimeType: "text/markdown",
+                description: `Especialista em ${e}`,
+            })),
+            ...templates.map((t) => ({
+                uri: `maestro://template/${encodeURIComponent(t)}`,
+                name: `Template: ${t}`,
+                mimeType: "text/markdown",
+                description: `Template de ${t}`,
+            })),
+            ...guias.map((g) => ({
+                uri: `maestro://guia/${encodeURIComponent(g)}`,
+                name: `Guia: ${g}`,
+                mimeType: "text/markdown",
+                description: `Guia de ${g}`,
+            })),
+            {
+                uri: "maestro://system-prompt",
+                name: "System Prompt",
+                mimeType: "text/markdown",
+                description: "Instruções de comportamento para a IA",
+            },
+        ],
     };
 }
 
@@ -502,6 +546,57 @@ async function callTool(name: string, args?: Record<string, unknown>) {
     return await routeToolCall(name, args || {});
 }
 
+async function getPromptsList() {
+    return {
+        prompts: [
+            {
+                name: "maestro-specialist",
+                description: "Persona + instruções do especialista da fase atual do projeto",
+                arguments: [{ name: "diretorio", description: "Diretório do projeto", required: true }],
+            },
+            {
+                name: "maestro-context",
+                description: "Contexto completo do projeto para a sessão de trabalho",
+                arguments: [{ name: "diretorio", description: "Diretório do projeto", required: true }],
+            },
+            {
+                name: "maestro-template",
+                description: "Template do entregável esperado para a fase atual",
+                arguments: [{ name: "diretorio", description: "Diretório do projeto", required: true }],
+            },
+            {
+                name: "maestro-sessao",
+                description: "Contexto completo para sessão de trabalho (specialist + context + template + tools)",
+                arguments: [{ name: "diretorio", description: "Diretório do projeto", required: true }],
+            },
+        ],
+    };
+}
+
+async function getPromptContent(name: string, args?: Record<string, string>) {
+    const diretorio = args?.diretorio || process.cwd();
+
+    // Prompt simples baseado no nome — lógica detalhada será movida para handlers compartilhados (Task 1.5)
+    switch (name) {
+        case "maestro-specialist":
+        case "maestro-context":
+        case "maestro-template":
+        case "maestro-sessao":
+            return {
+                description: `Prompt: ${name}`,
+                messages: [{
+                    role: "user" as const,
+                    content: {
+                        type: "text" as const,
+                        text: `Use a tool \`maestro(diretorio: "${diretorio}")\` para obter o contexto do projeto.`,
+                    },
+                }],
+            };
+        default:
+            throw new Error(`Prompt não encontrado: ${name}`);
+    }
+}
+
 // ============================================
 // Iniciar servidor
 // ============================================
@@ -509,7 +604,7 @@ async function callTool(name: string, args?: Record<string, unknown>) {
 app.listen(PORT, () => {
     console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║                    MCP MAESTRO v3.0.0                      ║
+║                    MCP MAESTRO v${MAESTRO_VERSION}                      ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  🚀 Server running on http://localhost:${PORT}              ║
 ║                                                             ║

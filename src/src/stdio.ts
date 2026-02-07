@@ -34,6 +34,8 @@ import {
 } from "./utils/files.js";
 
 import { routeToolCall, getRegisteredTools, getToolCount } from "./router.js";
+import { MAESTRO_NAME, MAESTRO_VERSION } from "./constants.js";
+import { captureClientCapabilities } from "./services/client-capabilities.service.js";
 import { ContentResolverService } from "./services/content-resolver.service.js";
 import { SkillLoaderService } from "./services/skill-loader.service.js";
 import { createStateService } from "./services/state.service.js";
@@ -44,8 +46,8 @@ import { getSkillParaFase } from "./utils/prompt-mapper.js";
 // Criar servidor MCP
 const server = new Server(
     {
-        name: "mcp-maestro",
-        version: "5.0.0",
+        name: MAESTRO_NAME,
+        version: MAESTRO_VERSION,
     },
     {
         capabilities: {
@@ -260,6 +262,17 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
                     },
                 ],
             },
+            {
+                name: "maestro-sessao",
+                description: "Contexto completo para sessão de trabalho (specialist + context + template + tools)",
+                arguments: [
+                    {
+                        name: "diretorio",
+                        description: "Diretório do projeto",
+                        required: true,
+                    },
+                ],
+            },
         ],
     };
 });
@@ -278,6 +291,10 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
 
     if (name === "maestro-template") {
         return await buildTemplatePrompt(diretorio);
+    }
+
+    if (name === "maestro-sessao") {
+        return await buildSessionPrompt(diretorio);
     }
 
     throw new Error(`Prompt não encontrado: ${name}`);
@@ -479,6 +496,101 @@ ${faseInfo.gate_checklist.map((item, i) => `${i + 1}. ${item}`).join("\n")}
     };
 }
 
+/**
+ * Prompt de sessão completa: combina specialist + context + template + tools disponíveis.
+ * v5.1: Substitui a necessidade de chamar 3 prompts separados.
+ */
+async function buildSessionPrompt(diretorio: string) {
+    const stateService = createStateService(diretorio);
+    const estado = await stateService.load();
+
+    if (!estado) {
+        return {
+            description: "Nenhum projeto encontrado",
+            messages: [{
+                role: "user" as const,
+                content: {
+                    type: "text" as const,
+                    text: `# 🎯 Sessão Maestro
+
+Nenhum projeto ativo em \`${diretorio}\`.
+
+Use \`maestro(diretorio: "${diretorio}")\` para começar.
+
+## Tools Disponíveis
+- **maestro** — Entry point inteligente (detecta contexto)
+- **avancar** — Avança no fluxo (onboarding ou desenvolvimento)
+- **status** — Status completo do projeto
+- **validar** — Valida gate, entregável ou compliance
+- **contexto** — Contexto acumulado do projeto
+- **salvar** — Salva conteúdo sem avançar
+- **checkpoint** — Gerencia checkpoints e rollbacks
+- **analisar** — Análise de código (segurança, qualidade, performance)`,
+                },
+            }],
+        };
+    }
+
+    const faseInfo = getFaseComStitch(estado.nivel as any, estado.fase_atual, estado.usar_stitch);
+    const specialist = faseInfo ? getSpecialistPersona(faseInfo.nome) : null;
+
+    // Montar contexto completo da sessão
+    let sessionContent = `# 🎯 Sessão Maestro — ${estado.nome}\n\n`;
+
+    // Specialist
+    if (specialist) {
+        sessionContent += `## 🤖 Especialista: ${specialist.name}\n\n`;
+        sessionContent += `**Tom:** ${specialist.tone}\n`;
+        sessionContent += `**Expertise:** ${specialist.expertise.join(", ")}\n`;
+        sessionContent += `**Instruções:** ${specialist.instructions}\n\n`;
+    }
+
+    // Contexto do projeto
+    sessionContent += `## 📋 Contexto\n\n`;
+    sessionContent += `| Campo | Valor |\n|-------|-------|\n`;
+    sessionContent += `| **Projeto** | ${estado.nome} |\n`;
+    sessionContent += `| **Nível** | ${estado.nivel.toUpperCase()} |\n`;
+    sessionContent += `| **Fase** | ${estado.fase_atual}/${estado.total_fases} — ${faseInfo?.nome || "N/A"} |\n`;
+    sessionContent += `| **Gates Validados** | ${estado.gates_validados.length} |\n\n`;
+
+    // Skill injection
+    if (faseInfo) {
+        try {
+            const contentResolver = new ContentResolverService(diretorio);
+            const skillLoader = new SkillLoaderService(contentResolver);
+            const mode = (estado.config?.mode || "balanced") as "economy" | "balanced" | "quality";
+            const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, mode);
+            if (contextPkg) {
+                sessionContent += `## 📚 Skill da Fase\n\n${skillLoader.formatAsMarkdown(contextPkg)}\n\n`;
+            }
+        } catch {
+            // Fallback silencioso
+        }
+    }
+
+    // Tools disponíveis
+    sessionContent += `## 🔧 Tools Disponíveis\n\n`;
+    sessionContent += `- **maestro** — Entry point inteligente\n`;
+    sessionContent += `- **avancar** — Avançar fase com entregável\n`;
+    sessionContent += `- **status** — Status completo\n`;
+    sessionContent += `- **validar** — Validar gate/entregável/compliance\n`;
+    sessionContent += `- **contexto** — Contexto acumulado\n`;
+    sessionContent += `- **salvar** — Salvar conteúdo\n`;
+    sessionContent += `- **checkpoint** — Gerenciar checkpoints\n`;
+    sessionContent += `- **analisar** — Análise de código\n`;
+
+    return {
+        description: `Sessão: ${estado.nome} — Fase ${estado.fase_atual}`,
+        messages: [{
+            role: "user" as const,
+            content: {
+                type: "text" as const,
+                text: sessionContent,
+            },
+        }],
+    };
+}
+
 // ==================== TOOLS (via Router Centralizado) ====================
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -502,7 +614,7 @@ setProjectDirectory(projectsDir);
 async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error(`MCP Maestro v5 (stdio) iniciado — ${getToolCount()} tools públicas`);
+    console.error(`MCP Maestro v${MAESTRO_VERSION} (stdio) iniciado — ${getToolCount()} tools públicas`);
     console.error(`Diretório de projetos: ${projectsDir}`);
 }
 

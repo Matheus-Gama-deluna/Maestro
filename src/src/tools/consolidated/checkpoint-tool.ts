@@ -11,6 +11,7 @@
  */
 
 import type { ToolResult } from "../../types/index.js";
+import { formatError } from "../../utils/response-formatter.js";
 import {
     createCheckpoint,
     rollbackTotal,
@@ -35,10 +36,7 @@ interface CheckpointArgs {
 export async function checkpoint(args: CheckpointArgs): Promise<ToolResult> {
     if (!args.diretorio) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Parâmetro `diretorio` é obrigatório.",
-            }],
+            content: formatError("checkpoint", "Parâmetro `diretorio` é obrigatório."),
             isError: true,
         };
     }
@@ -57,10 +55,7 @@ export async function checkpoint(args: CheckpointArgs): Promise<ToolResult> {
         case "rollback":
             if (!args.checkpointId) {
                 return {
-                    content: [{
-                        type: "text",
-                        text: "❌ **Erro**: `checkpointId` é obrigatório para rollback.",
-                    }],
+                    content: formatError("checkpoint", "`checkpointId` é obrigatório para rollback."),
                     isError: true,
                 };
             }
@@ -73,10 +68,7 @@ export async function checkpoint(args: CheckpointArgs): Promise<ToolResult> {
         case "rollback_parcial":
             if (!args.checkpointId || !args.modules?.length) {
                 return {
-                    content: [{
-                        type: "text",
-                        text: "❌ **Erro**: `checkpointId` e `modules` são obrigatórios para rollback parcial.",
-                    }],
+                    content: formatError("checkpoint", "`checkpointId` e `modules` são obrigatórios para rollback parcial."),
                     isError: true,
                 };
             }

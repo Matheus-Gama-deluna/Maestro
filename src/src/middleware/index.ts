@@ -56,6 +56,20 @@ export function applyLightMiddlewares(toolName: string, handler: ToolHandler): T
 }
 
 /**
+ * Aplica middlewares inteligentes: estado + skill injection condicional.
+ * v5.1: Injeta skill apenas quando o projeto está em fase de desenvolvimento (não onboarding).
+ * Substitui applyLightMiddlewares para tools que se beneficiam de skill injection.
+ */
+export function applySmartMiddlewares(toolName: string, handler: ToolHandler): ToolHandler {
+    return withErrorHandling(
+        toolName,
+        withStateLoad(
+            withSkillInjection(handler)
+        )
+    );
+}
+
+/**
  * Aplica middlewares de persistência e estado (sem skill injection).
  * Útil para tools que não precisam de injeção de skills mas precisam de persistência.
  */

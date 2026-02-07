@@ -8,6 +8,7 @@
 
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import type { NextAction, FlowProgress } from "../types/response.js";
+import { formatResponse, formatError, formatArgsPreview as fmtArgs, nextActionToProximoPasso } from "../utils/response-formatter.js";
 import { createStateService } from "../services/state.service.js";
 import { getNextStep, getFlowProgress, flowStepToNextAction, isInOnboarding } from "../services/flow-engine.js";
 import { getSpecialistPersona } from "../services/specialist.service.js";
@@ -91,9 +92,10 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
     const specialist = faseInfo ? getSpecialistPersona(faseInfo.nome) : null;
     const inOnboarding = isInOnboarding(estado);
 
-    // Montar resposta contextual
+    // Montar resposta contextual com formatResponse (v5.1)
     const statusEmoji = inOnboarding ? "🚀" : "📍";
     const phaseLabel = inOnboarding ? "Onboarding" : `Fase ${estado.fase_atual}/${estado.total_fases}`;
+    const nextAction = flowStepToNextAction(nextStep);
 
     // Injeção ativa v5: contexto resumido do especialista
     let specialistContext = "";
@@ -101,55 +103,51 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
         try {
             const contentResolver = new ContentResolverService(args.diretorio);
             const skillLoader = new SkillLoaderService(contentResolver);
-            // Usar modo economy para manter resposta concisa no maestro
             const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, "economy");
             if (contextPkg) {
-                specialistContext = `\n---\n\n${skillLoader.formatAsMarkdown(contextPkg)}\n`;
+                specialistContext = skillLoader.formatAsMarkdown(contextPkg);
             }
         } catch {
-            // Fallback silencioso — sem injeção ativa
+            // Fallback silencioso
         }
     }
 
-    const resposta = `# ${statusEmoji} Maestro — ${estado.nome}
+    const content = formatResponse({
+        titulo: `${statusEmoji} Maestro — ${estado.nome}`,
+        resumo: `${phaseLabel} — ${faseInfo?.nome || "N/A"}`,
+        dados: {
+            "Projeto": estado.nome,
+            "Nível": estado.nivel.toUpperCase(),
+            "Fase": `${phaseLabel} — ${faseInfo?.nome || "N/A"}`,
+            ...(specialist ? { "Especialista": specialist.name } : {}),
+        },
+        progresso: {
+            atual: estado.fase_atual,
+            total: estado.total_fases,
+            percentual: progress.percentage,
+        },
+        ...(specialist ? {
+            especialista: {
+                nome: specialist.name,
+                tom: specialist.tone,
+                expertise: specialist.expertise,
+            },
+        } : {}),
+        instrucoes: specialistContext || undefined,
+        proximo_passo: {
+            tool: nextStep.tool,
+            descricao: nextStep.description,
+            args: fmtArgs(nextStep.args_template),
+            requer_input_usuario: !nextStep.auto_execute,
+            prompt_usuario: nextStep.user_prompt,
+        },
+        secoes_extras: [{
+            titulo: "📊 Progresso do Fluxo",
+            conteudo: generateProgressBar(estado),
+        }],
+    });
 
-## Estado Atual
-
-| Campo | Valor |
-|-------|-------|
-| **Projeto** | ${estado.nome} |
-| **Nível** | ${estado.nivel.toUpperCase()} |
-| **Fase** | ${phaseLabel} — ${faseInfo?.nome || "N/A"} |
-| **Progresso** | ${"█".repeat(Math.floor(progress.percentage / 10))}${"░".repeat(10 - Math.floor(progress.percentage / 10))} ${progress.percentage}% |
-${specialist ? `| **Especialista** | ${specialist.name} |` : ""}
-
-## 🎯 Próximo Passo Recomendado
-
-**${nextStep.description}**
-
-${nextStep.user_prompt ? `> ${nextStep.user_prompt}` : ""}
-
-### Executar:
-\`\`\`
-${nextStep.tool}(${formatArgsPreview(nextStep.args_template)})
-\`\`\`
-
-${nextStep.auto_execute ? "> 🤖 Esta ação pode ser executada automaticamente." : "> 👤 Esta ação requer input do usuário."}
-
----
-
-## 📊 Progresso do Fluxo
-
-${generateProgressBar(estado)}
-${specialistContext}`;
-
-    return {
-        content: [{ type: "text", text: resposta }],
-        estado_atualizado: args.estado_json,
-        next_action: flowStepToNextAction(nextStep),
-        specialist_persona: specialist || undefined,
-        progress,
-    };
+    return { content };
 }
 
 /**
@@ -158,41 +156,33 @@ ${specialistContext}`;
 function handleNoProject(diretorio: string): ToolResult {
     const hasConfig = existsSync(join(diretorio, ".maestro", "config.json"));
 
-    const next_action: NextAction = hasConfig ? {
-        tool: "iniciar_projeto",
-        description: "Iniciar um novo projeto neste diretório",
-        args_template: { nome: "{{nome_do_projeto}}", diretorio },
-        requires_user_input: true,
-        user_prompt: "Qual o nome do projeto que deseja criar?",
-    } : {
-        tool: "setup_inicial",
-        description: "Configurar preferências globais do Maestro",
-        args_template: {},
-        requires_user_input: true,
-        user_prompt: "Vamos configurar suas preferências (IDE, modo operacional, etc.)",
-    };
+    const nextTool = hasConfig ? "iniciar_projeto" : "setup_inicial";
+    const nextDesc = hasConfig
+        ? "Iniciar um novo projeto neste diretório"
+        : "Configurar preferências globais do Maestro";
+    const nextPrompt = hasConfig
+        ? "Qual o nome do projeto que deseja criar?"
+        : "Vamos configurar suas preferências (IDE, modo operacional, etc.)";
+    const nextArgs = hasConfig
+        ? fmtArgs({ nome: "{{nome_do_projeto}}", diretorio })
+        : "";
 
-    return {
-        content: [{
-            type: "text",
-            text: `# 🎯 Maestro — Novo Projeto
+    const content = formatResponse({
+        titulo: "🎯 Maestro — Novo Projeto",
+        resumo: `Nenhum projeto encontrado em \`${diretorio}\`.`,
+        instrucoes: hasConfig
+            ? "Suas preferências já estão configuradas. Vamos iniciar um novo projeto!"
+            : "Primeiro, vamos configurar suas preferências (IDE, modo, etc.)",
+        proximo_passo: {
+            tool: nextTool,
+            descricao: nextDesc,
+            args: nextArgs,
+            requer_input_usuario: true,
+            prompt_usuario: nextPrompt,
+        },
+    });
 
-Nenhum projeto encontrado em \`${diretorio}\`.
-
-## 🚀 Próximo Passo
-
-${hasConfig
-    ? "**Suas preferências já estão configuradas.** Vamos iniciar um novo projeto!"
-    : "**Primeiro, vamos configurar suas preferências** (IDE, modo, etc.)"}
-
-### Executar:
-\`\`\`
-${next_action.tool}(${formatArgsPreview(next_action.args_template)})
-\`\`\`
-`,
-        }],
-        next_action,
-    };
+    return { content };
 }
 
 /**

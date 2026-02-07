@@ -1,6 +1,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { registerResources } from "./resources/index.js";
 import { registerTools } from "./tools/index.js";
+import { MAESTRO_NAME, MAESTRO_VERSION } from "./constants.js";
 
 /**
  * Cria e configura o servidor MCP
@@ -8,8 +9,8 @@ import { registerTools } from "./tools/index.js";
 export function createMcpServer(): Server {
     const server = new Server(
         {
-            name: "mcp-maestro",
-            version: "1.0.0",
+            name: MAESTRO_NAME,
+            version: MAESTRO_VERSION,
         },
         {
             capabilities: {

@@ -10,6 +10,7 @@
  */
 
 import type { ToolResult, EstadoProjeto } from "../../types/index.js";
+import { formatResponse, formatError } from "../../utils/response-formatter.js";
 import { parsearEstado } from "../../state/storage.js";
 import { isInOnboarding } from "../../services/flow-engine.js";
 import { proximo } from "../proximo.js";
@@ -35,10 +36,7 @@ interface AvancarArgs {
 export async function avancar(args: AvancarArgs): Promise<ToolResult> {
     if (!args.diretorio) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Parâmetro `diretorio` é obrigatório.",
-            }],
+            content: formatError("avancar", "Parâmetro `diretorio` é obrigatório."),
             isError: true,
         };
     }
@@ -86,20 +84,17 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
     // Desenvolvimento: delegar para proximo
     if (!args.entregavel) {
         return {
-            content: [{
-                type: "text",
-                text: `# ⚠️ Entregável Necessário
-
-Para avançar na fase de desenvolvimento, forneça o entregável:
-
-\`\`\`
-avancar(
-    diretorio: "${args.diretorio}",
-    entregavel: "conteúdo do entregável...",
-    estado_json: "..."
-)
-\`\`\``,
-            }],
+            content: formatResponse({
+                titulo: "⚠️ Entregável Necessário",
+                resumo: "Para avançar na fase de desenvolvimento, forneça o entregável.",
+                proximo_passo: {
+                    tool: "avancar",
+                    descricao: "Avançar fase com entregável",
+                    args: `diretorio: "${args.diretorio}", entregavel: "conteúdo do entregável..."`,
+                    requer_input_usuario: true,
+                    prompt_usuario: "Forneça o conteúdo do entregável da fase atual.",
+                },
+            }),
         };
     }
 
