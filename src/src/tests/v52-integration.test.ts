@@ -176,7 +176,9 @@ describe("response-formatter", () => {
             },
         });
         const text = blocks.map(b => b.text).join("\n");
-        expect(text).toContain("avancar");
+        // v5.3: tools internas são remapeadas para tools públicas (executar)
+        expect(text).toContain("```json");
+        expect(text).toMatch(/executar\(/);
         expect(text).toContain("Avançar fase");
     });
 
