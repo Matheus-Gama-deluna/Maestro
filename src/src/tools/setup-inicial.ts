@@ -14,18 +14,22 @@ export async function setupInicial(args: SetupInicialArgs): Promise<ToolResult> 
 
 Defina uma única vez suas preferências para evitar perguntas repetidas.
 
-Informe em **um único prompt** (sem quebrar em vários):
-\`\`\`
-setup_inicial({
-  ide: "windsurf",        // windsurf | cursor | antigravity
-  modo: "balanced",       // economy | balanced | quality
-  usar_stitch: false,
-  preferencias_stack: {
-    frontend: "react",    // opcional
-    backend: "node",      // opcional
-    database: "postgres"  // opcional
-  },
-  team_size: "pequeno"     // opcional
+Pergunte ao usuário:
+1. Qual IDE você usa? (windsurf / cursor / antigravity)
+2. Qual modo prefere? (economy = rápido / balanced = equilibrado / quality = completo)
+3. Deseja usar Stitch para prototipagem? (sim/não)
+
+Depois EXECUTE:
+
+\`\`\`json
+maestro({
+  "diretorio": "<diretorio>",
+  "acao": "setup_inicial",
+  "respostas": {
+    "ide": "windsurf",
+    "modo": "balanced",
+    "usar_stitch": false
+  }
 })
 \`\`\`
 
@@ -63,16 +67,18 @@ Configuração persistida em: \`${getConfigPath()}\`
 > Suas preferências serão usadas automaticamente ao iniciar projetos.`,
         }],
         next_action: {
-            tool: "iniciar_projeto",
-            description: "Iniciar um novo projeto com as preferências salvas",
+            tool: "maestro",
+            description: "Criar novo projeto com as preferências salvas",
             args_template: {
-                nome: "<nome_do_projeto>",
                 diretorio: "<diretorio_do_projeto>",
-                ide: payload.ide,
-                modo: payload.modo,
+                acao: "criar_projeto",
+                respostas: {
+                    nome: "<nome_do_projeto>",
+                    descricao: "<descrição breve>",
+                },
             },
             requires_user_input: true,
-            user_prompt: "Qual o nome e diretório do projeto que deseja iniciar?",
+            user_prompt: "Qual o nome e uma breve descrição do projeto que deseja criar?",
         },
     };
 }

@@ -20,6 +20,7 @@ import { inferirContextoBalanceado } from "../utils/inferencia-contextual.js";
 import { verificarSkillCarregada } from "../utils/content-injector.js";
 import { ContentResolverService } from "../services/content-resolver.service.js";
 import { SkillLoaderService } from "../services/skill-loader.service.js";
+import { saveFile, saveMultipleFiles, formatSavedFilesConfirmation } from "../utils/persistence.js";
 
 interface ProximoArgs {
     entregavel: string;
@@ -244,22 +245,24 @@ O **usuário humano** deve decidir:
 | Critérios | ${analise.criterios.join(", ")} |
 
 ## Ação obrigatória (responder em UM ÚNICO PROMPT)
-1) Confirme ou ajuste a classificação:
-\`\`\`
-confirmar_classificacao({
-  estado_json: "...",
-  diretorio: "${diretorio}",
-  nivel: "${analise.nivel}" // opcional, ajuste se necessário
+Confirme ou ajuste a classificação usando:
+
+\`\`\`json
+executar({
+  "diretorio": "${diretorio}",
+  "acao": "avancar",
+  "respostas": {
+    "nivel": "${analise.nivel}"
+  }
 })
 \`\`\`
-2) Responda também às perguntas abaixo no MESMO prompt (evita múltiplos prompts):
+
+Responda também às perguntas abaixo no MESMO prompt:
 ${perguntasMarkdown}
 
 > ⚠️ Não prossiga para outras fases antes de confirmar a classificação.
-> Consulte SKILL e templates em: ${getIDESkillResourcePath(getSkillParaFase(faseAtualInfo?.nome || "Produto") || "specialist-gestao-produto", 'templates', detectIDE(diretorio) || 'windsurf')}
 `,
                 }],
-                files: [{ path: `${diretorio}/${estadoFile.path}`, content: estadoFile.content }],
                 estado_atualizado: estadoFile.content,
             };
         }
@@ -299,18 +302,21 @@ ${msgSugestao}
 
 ## 🔐 Ação Necessária (responder em UM ÚNICO PROMPT)
 
-Use a tool \`confirmar_classificacao\` para validar ou ajustar a complexidade.
+Confirme ou ajuste a classificação:
 
+\`\`\`json
+executar({
+  "diretorio": "${diretorio}",
+  "acao": "avancar",
+  "respostas": {
+    "nivel": "<simples|medio|complexo>"
+  }
+})
 \`\`\`
-confirmar_classificacao(
-    estado_json: "...",
-    diretorio: "${diretorio}"
-)
-\`\`\`
 
-Inclua no MESMO prompt qualquer ajuste de domínio/stack ou integrações críticas para evitar prompts adicionais.
+Inclua no MESMO prompt qualquer ajuste de domínio/stack ou integrações críticas.
 
-> ⚠️ **IMPORTANTE**: Você DEVE chamar esta tool antes de continuar.
+> ⚠️ **IMPORTANTE**: Confirme a classificação antes de continuar.
 `,
                 }],
             };
@@ -433,6 +439,13 @@ ${gateResultado.itens_pendentes.map((item, i) => `- ${item}\n  💡 ${gateResult
         // Serializar estado bloqueado
         const estadoBloqueado = serializarEstado(estado);
 
+        // v5.3: Persistência direta para estado bloqueado
+        try {
+            await saveFile(`${diretorio}/${estadoBloqueado.path}`, estadoBloqueado.content);
+        } catch (err) {
+            console.error('[proximo] Erro ao salvar estado bloqueado:', err);
+        }
+
         return {
             content: [{
                 type: "text",
@@ -453,26 +466,12 @@ ${gateResultado.itens_pendentes.length > 0 ? `**Checklist pendente:**\n${gateRes
 
 O projeto foi **bloqueado** aguardando decisão do usuário:
 
-- **Para aprovar**: O usuário deve pedir para executar \`aprovar_gate(acao: "aprovar", ...)\`
-- **Para corrigir**: O usuário deve pedir para executar \`aprovar_gate(acao: "rejeitar", ...)\` e depois corrigir o entregável
+- **Para aprovar**: O usuário deve pedir para aprovar o gate
+- **Para corrigir**: O usuário deve pedir para rejeitar e corrigir o entregável
 
-> ⚠️ **CRÍTICO**: A IA NÃO pode chamar \`aprovar_gate\` automaticamente.
+> ⚠️ **CRÍTICO**: A IA NÃO pode aprovar automaticamente.
 > Aguarde a decisão explícita do usuário humano.
-
----
-
-## 📁 Salvar Estado Bloqueado
-
-**Caminho:** \`${diretorio}/.maestro/estado.json\`
-
-\`\`\`json
-${estadoBloqueado.content}
-\`\`\`
 `,
-            }],
-            files: [{
-                path: `${diretorio}/${estadoBloqueado.path}`,
-                content: estadoBloqueado.content
             }],
             estado_atualizado: estadoBloqueado.content,
         };
@@ -626,8 +625,8 @@ ${classificacao.criterios.map(c => `- ${c}`).join("\n")}
         // Serializa estado bloqueado
         const estadoBloqueado = serializarEstado(estado);
 
-        // Adiciona arquivo de estado à lista de salvamento (preservando o entregável já salvo)
-        const estadoFileIdx = filesToSave.findIndex(f => f.path.endsWith("estado.json"));
+        // v5.3: Persistência direta — salvar todos os arquivos pendentes
+        const estadoFileIdx = filesToSave.findIndex((f: { path: string }) => f.path.endsWith("estado.json"));
         if (estadoFileIdx >= 0) {
             filesToSave[estadoFileIdx].content = estadoBloqueado.content;
         } else {
@@ -636,6 +635,14 @@ ${classificacao.criterios.map(c => `- ${c}`).join("\n")}
                 content: estadoBloqueado.content
             });
         }
+
+        try {
+            await saveMultipleFiles(filesToSave);
+        } catch (err) {
+            console.error('[proximo] Erro ao salvar arquivos:', err);
+        }
+
+        const confirmacaoClassif = formatSavedFilesConfirmation(filesToSave.map((f: { path: string }) => f.path));
 
         return {
             content: [{
@@ -660,20 +667,20 @@ ${classificacao.criterios.map(c => `- ${c}`).join("\n")}
 O projeto foi **PAUSADO** para que você confirme essa classificação.
 A IA **NÃO** avançou para a próxima fase automaticamente.
 
-**Você deve chamar:**
-\`\`\`
-confirmar_classificacao(
-    estado_json: "...",
-    diretorio: "${diretorio}"
-)
-\`\`\`
+EXECUTE para confirmar:
 
-## 📁 Arquivos Salvos
-- O PRD foi salvo.
-- O estado foi atualizado marcando 'aguardando_classificacao'.
+\`\`\`json
+executar({
+  "diretorio": "${diretorio}",
+  "acao": "avancar",
+  "respostas": {
+    "nivel": "${classificacao.nivel}"
+  }
+})
+\`\`\`
+${confirmacaoClassif}
 `,
             }],
-            files: filesToSave,
             estado_atualizado: estadoBloqueado.content,
         };
     }
@@ -750,31 +757,23 @@ ${proximaFase?.gate_checklist.map(item => `- [ ] ${item}`).join("\n") || "Nenhum
 ${proximaSkillInfo}
 ---
 
-## ⚡ AÇÃO OBRIGATÓRIA - Salvar Arquivos
-
-### 1. Salvar entregável
-**Caminho:** \`${caminhoArquivo}\`
-(conteúdo no campo files)
-
-### 2. Atualizar estado
-**Caminho:** \`${diretorio}/.maestro/estado.json\`
-
-\`\`\`json
-${estadoFile.content}
-\`\`\`
-
-### 3. Atualizar resumo
-**Caminho:** \`${diretorio}/.maestro/resumo.json\`
-(conteúdo no campo files)
 `;
+
+    // v5.3: Persistência direta — salvar todos os arquivos via fs
+    try {
+        await saveMultipleFiles(filesToSave);
+    } catch (err) {
+        console.error('[proximo] Erro ao salvar arquivos:', err);
+    }
+
+    const confirmacao = formatSavedFilesConfirmation(filesToSave.map(f => f.path));
 
     const specialist = proximaFase ? getSpecialistPersona(proximaFase.nome) : null;
 
     // v5: next_action e progress são calculados automaticamente pelo middleware flow-engine.middleware.ts
     // Mantemos apenas specialist_persona e estado_atualizado para o middleware processar
     return {
-        content: [{ type: "text", text: resposta }],
-        files: filesToSave,
+        content: [{ type: "text", text: resposta + confirmacao }],
         estado_atualizado: estadoFile.content,
         specialist_persona: specialist || undefined,
         // next_action e progress serão adicionados pelo middleware withFlowEngine

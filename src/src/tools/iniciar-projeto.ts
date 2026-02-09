@@ -15,6 +15,7 @@ import { resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { ensureContentInstalled, injectContentForIDE } from "../utils/content-injector.js";
 import { formatSkillMessage } from "../utils/ide-paths.js";
 import { loadUserConfig } from "../utils/config.js";
+import { saveFile, formatSavedFilesConfirmation } from "../utils/persistence.js";
 import { calcularProgressoDiscovery } from "../utils/discovery-adapter.js";
 import { criarEstadoOnboardingInicial } from "../services/onboarding.service.js";
 import type { NextAction, FlowProgress } from "../types/response.js";
@@ -456,29 +457,6 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
 ---
 
-## ⚡ AÇÃO OBRIGATÓRIA - Criar Arquivos
-
-### 1. Criar: estado.json
-**Caminho:** \`${diretorio}/.maestro/estado.json\`
-
-\`\`\`json
-${estadoFile.content}
-\`\`\`
-
-### 2. Criar: resumo.json
-**Caminho:** \`${diretorio}/.maestro/resumo.json\`
-
-\`\`\`json
-${resumoFiles[0].content}
-\`\`\`
-
-### 3. Criar: resumo.md
-**Caminho:** \`${diretorio}/.maestro/resumo.md\`
-
-\`\`\`markdown
-${resumoFiles[1].content}
-\`\`\`
-
 ---
 
 ## 🤖 Especialista Ativado
@@ -506,14 +484,13 @@ ${blocoFormatado}
 
 ## 📝 Como Responder
 
-Preencha os campos acima e use o **onboarding_orchestrator** para continuar:
+Preencha os campos acima e EXECUTE:
 
-\`\`\`
-onboarding_orchestrator({
-    estado_json: "<conteúdo do estado.json que você acabou de criar>",
-    diretorio: "${diretorio}",
-    acao: "proximo_bloco",
-    respostas_bloco: {
+\`\`\`json
+executar({
+    "diretorio": "${diretorio}",
+    "acao": "avancar",
+    "respostas": {
         "campo_id": "valor",
         "outro_campo": "valor"
     }
@@ -545,21 +522,32 @@ ${args.usar_stitch ? '\n> 🎨 **Google Stitch habilitado** - Disponível para p
         });
     }
 
+    // v5.3: Persistência direta — salvar arquivos via fs
+    const savedPaths: string[] = [];
+    try {
+        await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content);
+        savedPaths.push(`${diretorio}/${estadoFile.path}`);
+        for (const f of resumoFiles) {
+            await saveFile(`${diretorio}/${f.path}`, f.content);
+            savedPaths.push(`${diretorio}/${f.path}`);
+        }
+    } catch (err) {
+        console.error('[iniciar-projeto] Erro ao salvar arquivos:', err);
+    }
+
+    // Adicionar confirmação de arquivos salvos ao output
+    const confirmacao = formatSavedFilesConfirmation(savedPaths);
+
     return {
-        content: [{ type: "text", text: resposta }],
-        files: [
-            { path: `${diretorio}/${estadoFile.path}`, content: estadoFile.content },
-            ...resumoFiles.map(f => ({ path: `${diretorio}/${f.path}`, content: f.content }))
-        ],
+        content: [{ type: "text", text: resposta + confirmacao }],
         estado_atualizado: estadoFile.content,
         next_action: {
-            tool: "onboarding_orchestrator",
+            tool: "executar",
             description: "Coletar respostas do primeiro bloco do discovery e enviar",
             args_template: {
-                estado_json: "{{estado_json}}",
                 diretorio: diretorio,
-                acao: "proximo_bloco",
-                respostas_bloco: camposTemplate,
+                acao: "avancar",
+                respostas: camposTemplate,
             },
             requires_user_input: true,
             user_prompt: primeiroBloco

@@ -8,6 +8,7 @@ import type { BrainstormSection, OnboardingState } from "../types/onboarding.js"
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { resolveProjectPath } from "../utils/files.js";
+import { saveFile } from "../utils/persistence.js";
 
 interface BrainstormArgs {
   estado_json: string;
@@ -242,12 +243,12 @@ export async function brainstorm(args: BrainstormArgs): Promise<ToolResult> {
 /**
  * Handler: iniciar brainstorm
  */
-function handleIniciarBrainstorm(
+async function handleIniciarBrainstorm(
   onboarding: OnboardingState,
   estado: any,
   diretorio: string,
   discoveryIncompleto: boolean = false
-): ToolResult {
+): Promise<ToolResult> {
   // Gerar seções de brainstorm
   if (onboarding.brainstormSections.length === 0) {
     onboarding.brainstormSections = gerarSecoesBrainstorm(onboarding.discoveryResponses);
@@ -267,9 +268,9 @@ function handleIniciarBrainstorm(
         text: "✅ **Brainstorm já concluído!** Todas as seções foram preenchidas.",
       }],
       next_action: {
-        tool: "prd_writer",
+        tool: "executar",
         description: "Gerar PRD a partir do brainstorm e discovery",
-        args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "gerar_validar" },
+        args_template: { diretorio: diretorio, acao: "avancar" },
         requires_user_input: false,
         auto_execute: true,
       },
@@ -301,13 +302,12 @@ ${secaoFormatada}
   return {
     content: [{ type: "text", text: resposta }],
     next_action: {
-      tool: "brainstorm",
+      tool: "executar",
       description: `Responder à seção "${proximaSecao.title}" do brainstorm`,
       args_template: {
-        estado_json: "{{estado_json}}",
         diretorio: diretorio,
-        acao: "proximo_secao",
-        resposta_secao: `<Resposta para: ${proximaSecao.title}>`,
+        acao: "avancar",
+        respostas: { resposta_secao: `<Resposta para: ${proximaSecao.title}>` },
       },
       requires_user_input: true,
       user_prompt: proximaSecao.prompt,
@@ -324,12 +324,12 @@ ${secaoFormatada}
 /**
  * Handler: processar próxima seção
  */
-function handleProximaSecao(
+async function handleProximaSecao(
   onboarding: OnboardingState,
   estado: any,
   diretorio: string,
   resposta?: string
-): ToolResult {
+): Promise<ToolResult> {
   if (!resposta || resposta.trim().length === 0) {
     return {
       content: [{
@@ -399,14 +399,20 @@ Agora vamos consolidar todos os insights em um **PRD Draft** estruturado.
 **Tempo estimado:** 5-10 minutos
 `;
 
+    // v5.3: Persistência direta
+    try {
+      await saveFile(`${diretorio}/${estadoFileFinal.path}`, estadoFileFinal.content);
+    } catch (err) {
+      console.error('[brainstorm] Erro ao salvar estado:', err);
+    }
+
     return {
       content: [{ type: "text", text: resposta }],
-      files: [{ path: `${diretorio}/${estadoFileFinal.path}`, content: estadoFileFinal.content }],
       estado_atualizado: estadoFileFinal.content,
       next_action: {
-        tool: "prd_writer",
+        tool: "executar",
         description: "Gerar PRD a partir do brainstorm e discovery",
-        args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "gerar_validar" },
+        args_template: { diretorio: diretorio, acao: "avancar" },
         requires_user_input: false,
         auto_execute: true,
       },
@@ -446,18 +452,23 @@ ${secaoFormatada}
 **Tempo estimado:** 10-15 minutos
 `;
 
+    // v5.3: Persistência direta
+    try {
+      await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content);
+    } catch (err) {
+      console.error('[brainstorm] Erro ao salvar estado:', err);
+    }
+
     return {
       content: [{ type: "text", text: resposta }],
-      files: [{ path: `${diretorio}/${estadoFile.path}`, content: estadoFile.content }],
       estado_atualizado: estadoFile.content,
       next_action: {
-        tool: "brainstorm",
+        tool: "executar",
         description: `Responder à seção "${proximaSecao.title}"`,
         args_template: {
-          estado_json: "{{estado_json}}",
           diretorio: diretorio,
-          acao: "proximo_secao",
-          resposta_secao: `<Resposta para: ${proximaSecao.title}>`,
+          acao: "avancar",
+          respostas: { resposta_secao: `<Resposta para: ${proximaSecao.title}>` },
         },
         requires_user_input: true,
         user_prompt: proximaSecao.prompt,
@@ -471,14 +482,20 @@ ${secaoFormatada}
     };
   }
 
+  // v5.3: Persistência direta
+  try {
+    await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content);
+  } catch (err) {
+    console.error('[brainstorm] Erro ao salvar estado:', err);
+  }
+
   return {
     content: [{ type: "text", text: "✅ **Brainstorm concluído!** Todas as seções foram preenchidas." }],
-    files: [{ path: `${diretorio}/${estadoFile.path}`, content: estadoFile.content }],
     estado_atualizado: estadoFile.content,
     next_action: {
-      tool: "prd_writer",
+      tool: "executar",
       description: "Gerar PRD a partir do brainstorm e discovery",
-      args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "gerar_validar" },
+      args_template: { diretorio: diretorio, acao: "avancar" },
       requires_user_input: false,
       auto_execute: true,
     },

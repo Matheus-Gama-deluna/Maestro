@@ -25,12 +25,14 @@ import {
   obterEstadoOnboarding,
   salvarEstadoOnboarding,
 } from "../services/onboarding.service.js";
+import { saveFile, formatSavedFilesConfirmation } from "../utils/persistence.js";
 
 interface OnboardingOrchestratorArgs {
   estado_json: string;
   diretorio: string;
   acao?: 'iniciar' | 'proximo_bloco' | 'status' | 'resumo';
   respostas_bloco?: Record<string, any>;
+  respostas?: Record<string, any>;
 }
 
 /**
@@ -114,7 +116,9 @@ export async function onboardingOrchestrator(args: OnboardingOrchestratorArgs): 
   if (acao === 'iniciar') {
     return handleIniciar(onboarding, estado, diretorio);
   } else if (acao === 'proximo_bloco') {
-    return handleProximoBloco(onboarding, estado, diretorio, args.respostas_bloco);
+    // v5.3: Aceitar tanto respostas_bloco quanto respostas (normalização)
+    const respostas = args.respostas_bloco || args.respostas;
+    return handleProximoBloco(onboarding, estado, diretorio, respostas);
   } else if (acao === 'status') {
     return handleStatus(onboarding);
   } else if (acao === 'resumo') {
@@ -133,11 +137,11 @@ export async function onboardingOrchestrator(args: OnboardingOrchestratorArgs): 
 /**
  * Handler: iniciar onboarding
  */
-function handleIniciar(
+async function handleIniciar(
   onboarding: OnboardingState,
   estado: EstadoProjeto,
   diretorio: string
-): ToolResult {
+): Promise<ToolResult> {
   const progresso = calcularProgressoDiscovery(onboarding.discoveryBlocks);
 
   if (!progresso.proximoBloco) {
@@ -147,9 +151,9 @@ function handleIniciar(
         text: "✅ **Discovery já concluído!**\n\nTodos os blocos foram preenchidos. Próximo passo: brainstorm.",
       }],
       next_action: {
-        tool: "brainstorm",
+        tool: "executar",
         description: "Iniciar brainstorm assistido após discovery completo",
-        args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "iniciar" },
+        args_template: { diretorio: diretorio, acao: "avancar" },
         requires_user_input: false,
         auto_execute: true,
       },
@@ -168,6 +172,13 @@ function handleIniciar(
   // Persistir estado atualizado (interação contada)
   const estadoAtualizado = salvarEstadoOnboarding(estado, onboarding);
   const estadoFile = serializarEstado(estadoAtualizado);
+
+  // v5.3: Persistência direta via fs
+  try {
+    await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content);
+  } catch (err) {
+    console.error('[onboarding] Erro ao salvar estado:', err);
+  }
 
   const blocoFormatado = formatarBlocoDiscovery(progresso.proximoBloco);
 
@@ -196,19 +207,14 @@ ${blocoFormatado}
 
   return {
     content: [{ type: "text", text: resposta }],
-    files: [{
-      path: `${diretorio}/${estadoFile.path}`,
-      content: estadoFile.content,
-    }],
     estado_atualizado: estadoFile.content,
     next_action: {
-      tool: "onboarding_orchestrator",
+      tool: "executar",
       description: `Coletar respostas do bloco "${progresso.proximoBloco.title}" e enviar`,
       args_template: {
-        estado_json: "{{estado_json}}",
         diretorio: diretorio,
-        acao: "proximo_bloco",
-        respostas_bloco: camposTemplate,
+        acao: "avancar",
+        respostas: camposTemplate,
       },
       requires_user_input: true,
       user_prompt: `Preencha as informações do bloco "${progresso.proximoBloco.title}"`,
@@ -225,12 +231,12 @@ ${blocoFormatado}
 /**
  * Handler: processar próximo bloco
  */
-function handleProximoBloco(
+async function handleProximoBloco(
   onboarding: OnboardingState,
   estado: EstadoProjeto,
   diretorio: string,
   respostas?: Record<string, any>
-): ToolResult {
+): Promise<ToolResult> {
   if (!respostas || Object.keys(respostas).length === 0) {
     return {
       content: [{
@@ -317,17 +323,20 @@ Todas as informações foram coletadas com sucesso! Agora vamos para o **Brainst
 **Tempo estimado:** 10-15 minutos
 `;
 
+    // v5.3: Persistência direta
+    try {
+      await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content);
+    } catch (err) {
+      console.error('[onboarding] Erro ao salvar estado:', err);
+    }
+
     return {
       content: [{ type: "text", text: resposta }],
-      files: [{
-        path: `${diretorio}/${estadoFile.path}`,
-        content: estadoFile.content,
-      }],
       estado_atualizado: estadoFile.content,
       next_action: {
-        tool: "brainstorm",
+        tool: "executar",
         description: "Iniciar brainstorm assistido com dados do discovery",
-        args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "iniciar" },
+        args_template: { diretorio: diretorio, acao: "avancar" },
         requires_user_input: false,
         auto_execute: true,
       },
@@ -392,21 +401,23 @@ ${blocoFormatado}
 **Tempo estimado:** ${progresso.proximoBloco.estimatedTime} minutos
 `;
 
+    // v5.3: Persistência direta
+    try {
+      await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content);
+    } catch (err) {
+      console.error('[onboarding] Erro ao salvar estado:', err);
+    }
+
     return {
       content: [{ type: "text", text: resposta }],
-      files: [{
-        path: `${diretorio}/${estadoFile.path}`,
-        content: estadoFile.content,
-      }],
       estado_atualizado: estadoFile.content,
       next_action: {
-        tool: "onboarding_orchestrator",
+        tool: "executar",
         description: `Coletar respostas do bloco "${progresso.proximoBloco.title}" e enviar`,
         args_template: {
-          estado_json: "{{estado_json}}",
           diretorio: diretorio,
-          acao: "proximo_bloco",
-          respostas_bloco: camposTemplate,
+          acao: "avancar",
+          respostas: camposTemplate,
         },
         requires_user_input: true,
         user_prompt: `Preencha as informações do bloco "${progresso.proximoBloco.title}"`,
@@ -420,20 +431,23 @@ ${blocoFormatado}
     };
   }
 
+  // v5.3: Persistência direta
+  try {
+    await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content);
+  } catch (err) {
+    console.error('[onboarding] Erro ao salvar estado:', err);
+  }
+
   return {
     content: [{
       type: "text",
       text: "✅ **Discovery concluído!** Todos os blocos foram preenchidos.",
     }],
-    files: [{
-      path: `${diretorio}/${estadoFile.path}`,
-      content: estadoFile.content,
-    }],
     estado_atualizado: estadoFile.content,
     next_action: {
-      tool: "brainstorm",
+      tool: "executar",
       description: "Iniciar brainstorm assistido",
-      args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "iniciar" },
+      args_template: { diretorio: diretorio, acao: "avancar" },
       requires_user_input: false,
       auto_execute: true,
     },

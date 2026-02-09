@@ -9,6 +9,7 @@ import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { resolveProjectPath } from "../utils/files.js";
 import { calcularQualidade } from "../gates/quality-scorer.js";
+import { saveFile, formatSavedFilesConfirmation } from "../utils/persistence.js";
 
 interface PRDWriterArgs {
   estado_json: string;
@@ -221,11 +222,11 @@ export async function prdWriter(args: PRDWriterArgs): Promise<ToolResult> {
 /**
  * Handler: gerar PRD
  */
-function handleGerarPRD(
+async function handleGerarPRD(
   onboarding: OnboardingState,
   estado: any,
   diretorio: string
-): ToolResult {
+): Promise<ToolResult> {
   if (onboarding.brainstormStatus !== 'completed') {
     return {
       content: [{
@@ -253,6 +254,19 @@ function handleGerarPRD(
 
   const estadoFile = serializarEstado(estadoAtualizado);
 
+  // v5.3: Persistência direta
+  const savedPaths: string[] = [];
+  try {
+    await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content);
+    savedPaths.push(`${diretorio}/${estadoFile.path}`);
+    await saveFile(`${diretorio}/docs/01-produto/PRD.md`, prdConteudo);
+    savedPaths.push(`${diretorio}/docs/01-produto/PRD.md`);
+  } catch (err) {
+    console.error('[prd-writer] Erro ao salvar arquivos:', err);
+  }
+
+  const confirmacao = formatSavedFilesConfirmation(savedPaths);
+
   const resposta = `# ✅ PRD Draft Gerado!
 
 O PRD foi consolidado a partir do discovery e brainstorm.
@@ -270,44 +284,18 @@ ${prdConteudo.substring(0, 500)}...
 ## 🔍 Próximos Passos
 
 1. **Revisar PRD:** Verifique se todos os detalhes estão corretos
-2. **Validar Completude:** Use \`prd_writer(estado_json: "...", diretorio: "...", acao: "validar")\`
-3. **Ajustar se necessário:** Refine seções que precisam de melhorias
-4. **Avançar para Fase 1:** Quando validado, o PRD estará pronto para a próxima fase
-
----
-
-## ⚡ AÇÃO OBRIGATÓRIA - Atualizar Estado
-
-**Caminho:** \`${estadoFile.path}\`
-
-\`\`\`json
-${estadoFile.content}
-\`\`\`
-
-**Arquivo PRD:** \`docs/01-produto/PRD.md\`
-
-\`\`\`markdown
-${prdConteudo}
-\`\`\`
+2. **Ajustar se necessário:** Refine seções que precisam de melhorias
+3. **Avançar para Fase 1:** Quando validado, o PRD estará pronto para a próxima fase
+${confirmacao}
 `;
 
   return {
     content: [{ type: "text", text: resposta }],
-    files: [
-      {
-        path: `${diretorio}/${estadoFile.path}`,
-        content: estadoFile.content,
-      },
-      {
-        path: `${diretorio}/docs/01-produto/PRD.md`,
-        content: prdConteudo,
-      },
-    ],
     estado_atualizado: estadoFile.content,
     next_action: {
-      tool: "prd_writer",
+      tool: "validar",
       description: "Validar completude do PRD gerado",
-      args_template: { estado_json: "{{estado_json}}", diretorio: diretorio, acao: "validar" },
+      args_template: { diretorio: diretorio, tipo: "entregavel" },
       requires_user_input: false,
       auto_execute: true,
     },
@@ -446,11 +434,11 @@ function handleStatusPRD(onboarding: OnboardingState): ToolResult {
 /**
  * Handler: gerar e validar PRD
  */
-function handleGerarValidarPRD(
+async function handleGerarValidarPRD(
   onboarding: OnboardingState,
   estado: any,
   diretorio: string
-): ToolResult {
+): Promise<ToolResult> {
   if (onboarding.brainstormStatus !== 'completed') {
     return {
       content: [{
@@ -528,6 +516,19 @@ function handleGerarValidarPRD(
 
   const estadoFile = serializarEstado(estadoAtualizado);
 
+  // v5.3: Persistência direta
+  const savedPaths: string[] = [];
+  try {
+    await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content);
+    savedPaths.push(`${diretorio}/${estadoFile.path}`);
+    await saveFile(`${diretorio}/docs/01-produto/PRD.md`, prdConteudo);
+    savedPaths.push(`${diretorio}/docs/01-produto/PRD.md`);
+  } catch (err) {
+    console.error('[prd-writer] Erro ao salvar arquivos:', err);
+  }
+
+  const confirmacao = formatSavedFilesConfirmation(savedPaths);
+
   const resposta = `# ✅ PRD Draft Gerado e Validado!
 
 O PRD foi consolidado a partir do discovery e brainstorm.
@@ -542,42 +543,20 @@ ${prdConteudo.substring(0, 500)}...
 
 ---
 
-## 🔍 Próximos Passos
-
-1. **Revisar PRD:** Verifique se todos os detalhes estão corretos
-2. **Ajustar se necessário:** Refine seções que precisam de melhorias
-3. **Avançar para Fase 1:** Quando validado, o PRD estará pronto para a próxima fase
-
----
-
-## ⚡ AÇÃO OBRIGATÓRIA - Atualizar Estado
-
-**Caminho:** \`${estadoFile.path}\`
-
-\`\`\`json
-${estadoFile.content}
-\`\`\`
-
-**Arquivo PRD:** \`docs/01-produto/PRD.md\`
-
-\`\`\`markdown
-${prdConteudo}
-\`\`\`
+${linhas.join('\n')}
+${confirmacao}
 `;
 
   return {
     content: [{ type: "text", text: resposta }],
-    files: [
-      {
-        path: `${diretorio}/${estadoFile.path}`,
-        content: estadoFile.content,
-      },
-      {
-        path: `${diretorio}/docs/01-produto/PRD.md`,
-        content: prdConteudo,
-      },
-    ],
     estado_atualizado: estadoFile.content,
+    next_action: score >= 70 ? {
+      tool: "executar",
+      description: "Avançar para Fase 1 (Produto) após PRD validado",
+      args_template: { diretorio: diretorio, acao: "avancar" },
+      requires_user_input: false,
+      auto_execute: true,
+    } : undefined,
   };
 }
 

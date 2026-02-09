@@ -53,6 +53,8 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
             diretorio: args.diretorio,
             estado_json: args.estado_json || "",
             acao: args.acao || "proximo_bloco",
+            // v5.3: Normalizar respostas → respostas_bloco para onboarding
+            respostas_bloco: args.respostas,
             respostas: args.respostas,
         } as any);
     }
@@ -64,11 +66,14 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
     if (inOnboarding) {
         // Se brainstorm está em progresso
         if (onboarding?.brainstormStatus === "in_progress") {
+            // v5.3: Extrair resposta_secao de respostas se presente
+            const respostasObj = args.respostas || {};
+            const respostaSecao = (respostasObj.resposta_secao as string) || "";
             return brainstorm({
                 diretorio: args.diretorio,
                 estado_json: args.estado_json || "",
                 acao: "proximo_secao",
-                respostas: args.respostas,
+                resposta_secao: respostaSecao,
             } as any);
         }
 
@@ -77,6 +82,8 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
             diretorio: args.diretorio,
             estado_json: args.estado_json || "",
             acao: args.acao || "proximo_bloco",
+            // v5.3: Normalizar respostas → respostas_bloco para onboarding
+            respostas_bloco: args.respostas,
             respostas: args.respostas,
         } as any);
     }
@@ -88,9 +95,9 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
                 titulo: "⚠️ Entregável Necessário",
                 resumo: "Para avançar na fase de desenvolvimento, forneça o entregável.",
                 proximo_passo: {
-                    tool: "avancar",
+                    tool: "executar",
                     descricao: "Avançar fase com entregável",
-                    args: `diretorio: "${args.diretorio}", entregavel: "conteúdo do entregável..."`,
+                    args: `{ "diretorio": "${args.diretorio}", "acao": "avancar", "entregavel": "conteúdo do entregável..." }`,
                     requer_input_usuario: true,
                     prompt_usuario: "Forneça o conteúdo do entregável da fase atual.",
                 },

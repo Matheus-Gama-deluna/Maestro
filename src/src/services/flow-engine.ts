@@ -68,7 +68,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "none",
         to: "setup",
-        tool: "setup_inicial",
+        tool: "maestro",
         description: "Configurar preferências globais do Maestro",
         condition: (s) => !s.hasGlobalConfig,
         requires_user_input: true,
@@ -77,8 +77,8 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "none",
         to: "iniciar",
-        tool: "iniciar_projeto",
-        description: "Iniciar um novo projeto",
+        tool: "maestro",
+        description: "Criar novo projeto",
         condition: (s) => s.hasGlobalConfig && !s.hasProject,
         requires_user_input: true,
         user_prompt: "Qual o nome e descrição do projeto?",
@@ -86,15 +86,15 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "setup",
         to: "iniciar",
-        tool: "iniciar_projeto",
-        description: "Iniciar um novo projeto após configuração",
+        tool: "maestro",
+        description: "Criar novo projeto após configuração",
         requires_user_input: true,
         user_prompt: "Configuração concluída! Qual o nome e descrição do projeto?",
     },
     {
         from: "iniciar",
         to: "confirmar",
-        tool: "confirmar_projeto",
+        tool: "maestro",
         description: "Confirmar criação do projeto com tipo e complexidade",
         requires_user_input: true,
         user_prompt: "Confirme o tipo e complexidade do projeto.",
@@ -102,7 +102,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "confirmar",
         to: "discovery",
-        tool: "onboarding_orchestrator",
+        tool: "executar",
         description: "Iniciar discovery do projeto",
         requires_user_input: true,
         user_prompt: "Vamos coletar informações sobre o projeto em blocos.",
@@ -110,7 +110,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "discovery_in_progress",
         to: "discovery_next_block",
-        tool: "onboarding_orchestrator",
+        tool: "executar",
         description: "Responder próximo bloco do discovery",
         requires_user_input: true,
         user_prompt: "Responda as perguntas do próximo bloco de discovery.",
@@ -118,7 +118,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "discovery_complete",
         to: "brainstorm",
-        tool: "brainstorm",
+        tool: "executar",
         description: "Brainstorm exploratório para refinar ideias",
         condition: (s) => s.mode !== "economy" && s.wantsBrainstorm,
         requires_user_input: true,
@@ -127,7 +127,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "discovery_complete",
         to: "prd",
-        tool: "prd_writer",
+        tool: "executar",
         description: "Gerar PRD a partir do discovery",
         condition: (s) => s.mode === "economy" || !s.wantsBrainstorm,
         requires_user_input: false,
@@ -136,7 +136,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "brainstorm_complete",
         to: "prd",
-        tool: "prd_writer",
+        tool: "executar",
         description: "Gerar PRD a partir do discovery + brainstorm",
         requires_user_input: false,
         auto_execute: true,
@@ -144,7 +144,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "prd_complete",
         to: "confirmar_classificacao",
-        tool: "confirmar_classificacao",
+        tool: "executar",
         description: "Confirmar classificação do projeto baseada no PRD",
         requires_user_input: true,
         user_prompt: "PRD gerado! Confirme a classificação sugerida.",
@@ -158,7 +158,7 @@ const DEVELOPMENT_FLOW: FlowTransition[] = [
     {
         from: "aguardando_aprovacao",
         to: "aprovar_gate",
-        tool: "aprovar_gate",
+        tool: "executar",
         description: "Projeto aguardando aprovação do usuário",
         requires_user_input: true,
         user_prompt: "O projeto está bloqueado. Deseja aprovar ou rejeitar?",
@@ -166,7 +166,7 @@ const DEVELOPMENT_FLOW: FlowTransition[] = [
     {
         from: "aguardando_classificacao",
         to: "confirmar_classificacao",
-        tool: "confirmar_classificacao",
+        tool: "executar",
         description: "Confirmar classificação antes de avançar",
         requires_user_input: true,
         user_prompt: "Confirme a classificação do projeto.",
@@ -174,7 +174,7 @@ const DEVELOPMENT_FLOW: FlowTransition[] = [
     {
         from: "fase_ativa",
         to: "gerar_entregavel",
-        tool: "proximo",
+        tool: "executar",
         description: "Gerar entregável da fase atual e avançar",
         requires_user_input: true,
         user_prompt: "Trabalhe com o especialista para gerar o entregável da fase.",
@@ -182,7 +182,7 @@ const DEVELOPMENT_FLOW: FlowTransition[] = [
     {
         from: "fase_concluida",
         to: "validar_gate",
-        tool: "validar_gate",
+        tool: "validar",
         description: "Validar checklist de saída da fase",
         requires_user_input: false,
         auto_execute: true,
@@ -190,7 +190,7 @@ const DEVELOPMENT_FLOW: FlowTransition[] = [
     {
         from: "projeto_concluido",
         to: "status_final",
-        tool: "status",
+        tool: "maestro",
         description: "Projeto concluído! Ver status final",
         requires_user_input: false,
     },

@@ -10,6 +10,7 @@
 
 import type { NextAction, SpecialistPersona, FlowProgress } from "../types/response.js";
 import { annotateContent, forAssistantOnly, forUserOnly } from "../services/annotations-fallback.service.js";
+import { remapToPublicTool, isPublicTool } from "./next-step-formatter.js";
 
 // === TIPOS ===
 
@@ -140,9 +141,18 @@ export function formatResponse(opts: ToolResponseOptions): ResponseBlock[] {
     }
 
     // Bloco final: Próximo passo (sempre no final, se houver)
+    // v5.3: Valida que tool é pública, remapeia se necessário
     if (opts.proximo_passo) {
+        const toolName = isPublicTool(opts.proximo_passo.tool) 
+            ? opts.proximo_passo.tool 
+            : remapToPublicTool(opts.proximo_passo.tool);
+        
+        if (!isPublicTool(opts.proximo_passo.tool)) {
+            console.error(`[response-formatter] proximo_passo referencia tool interna: ${opts.proximo_passo.tool} → remapeado para: ${toolName}`);
+        }
+
         let nextBlock = `## ▶️ Próximo Passo\n\n**${opts.proximo_passo.descricao}**\n`;
-        nextBlock += `\n\`\`\`\n${opts.proximo_passo.tool}(${opts.proximo_passo.args || ""})\n\`\`\``;
+        nextBlock += `\n\`\`\`json\n${toolName}(${opts.proximo_passo.args || ""})\n\`\`\``;
 
         if (opts.proximo_passo.requer_input_usuario) {
             nextBlock += `\n\n> 👤 ${opts.proximo_passo.prompt_usuario || "Aguardando input do usuário."}`;

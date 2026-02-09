@@ -110,7 +110,7 @@ export async function executar(args: ExecutarArgs): Promise<ToolResult> {
                     proximo_passo: {
                         tool: "executar",
                         descricao: "Tente novamente com uma ação válida",
-                        args: `diretorio: "${args.diretorio}", acao: "avancar"`,
+                        args: `{ "diretorio": "${args.diretorio}", "acao": "avancar" }`,
                     },
                 }),
             };

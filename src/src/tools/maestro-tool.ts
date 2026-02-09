@@ -20,6 +20,8 @@ import { readFile } from "fs/promises";
 import { ContentResolverService } from "../services/content-resolver.service.js";
 import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { buildResourceLinksBlock, skillResourceLink, templateResourceLink } from "../utils/resource-links.js";
+import { loadUserConfig } from "../utils/config.js";
+import { forAssistantOnly } from "../services/annotations-fallback.service.js";
 
 interface MaestroArgs {
     diretorio: string;
@@ -75,14 +77,27 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
         // Se acao for setup_inicial, executar diretamente
         if (args.acao === "setup_inicial") {
             const { setupInicial } = await import("./setup-inicial.js");
+            let params = args.respostas || {};
+            if (args.input && Object.keys(params).length === 0) {
+                const parsed = parseSetupInput(args.input);
+                if (parsed) {
+                    params = parsed;
+                }
+            }
             return setupInicial({
-                ide: args.respostas?.ide as any,
-                modo: args.respostas?.modo as any,
-                usar_stitch: args.respostas?.usar_stitch as boolean | undefined,
-                preferencias_stack: args.respostas?.preferencias_stack as any,
-                team_size: args.respostas?.team_size as any,
+                ide: params.ide as any,
+                modo: params.modo as any,
+                usar_stitch: params.usar_stitch as boolean | undefined,
+                preferencias_stack: params.preferencias_stack as any,
+                team_size: params.team_size as any,
             });
         }
+
+        // v5.3: Ação criar_projeto — combina setup + iniciar + confirmar em 1 passo
+        if (args.acao === "criar_projeto") {
+            return handleCriarProjeto(args);
+        }
+
         return handleNoProject(args.diretorio);
     }
 
@@ -170,37 +185,130 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
 
 /**
  * Quando não há projeto no diretório
+ * v5.3: Sempre referencia tools públicas (maestro) com parâmetros explícitos
  */
 function handleNoProject(diretorio: string): ToolResult {
     const hasConfig = existsSync(join(diretorio, ".maestro", "config.json"));
 
-    const nextTool = hasConfig ? "iniciar_projeto" : "setup_inicial";
-    const nextDesc = hasConfig
-        ? "Iniciar um novo projeto neste diretório"
-        : "Configurar preferências globais do Maestro";
-    const nextPrompt = hasConfig
-        ? "Qual o nome do projeto que deseja criar?"
-        : "Vamos configurar suas preferências (IDE, modo operacional, etc.)";
-    const nextArgs = hasConfig
-        ? fmtArgs({ nome: "{{nome_do_projeto}}", diretorio })
-        : "";
+    if (hasConfig) {
+        // Config já existe — ir direto para criar projeto
+        const content = formatResponse({
+            titulo: "🎯 Maestro — Novo Projeto",
+            resumo: `Nenhum projeto encontrado em \`${diretorio}\`. Preferências já configuradas.`,
+            instrucoes: `EXECUTE a seguinte tool call após perguntar ao usuário o nome e descrição do projeto:
 
+maestro({
+  "diretorio": "${diretorio}",
+  "acao": "criar_projeto",
+  "respostas": {
+    "nome": "<nome do projeto>",
+    "descricao": "<descrição breve>"
+  }
+})`,
+            proximo_passo: {
+                tool: "maestro",
+                descricao: "Criar novo projeto neste diretório",
+                args: `{ "diretorio": "${diretorio}", "acao": "criar_projeto", "respostas": { "nome": "<nome>", "descricao": "<descrição>" } }`,
+                requer_input_usuario: true,
+                prompt_usuario: "Qual o nome e uma breve descrição do projeto?",
+            },
+        });
+        return { content };
+    }
+
+    // Sem config — precisa de setup primeiro
     const content = formatResponse({
         titulo: "🎯 Maestro — Novo Projeto",
-        resumo: `Nenhum projeto encontrado em \`${diretorio}\`.`,
-        instrucoes: hasConfig
-            ? "Suas preferências já estão configuradas. Vamos iniciar um novo projeto!"
-            : "Primeiro, vamos configurar suas preferências (IDE, modo, etc.)",
+        resumo: `Nenhum projeto encontrado em \`${diretorio}\`. Configuração inicial necessária.`,
+        instrucoes: `Pergunte ao usuário:
+1. Qual IDE você usa? (windsurf / cursor / antigravity)
+2. Qual modo prefere? (economy = rápido / balanced = equilibrado / quality = completo)
+3. Deseja usar Stitch para prototipagem? (sim/não)
+
+Depois EXECUTE:
+
+maestro({
+  "diretorio": "${diretorio}",
+  "acao": "setup_inicial",
+  "respostas": {
+    "ide": "windsurf",
+    "modo": "balanced",
+    "usar_stitch": false
+  }
+})`,
         proximo_passo: {
-            tool: nextTool,
-            descricao: nextDesc,
-            args: nextArgs,
+            tool: "maestro",
+            descricao: "Configurar preferências e depois criar projeto",
+            args: `{ "diretorio": "${diretorio}", "acao": "setup_inicial", "respostas": { "ide": "windsurf", "modo": "balanced", "usar_stitch": false } }`,
             requer_input_usuario: true,
-            prompt_usuario: nextPrompt,
+            prompt_usuario: "Qual IDE você usa? Qual modo prefere? (economy/balanced/quality)",
         },
     });
-
     return { content };
+}
+
+/**
+ * v5.3: Criar projeto completo em um único passo
+ * Combina setup_inicial + iniciar_projeto + confirmar_projeto
+ */
+async function handleCriarProjeto(args: MaestroArgs): Promise<ToolResult> {
+    const diretorio = args.diretorio;
+    const params = args.respostas || {};
+    const nome = params.nome as string;
+    const descricao = (params.descricao as string) || "";
+
+    if (!nome) {
+        const content = formatResponse({
+            titulo: "🎯 Maestro — Criar Projeto",
+            resumo: "Informe o nome e descrição do projeto para continuar.",
+            instrucoes: `Pergunte ao usuário o nome e descrição do projeto, depois EXECUTE:
+
+maestro({
+  "diretorio": "${diretorio}",
+  "acao": "criar_projeto",
+  "respostas": {
+    "nome": "<nome do projeto>",
+    "descricao": "<descrição breve>"
+  }
+})`,
+            proximo_passo: {
+                tool: "maestro",
+                descricao: "Criar projeto com nome e descrição",
+                args: `{ "diretorio": "${diretorio}", "acao": "criar_projeto", "respostas": { "nome": "<nome>", "descricao": "<descrição>" } }`,
+                requer_input_usuario: true,
+                prompt_usuario: "Qual o nome e uma breve descrição do projeto?",
+            },
+        });
+        return { content };
+    }
+
+    // Carregar config global ou usar defaults
+    const configGlobal = await loadUserConfig();
+    const ide = (params.ide as string) || configGlobal?.ide || "windsurf";
+    const modo = (params.modo as string) || configGlobal?.modo || "balanced";
+    const usarStitch = (params.usar_stitch as boolean) ?? configGlobal?.usar_stitch ?? false;
+
+    // Se não tem config global, salvar automaticamente
+    if (!configGlobal) {
+        try {
+            const { saveUserConfig } = await import("../utils/config.js");
+            await saveUserConfig({ ide: ide as any, modo: modo as any, usar_stitch: usarStitch });
+        } catch {
+            // Fallback silencioso
+        }
+    }
+
+    // Delegar para iniciar_projeto com confirmar_automaticamente=true
+    const { iniciarProjeto } = await import("./iniciar-projeto.js");
+    return iniciarProjeto({
+        nome,
+        descricao,
+        diretorio,
+        ide: ide as any,
+        modo: modo as any,
+        usar_stitch: usarStitch,
+        confirmar_automaticamente: true,
+    });
 }
 
 /**
@@ -227,8 +335,26 @@ function generateProgressBar(estado: EstadoProjeto): string {
 }
 
 /**
- * Formata preview de argumentos para exibição
+ * Parse input text to extract setup_inicial parameters
+ * Handles formats like: setup_inicial({ ide: "windsurf", modo: "balanced" })
  */
+function parseSetupInput(input: string): Record<string, unknown> | null {
+    // Match setup_inicial({ ... }) pattern
+    const match = input.match(/setup_inicial\s*\(\s*(\{[\s\S]*\})\s*\)/);
+    if (!match) return null;
+    
+    try {
+        // Use Function constructor to safely evaluate the object literal
+        const objStr = match[1];
+        // Replace unquoted keys with quoted keys for valid JSON
+        const jsonStr = objStr
+            .replace(/([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '"$1":')
+            .replace(/'/g, '"');
+        return JSON.parse(jsonStr);
+    } catch {
+        return null;
+    }
+}
 function formatArgsPreview(args: Record<string, unknown>): string {
     return Object.entries(args)
         .map(([key, value]) => {
@@ -257,6 +383,7 @@ export const maestroToolSchema = {
         acao: {
             type: "string",
             description: "Ação específica a executar (opcional)",
+            enum: ["setup_inicial", "criar_projeto"],
         },
         estado_json: {
             type: "string",
@@ -264,7 +391,14 @@ export const maestroToolSchema = {
         },
         respostas: {
             type: "object",
-            description: "Respostas de formulário (opcional)",
+            description: "Parâmetros estruturados. Para setup: {ide, modo, usar_stitch}. Para criar_projeto: {nome, descricao}. Para onboarding: respostas do bloco atual.",
+            properties: {
+                ide: { type: "string", enum: ["windsurf", "cursor", "antigravity"], description: "IDE utilizada (para setup_inicial)" },
+                modo: { type: "string", enum: ["economy", "balanced", "quality"], description: "Modo operacional (para setup_inicial)" },
+                usar_stitch: { type: "boolean", description: "Usar Stitch para prototipagem (para setup_inicial)" },
+                nome: { type: "string", description: "Nome do projeto (para criar_projeto)" },
+                descricao: { type: "string", description: "Descrição breve do projeto (para criar_projeto)" },
+            },
         },
     },
     required: ["diretorio"],

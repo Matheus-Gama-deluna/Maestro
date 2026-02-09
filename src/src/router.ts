@@ -121,7 +121,7 @@ interface ToolDefinition {
 const publicTools: ToolDefinition[] = [
     {
         name: "maestro",
-        description: "🎯 Entry point inteligente do Maestro. Detecta contexto e guia o próximo passo. Sem ação = retorna status do projeto. Use quando não souber qual tool usar.",
+        description: "🎯 Entry point do Maestro. Sem projeto: cria novo (acao='criar_projeto', respostas={nome, descricao}). Com projeto: retorna status e próximo passo. Para setup: acao='setup_inicial', respostas={ide, modo, usar_stitch}. Sem ação = retorna status do projeto.",
         inputSchema: maestroToolSchema,
         outputSchema: {
             type: "object",
@@ -146,7 +146,7 @@ const publicTools: ToolDefinition[] = [
     },
     {
         name: "executar",
-        description: "⚡ Executa ações no projeto. acao='avancar' (padrão): avança fase/onboarding. acao='salvar': salva conteúdo sem avançar. acao='checkpoint': gerencia checkpoints.",
+        description: "⚡ Executa ações no projeto. acao='avancar' (padrão): avança fase/onboarding (com entregavel ou respostas). acao='salvar': salva conteúdo (requer conteudo). acao='checkpoint': gerencia checkpoints. Para onboarding: respostas={campo1: valor1, campo2: valor2}.",
         inputSchema: executarSchema,
         handler: applySmartMiddlewares("executar", (a) => executar(a as any)),
     },
