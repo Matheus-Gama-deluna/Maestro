@@ -2,11 +2,11 @@
  * Constantes centralizadas do Maestro MCP
  * 
  * Ponto ÚNICO de definição de versão, nome e protocol.
- * Todos os entry points (stdio.ts, index.ts, server.ts) importam daqui.
+ * Todos os entry points (stdio.ts, index.ts) importam daqui.
  */
 
 export const MAESTRO_NAME = "mcp-maestro";
-export const MAESTRO_VERSION = "5.1.0";
+export const MAESTRO_VERSION = "5.2.0";
 export const MAESTRO_DESCRIPTION = "Maestro — Orquestrador de desenvolvimento assistido por IA";
 
 /**

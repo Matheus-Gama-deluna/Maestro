@@ -171,27 +171,34 @@ export interface ResourceInfo {
     description?: string;
 }
 
-// Tool result - compatible with MCP SDK
+// Tool result - compatible with MCP SDK ServerResult
+// v5.2: Index signature mantido para compatibilidade com ServerResult do SDK.
+// Campos internos (_internal) são usados pelo middleware pipeline e NÃO vazam para o client.
+// O middleware embedAllMetadata() embute next_action/progress/specialist no content textual.
 export interface ToolResult {
     [x: string]: unknown;
     content: Array<{
         type: "text";
         text: string;
+        annotations?: Record<string, unknown>;
     }>;
     isError?: boolean;
-    /** Files for the AI to save (stateless mode) */
-    files?: Array<{
-        path: string;
-        content: string;
-        encoding?: string;
-    }>;
-    /** Updated state JSON string */
+    /** Structured content para clients que suportam (protocol ≥ 2025-06-18) — campo MCP padrão */
+    structuredContent?: { type: string; json: Record<string, unknown> };
+
+    // === Campos INTERNOS (pipeline de middlewares) ===
+    // Estes campos são consumidos pelos middlewares e NÃO são enviados ao client MCP.
+    // O SDK do MCP ignora campos desconhecidos no retorno.
+
+    /** @internal Files for persistence middleware to save */
+    files?: Array<{ path: string; content: string; encoding?: string }>;
+    /** @internal Updated state JSON — consumido por withPersistence */
     estado_atualizado?: string;
-    /** Instrução programática do próximo passo */
+    /** @internal Next action — calculado por withFlowEngine, embutido no content por embedAllMetadata */
     next_action?: NextAction;
-    /** Persona de especialista ativa */
+    /** @internal Specialist persona — calculado por withFlowEngine */
     specialist_persona?: SpecialistPersona;
-    /** Progresso do fluxo */
+    /** @internal Flow progress — calculado por withFlowEngine */
     progress?: FlowProgress;
 }
 

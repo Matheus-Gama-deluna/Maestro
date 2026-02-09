@@ -19,6 +19,7 @@ import { join } from "path";
 import { readFile } from "fs/promises";
 import { ContentResolverService } from "../services/content-resolver.service.js";
 import { SkillLoaderService } from "../services/skill-loader.service.js";
+import { buildResourceLinksBlock, skillResourceLink, templateResourceLink } from "../utils/resource-links.js";
 
 interface MaestroArgs {
     diretorio: string;
@@ -146,6 +147,23 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
             conteudo: generateProgressBar(estado),
         }],
     });
+
+    // v5.2: Resource links para especialista/skill referenciado
+    if (!inOnboarding && faseInfo) {
+        try {
+            const { getSkillParaFase } = await import("../utils/prompt-mapper.js");
+            const skillName = getSkillParaFase(faseInfo.nome);
+            if (skillName) {
+                const links = buildResourceLinksBlock([
+                    skillResourceLink(skillName),
+                    templateResourceLink(skillName, "template.md"),
+                ], "Recursos do Especialista");
+                content.push(...(links as any));
+            }
+        } catch {
+            // Fallback silencioso se skill não encontrada
+        }
+    }
 
     return { content };
 }

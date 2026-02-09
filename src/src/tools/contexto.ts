@@ -9,6 +9,8 @@ import { resolve } from "path";
 import { getSkillParaFase } from "../utils/prompt-mapper.js";
 import { formatSkillMessage, detectIDE } from "../utils/ide-paths.js";
 import { getSpecialistPersona } from "../services/specialist.service.js";
+import { formatError, embedAllMetadata } from "../utils/response-formatter.js";
+import { withStructuredContent } from "../services/structured-content.service.js";
 
 interface ContextoArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -23,32 +25,13 @@ export async function contexto(args: ContextoArgs): Promise<ToolResult> {
     // Validar parâmetros
     if (!args.estado_json) {
         return {
-            content: [{
-                type: "text",
-                text: `# 📋 Contexto do Projeto (Modo Stateless)
-
-Para obter o contexto, a IA deve:
-1. Ler o arquivo \`.maestro/estado.json\` do projeto
-2. Passar o conteúdo como parâmetro
-
-**Uso:**
-\`\`\`
-contexto(
-    estado_json: "...",
-    diretorio: "C:/projetos/meu-projeto"
-)
-\`\`\`
-`,
-            }],
+            content: formatError("contexto", "Parâmetro `estado_json` é obrigatório.", "Leia `.maestro/estado.json` e passe como parâmetro."),
         };
     }
 
     if (!args.diretorio) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Parâmetro `diretorio` é obrigatório.",
-            }],
+            content: formatError("contexto", "Parâmetro `diretorio` é obrigatório."),
             isError: true,
         };
     }
@@ -57,10 +40,7 @@ contexto(
     const estado = parsearEstado(args.estado_json);
     if (!estado) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Não foi possível parsear o estado JSON.",
-            }],
+            content: formatError("contexto", "Não foi possível parsear o estado JSON."),
             isError: true,
         };
     }
@@ -165,9 +145,9 @@ ${fluxo.fases.map(f => {
     const specialist = faseAtual ? getSpecialistPersona(faseAtual.nome) : null;
 
     const next_action: NextAction = {
-        tool: "proximo",
+        tool: "avancar",
         description: `Gerar entregável da fase ${estado.fase_atual} (${faseAtual?.nome || 'atual'}) e avançar`,
-        args_template: { entregavel: "{{conteudo_do_entregavel}}", estado_json: "{{estado_json}}", diretorio: args.diretorio },
+        args_template: { entregavel: "{{conteudo_do_entregavel}}", diretorio: args.diretorio },
         requires_user_input: true,
         user_prompt: `Use o contexto acima para trabalhar com ${faseAtual?.especialista || 'o especialista'} e gerar: ${faseAtual?.entregavel_esperado || 'entregável'}`,
     };
@@ -179,13 +159,27 @@ ${fluxo.fases.map(f => {
         percentage: Math.round((estado.gates_validados.length / estado.total_fases) * 100),
     };
 
-    return {
-        content: [{ type: "text", text: resposta }],
-        estado_atualizado: args.estado_json,
-        next_action,
-        specialist_persona: specialist || undefined,
-        progress,
+    // v5.2: Structured content — dados JSON para clients que suportam
+    const structuredData = {
+        projeto: estado.nome,
+        nivel: estado.nivel,
+        fase_atual: estado.fase_atual,
+        total_fases: estado.total_fases,
+        fase_nome: faseAtual?.nome || null,
+        progresso_percentual: progress.percentage,
+        gates_validados: estado.gates_validados,
+        entregaveis: estado.entregaveis,
+        fases_completas: fasesCompletas,
     };
+
+    // v5.2: Embute metadados no content (elimina campos custom ignorados pelo client)
+    const baseContent = embedAllMetadata(
+        [{ type: "text", text: resposta }],
+        { next_action, specialist: specialist || undefined, progress }
+    );
+
+    const result = withStructuredContent(baseContent, structuredData, "Contexto do Projeto");
+    return { content: result.content };
 }
 
 /**

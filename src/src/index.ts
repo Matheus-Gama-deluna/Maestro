@@ -345,197 +345,20 @@ async function handleMcpRequest(request: {
 // Implementações diretas (bypass do SDK transport)
 // ============================================
 
-import {
-    listarEspecialistas,
-    listarTemplates,
-    listarGuias,
-    lerEspecialista,
-    lerTemplate,
-    lerGuia,
-    lerPrompt,
-} from "./utils/files.js";
-
 import { MAESTRO_NAME, MAESTRO_VERSION, SUPPORTED_PROTOCOL_VERSION } from "./constants.js";
 import { captureClientCapabilities } from "./services/client-capabilities.service.js";
 
 import { routeToolCall, getRegisteredTools, getToolCount } from "./router.js";
+import { listResources as sharedListResources, readResource as sharedReadResource } from "./handlers/shared-resource-handler.js";
+import { listPrompts as sharedListPrompts, getPrompt as sharedGetPrompt } from "./handlers/shared-prompt-handler.js";
 
-// Gera documentação de uma tool a partir do registry do router
-function getToolDocumentation(toolName: string): string {
-    const tools = getRegisteredTools();
-    const tool = tools.find(t => t.name === toolName);
-    if (!tool) return `Tool não encontrada: ${toolName}`;
-
-    return `## 🎯 ${tool.name}
-
-${tool.description}
-
----
-**AÇÃO REQUERIDA**: Execute a tool acima com os parâmetros necessários.
-`;
-}
-
+// v5.2: Usa handler compartilhado para resources (elimina duplicação)
 async function getResourcesList() {
-    // v5.1: Expor especialistas, templates e guias (não tools)
-    // Alinhado com stdio.ts para paridade funcional
-    const especialistas = await listarEspecialistas();
-    const templates = await listarTemplates();
-    const guias = await listarGuias();
-
-    return {
-        resources: [
-            ...especialistas.map((e) => ({
-                uri: `maestro://especialista/${encodeURIComponent(e)}`,
-                name: `Especialista: ${e}`,
-                mimeType: "text/markdown",
-                description: `Especialista em ${e}`,
-            })),
-            ...templates.map((t) => ({
-                uri: `maestro://template/${encodeURIComponent(t)}`,
-                name: `Template: ${t}`,
-                mimeType: "text/markdown",
-                description: `Template de ${t}`,
-            })),
-            ...guias.map((g) => ({
-                uri: `maestro://guia/${encodeURIComponent(g)}`,
-                name: `Guia: ${g}`,
-                mimeType: "text/markdown",
-                description: `Guia de ${g}`,
-            })),
-            {
-                uri: "maestro://system-prompt",
-                name: "System Prompt",
-                mimeType: "text/markdown",
-                description: "Instruções de comportamento para a IA",
-            },
-        ],
-    };
+    return await sharedListResources();
 }
 
 async function getResourceContent(uri: string) {
-    // Handler para tools (exibidas no seletor @mcp:maestro:)
-    if (uri.startsWith("maestro://tool/")) {
-        const toolName = uri.replace("maestro://tool/", "");
-        const conteudo = getToolDocumentation(toolName);
-        return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
-    }
-
-    // Handlers para recursos internos (acessíveis via URI direta pela IA)
-    if (uri.startsWith("maestro://especialista/")) {
-        const nome = decodeURIComponent(uri.replace("maestro://especialista/", ""));
-        const conteudo = await lerEspecialista(nome);
-        return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
-    }
-
-    if (uri.startsWith("maestro://template/")) {
-        const nome = decodeURIComponent(uri.replace("maestro://template/", ""));
-        const conteudo = await lerTemplate(nome);
-        return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
-    }
-
-    if (uri.startsWith("maestro://guia/")) {
-        const nome = decodeURIComponent(uri.replace("maestro://guia/", ""));
-        const conteudo = await lerGuia(nome);
-        return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
-    }
-
-    if (uri.startsWith("maestro://prompt/")) {
-        const path = uri.replace("maestro://prompt/", "");
-        const [categoria, nome] = path.split("/");
-        const conteudo = await lerPrompt(
-            decodeURIComponent(categoria),
-            decodeURIComponent(nome)
-        );
-        return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
-    }
-
-    if (uri === "maestro://system-prompt") {
-        const conteudo = `# Maestro - Instruções OBRIGATÓRIAS para IA
-
-## 🚫 REGRAS ABSOLUTAS (VIOLAÇÃO = FALHA)
-
-1. **NUNCA chame \`aprovar_gate\`** - Esta tool é EXCLUSIVA do usuário humano
-2. **NUNCA gere entregáveis SEM LER o especialista e template ANTES**
-3. **NUNCA avance sem confirmação EXPLÍCITA do usuário** ("sim", "pode", "avançar")
-4. **NUNCA passe entregáveis vazios ou incompletos** para \`proximo()\`
-5. **NUNCA pule a leitura de recursos** - é OBRIGATÓRIO para cada fase
-
----
-
-## 📚 LEITURA OBRIGATÓRIA DE RECURSOS
-
-Para CADA fase, você DEVE executar estes comandos ANTES de gerar qualquer conteúdo:
-
-\`\`\`
-// 1. Ler o especialista da fase
-read_resource("maestro://especialista/{nome}")
-
-// 2. Ler o template do entregável
-read_resource("maestro://template/{nome}")
-\`\`\`
-
-### Recursos Disponíveis
-
-| Tipo | URI | Exemplo |
-|------|-----|---------|
-| Especialista | \`maestro://especialista/{nome}\` | \`maestro://especialista/Gestão de Produto\` |
-| Template | \`maestro://template/{nome}\` | \`maestro://template/PRD\` |
-| Guia | \`maestro://guia/{nome}\` | \`maestro://guia/Gates de Qualidade\` |
-
-> ⛔ **GERAR ENTREGÁVEL SEM LER RECURSOS = ERRO GRAVE**
-
----
-
-## 🔄 FLUXO OBRIGATÓRIO DE AVANÇO
-
-1. Chamar \`status()\` para ver fase atual
-2. **LER especialista** da fase → OBRIGATÓRIO
-3. **LER template** da fase → OBRIGATÓRIO
-4. Fazer as perguntas obrigatórias do especialista ao usuário
-5. Gerar entregável seguindo TODAS as seções do template
-6. **Apresentar ao usuário** e perguntar: "Posso salvar e avançar?"
-7. **Aguardar confirmação EXPLÍCITA** ("sim", "pode", "avançar")
-8. Chamar \`proximo(entregavel)\`
-9. Se bloqueado (score < 70): PARAR e informar ao usuário
-10. Repetir para próxima fase
-
----
-
-## 🔐 Sistema de Proteção de Gates
-
-- **Score >= 70**: Aprovado automaticamente
-- **Score 50-69**: BLOQUEADO → Aguardar decisão do usuário
-- **Score < 50**: Rejeitado → Corrigir e tentar novamente
-- **Entregável < 200 chars**: BLOQUEADO → Desenvolver conteúdo
-
-Quando bloqueado:
-- A IA deve INFORMAR o usuário sobre o bloqueio
-- A IA deve AGUARDAR o usuário decidir
-- A IA NÃO pode chamar \`aprovar_gate\` por conta própria
-
----
-
-## Tools Disponíveis
-
-### Core
-- \`iniciar_projeto\` - Inicia novo projeto
-- \`carregar_projeto\` - Carrega projeto existente
-- \`proximo\` - Salva entregável e avança fase
-- \`status\` - Retorna estado atual
-- \`validar_gate\` - Valida checklist da fase
-
-### 🔐 Exclusivo do Usuário
-- \`aprovar_gate\` - ⛔ IA NÃO PODE USAR
-
-### Auxiliares
-- \`classificar\` - Reclassifica complexidade
-- \`contexto\` - Retorna contexto acumulado
-- \`salvar\` - Salva rascunhos/anexos
-`;
-        return { contents: [{ uri, mimeType: "text/markdown", text: conteudo }] };
-    }
-
-    throw new Error(`Resource não encontrado: ${uri}`);
+    return await sharedReadResource(uri);
 }
 
 async function getToolsList() {
@@ -546,55 +369,14 @@ async function callTool(name: string, args?: Record<string, unknown>) {
     return await routeToolCall(name, args || {});
 }
 
+// v5.2: Usa handler compartilhado para prompts (elimina duplicação)
 async function getPromptsList() {
-    return {
-        prompts: [
-            {
-                name: "maestro-specialist",
-                description: "Persona + instruções do especialista da fase atual do projeto",
-                arguments: [{ name: "diretorio", description: "Diretório do projeto", required: true }],
-            },
-            {
-                name: "maestro-context",
-                description: "Contexto completo do projeto para a sessão de trabalho",
-                arguments: [{ name: "diretorio", description: "Diretório do projeto", required: true }],
-            },
-            {
-                name: "maestro-template",
-                description: "Template do entregável esperado para a fase atual",
-                arguments: [{ name: "diretorio", description: "Diretório do projeto", required: true }],
-            },
-            {
-                name: "maestro-sessao",
-                description: "Contexto completo para sessão de trabalho (specialist + context + template + tools)",
-                arguments: [{ name: "diretorio", description: "Diretório do projeto", required: true }],
-            },
-        ],
-    };
+    return sharedListPrompts();
 }
 
 async function getPromptContent(name: string, args?: Record<string, string>) {
     const diretorio = args?.diretorio || process.cwd();
-
-    // Prompt simples baseado no nome — lógica detalhada será movida para handlers compartilhados (Task 1.5)
-    switch (name) {
-        case "maestro-specialist":
-        case "maestro-context":
-        case "maestro-template":
-        case "maestro-sessao":
-            return {
-                description: `Prompt: ${name}`,
-                messages: [{
-                    role: "user" as const,
-                    content: {
-                        type: "text" as const,
-                        text: `Use a tool \`maestro(diretorio: "${diretorio}")\` para obter o contexto do projeto.`,
-                    },
-                }],
-            };
-        default:
-            throw new Error(`Prompt não encontrado: ${name}`);
-    }
+    return await sharedGetPrompt(name, diretorio);
 }
 
 // ============================================

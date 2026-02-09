@@ -11,6 +11,7 @@
 import { ContentResolverService } from "./content-resolver.service.js";
 import { getSkillParaFase } from "../utils/prompt-mapper.js";
 import { getSpecialistPersona } from "./specialist.service.js";
+import { getCached, setCache } from "./skill-cache.service.js";
 import type { SpecialistPersona } from "../types/response.js";
 
 /**
@@ -97,6 +98,17 @@ export class SkillLoaderService {
         const skillName = getSkillParaFase(faseNome);
         if (!skillName) return null;
 
+        // v5.2: Verificar cache antes de ler filesystem
+        const cacheKey = `skill:${skillName}:${mode}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            try {
+                return JSON.parse(cached) as ContextPackage;
+            } catch {
+                // Cache corrompido, continuar com leitura normal
+            }
+        }
+
         const budget = TOKEN_BUDGETS[mode];
         const specialist = getSpecialistPersona(faseNome);
 
@@ -142,7 +154,7 @@ export class SkillLoaderService {
         const resultMode: ContextPackage["mode"] =
             mode === "economy" ? "summary" : mode === "balanced" ? "summary" : "full";
 
-        return {
+        const result: ContextPackage = {
             skillName,
             specialist,
             skillContent,
@@ -152,6 +164,11 @@ export class SkillLoaderService {
             tokenEstimate: totalTokens,
             mode: resultMode,
         };
+
+        // v5.2: Armazenar no cache para evitar re-leitura do filesystem
+        setCache(cacheKey, JSON.stringify(result));
+
+        return result;
     }
 
     /**

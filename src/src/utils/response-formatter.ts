@@ -5,15 +5,18 @@
  * Todas as tools devem usar estes helpers para gerar retornos consistentes.
  * 
  * @since v5.1.0 — Task 1.2 do Roadmap de Melhorias MCP
+ * @updated v5.2.0 — Task A.7: Integração de annotations-fallback
  */
 
 import type { NextAction, SpecialistPersona, FlowProgress } from "../types/response.js";
+import { annotateContent, forAssistantOnly, forUserOnly } from "../services/annotations-fallback.service.js";
 
 // === TIPOS ===
 
 interface ResponseBlock {
     type: "text";
     text: string;
+    annotations?: Record<string, unknown>;
 }
 
 export interface ToolResponseOptions {
@@ -55,6 +58,7 @@ export interface ToolResponseOptions {
 /**
  * Gera resposta formatada em Markdown estruturado.
  * Retorna array de content blocks separados por propósito.
+ * v5.2: Blocos de especialista e instruções marcados como assistant-only via annotations.
  */
 export function formatResponse(opts: ToolResponseOptions): ResponseBlock[] {
     const blocks: ResponseBlock[] = [];
@@ -81,20 +85,20 @@ export function formatResponse(opts: ToolResponseOptions): ResponseBlock[] {
 
     blocks.push({ type: "text", text: resumoBlock });
 
-    // Bloco 2: Especialista (se houver)
+    // Bloco 2: Especialista (se houver) — v5.2: marcado como assistant-only
     if (opts.especialista) {
-        blocks.push({
+        blocks.push(forAssistantOnly({
             type: "text",
             text: `## 🤖 Especialista: ${opts.especialista.nome}\n\n**Tom:** ${opts.especialista.tom}\n**Expertise:** ${opts.especialista.expertise.join(", ")}`,
-        });
+        }));
     }
 
-    // Bloco 3: Instruções para a IA (se houver)
+    // Bloco 3: Instruções para a IA (se houver) — v5.2: marcado como assistant-only
     if (opts.instrucoes) {
-        blocks.push({
+        blocks.push(forAssistantOnly({
             type: "text",
             text: `## 🤖 Instruções\n\n${opts.instrucoes}`,
-        });
+        }));
     }
 
     // Bloco 4: Template (se houver)

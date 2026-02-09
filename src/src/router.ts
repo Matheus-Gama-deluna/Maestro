@@ -100,12 +100,16 @@ import { validar, validarSchema } from "./tools/consolidated/validar.js";
 import { checkpoint, checkpointSchema } from "./tools/consolidated/checkpoint-tool.js";
 import { analisar, analisarSchema } from "./tools/consolidated/analisar.js";
 
+// v5.2: Tool executar (consolida avancar + salvar + checkpoint)
+import { executar, executarSchema } from "./tools/consolidated/executar.js";
+
 // === DEFINIÇÃO DE TOOL ===
 
 interface ToolDefinition {
     name: string;
     description: string;
     inputSchema: Record<string, unknown>;
+    outputSchema?: Record<string, unknown>;
     handler: (args: Record<string, unknown>) => Promise<ToolResult>;
 }
 
@@ -113,24 +117,38 @@ interface ToolDefinition {
 // PUBLIC TOOLS — Expostas para a IA (superfície reduzida)
 // ============================================================
 
+// v5.2: 5 tools públicas (consolidação de 8→5)
 const publicTools: ToolDefinition[] = [
     {
         name: "maestro",
-        description: "🎯 Entry point inteligente do Maestro. Detecta contexto do projeto automaticamente e guia o próximo passo. Use esta tool quando não souber qual tool usar.",
+        description: "🎯 Entry point inteligente do Maestro. Detecta contexto e guia o próximo passo. Sem ação = retorna status do projeto. Use quando não souber qual tool usar.",
         inputSchema: maestroToolSchema,
+        outputSchema: {
+            type: "object",
+            properties: {
+                projeto: { type: "string" },
+                nivel: { type: "string" },
+                fase_atual: { type: "number" },
+                total_fases: { type: "number" },
+                fase_nome: { type: "string" },
+                progresso_percentual: { type: "number" },
+                especialista: { type: "string" },
+                proximo_passo: {
+                    type: "object",
+                    properties: {
+                        tool: { type: "string" },
+                        descricao: { type: "string" },
+                    },
+                },
+            },
+        },
         handler: applySmartMiddlewares("maestro", (a) => maestroTool(a as any)),
     },
     {
-        name: "avancar",
-        description: "⏭️ Avança no fluxo do projeto. Em onboarding: processa próximo bloco. Em desenvolvimento: submete entregável e avança fase. Detecta contexto automaticamente.",
-        inputSchema: avancarSchema,
-        handler: applySmartMiddlewares("avancar", (a) => avancar(a as any)),
-    },
-    {
-        name: "status",
-        description: "📊 Retorna status completo do projeto com progresso, fase atual e próximos passos.",
-        inputSchema: statusSchema,
-        handler: applyMiddlewares("status", (a) => status(a as any)),
+        name: "executar",
+        description: "⚡ Executa ações no projeto. acao='avancar' (padrão): avança fase/onboarding. acao='salvar': salva conteúdo sem avançar. acao='checkpoint': gerencia checkpoints.",
+        inputSchema: executarSchema,
+        handler: applySmartMiddlewares("executar", (a) => executar(a as any)),
     },
     {
         name: "validar",
@@ -139,28 +157,30 @@ const publicTools: ToolDefinition[] = [
         handler: applyMiddlewares("validar", (a) => validar(a as any)),
     },
     {
-        name: "contexto",
-        description: "🧠 Retorna contexto acumulado do projeto (ADRs, padrões, decisões, knowledge base).",
-        inputSchema: contextoSchema,
-        handler: applyMiddlewares("contexto", (a) => contexto(a as any)),
-    },
-    {
-        name: "salvar",
-        description: "💾 Salva conteúdo (rascunho, anexo ou entregável) sem avançar de fase.",
-        inputSchema: salvarSchema,
-        handler: applyPersistenceMiddlewares("salvar", (a) => salvar(a as any)),
-    },
-    {
-        name: "checkpoint",
-        description: "🔒 Gerencia checkpoints: criar, rollback total/parcial ou listar. Usa parâmetro 'acao'.",
-        inputSchema: checkpointSchema,
-        handler: applyPersistenceMiddlewares("checkpoint", (a) => checkpoint(a as any)),
-    },
-    {
         name: "analisar",
         description: "🔍 Analisa código: segurança, qualidade, performance, dependências ou relatório completo. Usa parâmetro 'tipo'.",
         inputSchema: analisarSchema,
         handler: applyMiddlewares("analisar", (a) => analisar(a as any)),
+    },
+    {
+        name: "contexto",
+        description: "🧠 Retorna contexto acumulado do projeto (ADRs, padrões, decisões, knowledge base).",
+        inputSchema: contextoSchema,
+        outputSchema: {
+            type: "object",
+            properties: {
+                projeto: { type: "string" },
+                nivel: { type: "string" },
+                fase_atual: { type: "number" },
+                total_fases: { type: "number" },
+                fase_nome: { type: "string" },
+                progresso_percentual: { type: "number" },
+                gates_validados: { type: "array", items: { type: "number" } },
+                entregaveis: { type: "object" },
+                fases_completas: { type: "array" },
+            },
+        },
+        handler: applyMiddlewares("contexto", (a) => contexto(a as any)),
     },
 ];
 
@@ -170,6 +190,31 @@ const publicTools: ToolDefinition[] = [
 // ============================================================
 
 const legacyTools: ToolDefinition[] = [
+    // ──── v5.2 LEGACY (antes públicas, agora subsumidas por executar/maestro) ────
+    {
+        name: "avancar",
+        description: "[v5.2 Legacy] Use 'executar' com acao='avancar'. Avança fase/onboarding.",
+        inputSchema: avancarSchema,
+        handler: applySmartMiddlewares("avancar", (a) => avancar(a as any)),
+    },
+    {
+        name: "salvar",
+        description: "[v5.2 Legacy] Use 'executar' com acao='salvar'. Salva conteúdo sem avançar.",
+        inputSchema: salvarSchema,
+        handler: applyPersistenceMiddlewares("salvar", (a) => salvar(a as any)),
+    },
+    {
+        name: "checkpoint",
+        description: "[v5.2 Legacy] Use 'executar' com acao='checkpoint'. Gerencia checkpoints.",
+        inputSchema: checkpointSchema,
+        handler: applyPersistenceMiddlewares("checkpoint", (a) => checkpoint(a as any)),
+    },
+    {
+        name: "status",
+        description: "[v5.2 Legacy] Use 'maestro' sem ação para obter status. Retorna status do projeto.",
+        inputSchema: statusSchema,
+        handler: applyMiddlewares("status", (a) => status(a as any)),
+    },
     // ──── CORE LEGACY ────
     {
         name: "setup_inicial",
@@ -449,7 +494,13 @@ for (const tool of legacyTools) allToolsMap.set(tool.name, tool);
  */
 // Mapa de redirecionamento para deprecation warnings
 const legacyRedirects: Record<string, string> = {
-    "proximo": "avancar",
+    // v5.2: Tools consolidadas em executar
+    "avancar": "executar(acao: 'avancar')",
+    "salvar": "executar(acao: 'salvar')",
+    "checkpoint": "executar(acao: 'checkpoint')",
+    "status": "maestro",
+    // v5.0 legacy
+    "proximo": "executar(acao: 'avancar')",
     "setup_inicial": "maestro",
     "iniciar_projeto": "maestro",
     "carregar_projeto": "maestro",
@@ -462,16 +513,16 @@ const legacyRedirects: Record<string, string> = {
     "gerar_relatorio": "analisar(tipo: 'completo')",
     "validate_dependencies": "analisar(tipo: 'dependencias')",
     "validate_security": "analisar(tipo: 'seguranca')",
-    "create_checkpoint": "checkpoint(acao: 'criar')",
-    "rollback_total": "checkpoint(acao: 'rollback')",
-    "rollback_partial": "checkpoint(acao: 'rollback_parcial')",
-    "list_checkpoints": "checkpoint(acao: 'listar')",
+    "create_checkpoint": "executar(acao: 'checkpoint', checkpoint_acao: 'criar')",
+    "rollback_total": "executar(acao: 'checkpoint', checkpoint_acao: 'rollback')",
+    "rollback_partial": "executar(acao: 'checkpoint', checkpoint_acao: 'rollback_parcial')",
+    "list_checkpoints": "executar(acao: 'checkpoint', checkpoint_acao: 'listar')",
     "get_context": "contexto",
-    "onboarding_orchestrator": "avancar",
-    "brainstorm": "avancar",
-    "prd_writer": "avancar",
+    "onboarding_orchestrator": "executar(acao: 'avancar')",
+    "brainstorm": "executar(acao: 'avancar')",
+    "prd_writer": "executar(acao: 'avancar')",
     "next_steps_dashboard": "maestro",
-    "discovery": "avancar",
+    "discovery": "executar(acao: 'avancar')",
 };
 
 // Set para lookup rápido de nomes públicos
@@ -514,11 +565,12 @@ export async function routeToolCall(name: string, rawArgs: Record<string, unknow
  * v5: Apenas 8 tools consolidadas (reduz superfície cognitiva).
  * Ponto ÚNICO de listagem - usado por stdio.ts e index.ts.
  */
-export function getRegisteredTools(): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> {
+export function getRegisteredTools(): Array<{ name: string; description: string; inputSchema: Record<string, unknown>; outputSchema?: Record<string, unknown> }> {
     return publicTools.map(t => ({
         name: t.name,
         description: t.description,
         inputSchema: t.inputSchema,
+        ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}),
     }));
 }
 

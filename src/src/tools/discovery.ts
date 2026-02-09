@@ -3,6 +3,7 @@ import type { OnboardingState } from "../types/onboarding.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { resolveProjectPath } from "../utils/files.js";
+import { buildElicitation } from "../services/elicitation-fallback.service.js";
 
 /**
  * Respostas do Discovery inicial
@@ -144,16 +145,38 @@ export async function discovery(args: DiscoveryArgs): Promise<ToolResult> {
     const diretorio = resolveProjectPath(args.diretorio);
     setCurrentDirectory(diretorio);
 
-    // Se não tem respostas, retorna questionário
+    // Se não tem respostas, retorna questionário via elicitation fallback
     if (!args.respostas) {
         const modo = estado.config?.mode || 'balanced';
+
+        // v5.2: Usar elicitation-fallback para perguntas estruturadas
+        const elicitation = buildElicitation({
+            title: "Discovery Inicial - Maestro",
+            description: "Para otimizar o desenvolvimento, vou coletar informações iniciais agrupadas.",
+            fields: [
+                { name: "nome_projeto", label: "Nome do projeto", type: "text", required: true },
+                { name: "problema", label: "Problema que resolve", type: "text", required: true, description: "Descreva o problema principal" },
+                { name: "publico_alvo", label: "Público-alvo principal", type: "text", required: true },
+                { name: "funcionalidades_principais", label: "3-5 funcionalidades principais do MVP", type: "text", required: true },
+                { name: "cronograma", label: "Cronograma desejado", type: "text", required: false, default: "3 meses" },
+                { name: "stack_preferida", label: "Stack preferida", type: "text", required: false, description: "Ex: React + Node.js, ou 'sugerir'" },
+                { name: "plataformas", label: "Plataformas alvo", type: "select", options: ["web", "mobile", "desktop"], required: true },
+            ],
+        });
+
+        // Se client suporta elicitation nativa, retornar payload nativo
+        if (elicitation.useNative && elicitation.nativePayload) {
+            return {
+                content: [{ type: "text", text: "Aguardando respostas do discovery via elicitation..." }],
+            };
+        }
+
+        // Fallback: questionário Markdown completo
         const questionario = gerarQuestionario(modo);
-        
         return {
-            content: [{
-                type: "text",
-                text: questionario,
-            }],
+            content: [
+                { type: "text", text: elicitation.markdownFallback || questionario },
+            ],
         };
     }
 

@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SkillLoaderService, type ContextPackage } from '../services/skill-loader.service.js';
 import { ContentResolverService } from '../services/content-resolver.service.js';
+import { invalidateCache } from '../services/skill-cache.service.js';
 
 // Mock ContentResolverService
 vi.mock('../services/content-resolver.service.js');
@@ -123,6 +124,7 @@ describe('SkillLoaderService', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        invalidateCache();
 
         mockResolver = {
             readSkillFile: vi.fn(),

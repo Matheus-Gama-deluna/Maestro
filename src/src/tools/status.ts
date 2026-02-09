@@ -10,6 +10,9 @@ import { gerarSecaoPrompts, getSkillParaFase, getSkillPath } from "../utils/prom
 import { temContentLocal, normalizeProjectPath, joinProjectPath } from "../utils/files.js";
 import { formatSkillMessage, detectIDE } from "../utils/ide-paths.js";
 import { getSpecialistPersona } from "../services/specialist.service.js";
+import { formatResponse, formatError, embedAllMetadata } from "../utils/response-formatter.js";
+import { withStructuredContent } from "../services/structured-content.service.js";
+import type { FlowProgress } from "../types/response.js";
 
 interface StatusArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -24,32 +27,13 @@ export async function status(args: StatusArgs): Promise<ToolResult> {
     // Validar parâmetros
     if (!args.estado_json) {
         return {
-            content: [{
-                type: "text",
-                text: `# ℹ️ Status do Projeto (Modo Stateless)
-
-Para ver o status, a IA deve:
-1. Ler o arquivo \`.maestro/estado.json\` do projeto
-2. Passar o conteúdo como parâmetro
-
-**Uso:**
-\`\`\`
-status(
-    estado_json: "...",
-    diretorio: "C:/projetos/meu-projeto"
-)
-\`\`\`
-`,
-            }],
+            content: formatError("status", "Parâmetro `estado_json` é obrigatório.", "Leia `.maestro/estado.json` e passe como parâmetro."),
         };
     }
 
     if (!args.diretorio) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Parâmetro `diretorio` é obrigatório.",
-            }],
+            content: formatError("status", "Parâmetro `diretorio` é obrigatório."),
             isError: true,
         };
     }
@@ -58,10 +42,7 @@ status(
     const estado = parsearEstado(args.estado_json);
     if (!estado) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Não foi possível parsear o estado JSON.",
-            }],
+            content: formatError("status", "Não foi possível parsear o estado JSON."),
             isError: true,
         };
     }
@@ -153,14 +134,35 @@ ${Object.keys(estado.entregaveis).length > 0
 
     const specialist = faseAtual ? getSpecialistPersona(faseAtual.nome) : null;
 
-    // v5: next_action e progress são calculados automaticamente pelo middleware flow-engine.middleware.ts
-    // Retornamos apenas estado_atualizado e specialist_persona para o middleware processar
-    return {
-        content: [{ type: "text", text: resposta }],
-        estado_atualizado: args.estado_json,
-        specialist_persona: specialist || undefined,
-        // next_action e progress serão adicionados pelo middleware withFlowEngine
+    const progress: FlowProgress = {
+        current_phase: faseAtual?.nome || `Fase ${estado.fase_atual}`,
+        total_phases: estado.total_fases,
+        completed_phases: estado.gates_validados.length,
+        percentage: Math.round((estado.gates_validados.length / estado.total_fases) * 100),
     };
+
+    // v5.2: Structured content — dados JSON para clients que suportam
+    const structuredData = {
+        projeto: estado.nome,
+        projeto_id: estado.projeto_id,
+        nivel: estado.nivel,
+        fase_atual: estado.fase_atual,
+        total_fases: estado.total_fases,
+        fase_nome: faseAtual?.nome || null,
+        progresso_percentual: progress.percentage,
+        gates_validados: estado.gates_validados,
+        entregaveis: estado.entregaveis,
+        atualizado_em: estado.atualizado_em,
+    };
+
+    // v5.2: Embute metadados no content (elimina campos custom ignorados pelo client)
+    const baseContent = embedAllMetadata(
+        [{ type: "text", text: resposta }],
+        { specialist: specialist || undefined, progress }
+    );
+
+    const result = withStructuredContent(baseContent, structuredData, "Status do Projeto");
+    return { content: result.content };
 }
 
 /**

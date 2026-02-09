@@ -4,6 +4,7 @@ import type { NextAction } from "../types/response.js";
 import { parsearEstado } from "../state/storage.js";
 import { normalizeProjectPath, resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { setCurrentDirectory } from "../state/context.js";
+import { formatError, embedNextAction } from "../utils/response-formatter.js";
 
 interface SalvarArgs {
     conteudo: string;
@@ -22,10 +23,7 @@ export async function salvar(args: SalvarArgs): Promise<ToolResult> {
     // Validar parâmetros obrigatórios
     if (!args.conteudo || args.conteudo.trim().length === 0) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Parâmetro `conteudo` é obrigatório e não pode estar vazio.",
-            }],
+            content: formatError("salvar", "Parâmetro `conteudo` é obrigatório e não pode estar vazio."),
             isError: true,
         };
     }
@@ -33,43 +31,21 @@ export async function salvar(args: SalvarArgs): Promise<ToolResult> {
     const tiposValidos = ["rascunho", "anexo", "entregavel"];
     if (!args.tipo || !tiposValidos.includes(args.tipo)) {
         return {
-            content: [{
-                type: "text",
-                text: `❌ **Erro**: Parâmetro \`tipo\` deve ser um de: ${tiposValidos.join(", ")}.\n\nRecebido: "${args.tipo || "undefined"}"`,
-            }],
+            content: formatError("salvar", `Parâmetro \`tipo\` deve ser um de: ${tiposValidos.join(", ")}. Recebido: "${args.tipo || "undefined"}"`),
             isError: true,
         };
     }
 
     if (!args.estado_json) {
         return {
-            content: [{
-                type: "text",
-                text: `# ❌ Erro: Estado Obrigatório
-
-O parâmetro \`estado_json\` é obrigatório.
-
-**Uso:**
-\`\`\`
-salvar(
-    conteudo: "...",
-    tipo: "rascunho",
-    estado_json: "...",
-    diretorio: "C:/projetos/meu-projeto"
-)
-\`\`\`
-`,
-            }],
+            content: formatError("salvar", "Parâmetro `estado_json` é obrigatório.", "Leia `.maestro/estado.json` e passe como parâmetro."),
             isError: true,
         };
     }
 
     if (!args.diretorio) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Parâmetro `diretorio` é obrigatório.",
-            }],
+            content: formatError("salvar", "Parâmetro `diretorio` é obrigatório."),
             isError: true,
         };
     }
@@ -78,10 +54,7 @@ salvar(
     const estado = parsearEstado(args.estado_json);
     if (!estado) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Não foi possível parsear o estado JSON.",
-            }],
+            content: formatError("salvar", "Não foi possível parsear o estado JSON."),
             isError: true,
         };
     }
@@ -157,25 +130,35 @@ ${args.conteudo.slice(0, 500)}${args.conteudo.length > 500 ? "\n... [conteúdo c
 `;
 
     const next_action: NextAction = args.tipo === "entregavel" ? {
-        tool: "proximo",
+        tool: "avancar",
         description: "Validar e avançar com o entregável salvo",
-        args_template: { entregavel: args.conteudo.slice(0, 100) + "...", estado_json: "{{estado_json}}", diretorio },
+        args_template: { entregavel: "{{conteudo}}", diretorio },
         requires_user_input: false,
         auto_execute: false,
     } : {
         tool: "status",
         description: "Verificar status atual do projeto",
-        args_template: { estado_json: "{{estado_json}}", diretorio },
+        args_template: { diretorio },
         requires_user_input: false,
     };
 
+    // v5.2: Embute metadados no content + files como instrução inline
+    const fileInstruction: { type: "text"; text: string } = {
+        type: "text",
+        text: `## ⚡ AÇÃO OBRIGATÓRIA - Salvar Arquivo\n\n**Caminho:** \`${targetPath}\`\n**Tamanho:** ${args.conteudo.length} caracteres\n\n> A IA DEVE salvar o conteúdo no caminho indicado acima.`,
+    };
+
+    const content = embedNextAction(
+        [{ type: "text", text: resposta }, fileInstruction],
+        next_action
+    );
+
     return {
-        content: [{ type: "text", text: resposta }],
+        content,
         files: [{
             path: targetPath,
             content: args.conteudo
         }],
-        next_action,
     };
 }
 

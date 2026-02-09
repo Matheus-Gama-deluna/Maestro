@@ -19,6 +19,7 @@ import { analisarQualidade } from "../analise/qualidade.js";
 import { analisarPerformance } from "../analise/performance.js";
 import { gerarRelatorio } from "../analise/relatorio.js";
 import { validateDependencies, validateSecurity } from "../fase1/validation.tools.js";
+import { buildCodeAnalysisFallback } from "../../services/sampling-fallback.service.js";
 
 interface AnalisarArgs {
     diretorio: string;
@@ -73,11 +74,28 @@ export async function analisar(args: AnalisarArgs): Promise<ToolResult> {
             } as any);
 
         case "completo":
-        default:
+        default: {
+            // v5.2: Se código fornecido sem sampling, gerar checklist de self-analysis
+            if (args.code && args.code.trim().length > 0) {
+                const fallbackContent = buildCodeAnalysisFallback(args.code, "completo");
+                const subResult = await gerarRelatorio({
+                    diretorio: args.diretorio,
+                    estado_json: args.estado_json || "",
+                } as any);
+                // Append sampling fallback checklist to the result
+                return {
+                    ...subResult,
+                    content: [
+                        ...subResult.content,
+                        { type: "text", text: fallbackContent },
+                    ],
+                };
+            }
             return gerarRelatorio({
                 diretorio: args.diretorio,
                 estado_json: args.estado_json || "",
             } as any);
+        }
     }
 }
 
