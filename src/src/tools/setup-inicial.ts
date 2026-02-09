@@ -3,7 +3,7 @@ import { saveUserConfig, loadUserConfig, getConfigPath, MaestroUserConfig } from
 
 interface SetupInicialArgs extends Partial<MaestroUserConfig> {}
 
-export async function setupInicial(args: SetupInicialArgs): Promise<ToolResult> {
+export async function setupInicial(args: SetupInicialArgs, diretorio?: string): Promise<ToolResult> {
     const existente = await loadUserConfig();
 
     if (!args.ide || !args.modo || args.usar_stitch === undefined) {
@@ -49,6 +49,9 @@ ${existente ? `Config atual detectada em ${getConfigPath()}. Envie novamente par
 
     await saveUserConfig(payload);
 
+    // v5.4: Montar próximo passo com diretório concreto se disponível
+    const dirLabel = diretorio || "<diretorio_do_projeto>";
+
     return {
         content: [{
             type: "text",
@@ -64,13 +67,32 @@ Configuração persistida em: \`${getConfigPath()}\`
 | Stack | ${formatStack(payload)} |
 | Time | ${payload.team_size || "-"} |
 
-> Suas preferências serão usadas automaticamente ao iniciar projetos.`,
+> Suas preferências serão usadas automaticamente ao iniciar projetos.
+
+---
+
+## ▶️ Próximo Passo: Criar Projeto
+
+Agora pergunte ao usuário o **nome** e uma **descrição breve** do projeto, depois EXECUTE:
+
+\`\`\`json
+maestro({
+  "diretorio": "${dirLabel}",
+  "acao": "criar_projeto",
+  "respostas": {
+    "nome": "<nome do projeto>",
+    "descricao": "<descrição breve>"
+  }
+})
+\`\`\`
+
+⚠️ **IMPORTANTE:** NÃO chame \`maestro()\` sem \`acao\` — isso reinicia o fluxo. Sempre use \`acao: "criar_projeto"\`.`,
         }],
         next_action: {
             tool: "maestro",
             description: "Criar novo projeto com as preferências salvas",
             args_template: {
-                diretorio: "<diretorio_do_projeto>",
+                diretorio: dirLabel,
                 acao: "criar_projeto",
                 respostas: {
                     nome: "<nome_do_projeto>",

@@ -13,13 +13,17 @@ import { existsSync } from "fs";
 import { join } from "path";
 import type { EstadoProjeto } from "../types/index.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
+import { resolveProjectPath } from "../utils/files.js";
 
 export class StateService {
     private maestroDir: string;
     private estadoPath: string;
 
     constructor(private diretorio: string) {
-        this.maestroDir = join(diretorio, ".maestro");
+        // v5.4: Normalizar diretório para evitar inconsistência de caminhos
+        // Ex: /xampp/htdocs/cccrj → C:\xampp\htdocs\cccrj no Windows
+        this.diretorio = resolveProjectPath(diretorio);
+        this.maestroDir = join(this.diretorio, ".maestro");
         this.estadoPath = join(this.maestroDir, "estado.json");
     }
 

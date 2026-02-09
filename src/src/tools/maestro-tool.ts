@@ -14,9 +14,7 @@ import { getNextStep, getFlowProgress, flowStepToNextAction, isInOnboarding } fr
 import { getSpecialistPersona } from "../services/specialist.service.js";
 import { getFaseComStitch } from "../flows/types.js";
 import { parsearEstado } from "../state/storage.js";
-import { existsSync } from "fs";
-import { join } from "path";
-import { readFile } from "fs/promises";
+import { resolveProjectPath } from "../utils/files.js";
 import { ContentResolverService } from "../services/content-resolver.service.js";
 import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { buildResourceLinksBlock, skillResourceLink, templateResourceLink } from "../utils/resource-links.js";
@@ -59,7 +57,11 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
         };
     }
 
-    const stateService = createStateService(args.diretorio);
+    // v5.4: Normalizar diretório para evitar inconsistência de caminhos
+    // Ex: /xampp/htdocs/cccrj → C:\xampp\htdocs\cccrj no Windows
+    const diretorio = resolveProjectPath(args.diretorio);
+
+    const stateService = createStateService(diretorio);
 
     // Tentar carregar estado do filesystem ou do argumento
     let estado: EstadoProjeto | null = null;
@@ -90,19 +92,19 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
                 usar_stitch: params.usar_stitch as boolean | undefined,
                 preferencias_stack: params.preferencias_stack as any,
                 team_size: params.team_size as any,
-            });
+            }, diretorio);
         }
 
         // v5.3: Ação criar_projeto — combina setup + iniciar + confirmar em 1 passo
         if (args.acao === "criar_projeto") {
-            return handleCriarProjeto(args);
+            return handleCriarProjeto({ ...args, diretorio });
         }
 
-        return handleNoProject(args.diretorio);
+        return await handleNoProject(diretorio);
     }
 
     // Com projeto: analisar estado e recomendar
-    const nextStep = getNextStep(estado, args.diretorio);
+    const nextStep = getNextStep(estado, diretorio);
     const progress = getFlowProgress(estado);
     const faseInfo = getFaseComStitch(estado.nivel as any, estado.fase_atual, estado.usar_stitch);
     const specialist = faseInfo ? getSpecialistPersona(faseInfo.nome) : null;
@@ -117,7 +119,7 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
     let specialistContext = "";
     if (!inOnboarding && faseInfo) {
         try {
-            const contentResolver = new ContentResolverService(args.diretorio);
+            const contentResolver = new ContentResolverService(diretorio);
             const skillLoader = new SkillLoaderService(contentResolver);
             const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, "economy");
             if (contextPkg) {
@@ -185,17 +187,19 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
 
 /**
  * Quando não há projeto no diretório
- * v5.3: Sempre referencia tools públicas (maestro) com parâmetros explícitos
+ * v5.4: Usa loadUserConfig() (config global em ~/.maestro/) ao invés de verificar config no diretório do projeto
  */
-function handleNoProject(diretorio: string): ToolResult {
-    const hasConfig = existsSync(join(diretorio, ".maestro", "config.json"));
+async function handleNoProject(diretorio: string): Promise<ToolResult> {
+    // v5.4: Verificar config GLOBAL do usuário (salva em ~/.maestro/config.json)
+    // NÃO verificar no diretório do projeto — config é global
+    const configGlobal = await loadUserConfig();
 
-    if (hasConfig) {
+    if (configGlobal) {
         // Config já existe — ir direto para criar projeto
         const content = formatResponse({
             titulo: "🎯 Maestro — Novo Projeto",
-            resumo: `Nenhum projeto encontrado em \`${diretorio}\`. Preferências já configuradas.`,
-            instrucoes: `EXECUTE a seguinte tool call após perguntar ao usuário o nome e descrição do projeto:
+            resumo: `Nenhum projeto encontrado em \`${diretorio}\`. Preferências já configuradas (${configGlobal.ide}, ${configGlobal.modo}).`,
+            instrucoes: `Pergunte ao usuário o **nome** e uma **descrição breve** do projeto, depois EXECUTE:
 
 maestro({
   "diretorio": "${diretorio}",
@@ -204,7 +208,9 @@ maestro({
     "nome": "<nome do projeto>",
     "descricao": "<descrição breve>"
   }
-})`,
+})
+
+⚠️ NÃO chame maestro() sem ação — isso reinicia o fluxo. Sempre use acao="criar_projeto".`,
             proximo_passo: {
                 tool: "maestro",
                 descricao: "Criar novo projeto neste diretório",
@@ -231,17 +237,19 @@ maestro({
   "diretorio": "${diretorio}",
   "acao": "setup_inicial",
   "respostas": {
-    "ide": "windsurf",
-    "modo": "balanced",
-    "usar_stitch": false
+    "ide": "<resposta_ide>",
+    "modo": "<resposta_modo>",
+    "usar_stitch": <true_ou_false>
   }
-})`,
+})
+
+⚠️ Substitua os valores pelos que o usuário informar. NÃO use valores padrão sem perguntar.`,
         proximo_passo: {
             tool: "maestro",
             descricao: "Configurar preferências e depois criar projeto",
             args: `{ "diretorio": "${diretorio}", "acao": "setup_inicial", "respostas": { "ide": "windsurf", "modo": "balanced", "usar_stitch": false } }`,
             requer_input_usuario: true,
-            prompt_usuario: "Qual IDE você usa? Qual modo prefere? (economy/balanced/quality)",
+            prompt_usuario: "Qual IDE você usa? Qual modo prefere? (economy/balanced/quality) Deseja usar Stitch?",
         },
     });
     return { content };
