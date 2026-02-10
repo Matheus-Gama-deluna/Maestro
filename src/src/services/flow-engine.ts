@@ -260,24 +260,30 @@ function determineCurrentPhase(estado: EstadoProjeto): string {
 
     const onboarding = (estado as any).onboarding;
     if (onboarding) {
-        // v6.0: Novo fluxo com specialistPhase
-        if (onboarding.specialistPhase) {
-            const sp = onboarding.specialistPhase;
-            switch (sp.status) {
-                case 'active': return "specialist_active";
-                case 'collecting': return "specialist_collecting";
-                case 'generating': return "specialist_generating";
-                case 'validating': return "specialist_validating";
-                case 'approved': return "specialist_approved";
+        // v8.0: Se onboarding está completo (phase='completed') e specialistPhase foi limpo,
+        // NÃO retornar fases de onboarding — ir direto para fase_ativa
+        if (onboarding.phase === 'completed' && !onboarding.specialistPhase) {
+            // Onboarding concluído, cair no fluxo de desenvolvimento abaixo
+        } else {
+            // v6.0: Novo fluxo com specialistPhase
+            if (onboarding.specialistPhase) {
+                const sp = onboarding.specialistPhase;
+                switch (sp.status) {
+                    case 'active': return "specialist_active";
+                    case 'collecting': return "specialist_collecting";
+                    case 'generating': return "specialist_generating";
+                    case 'validating': return "specialist_validating";
+                    case 'approved': return "specialist_approved";
+                }
             }
-        }
 
-        // Legacy: discoveryBlocks-based flow
-        if (onboarding.discoveryStatus === "in_progress") return "discovery_in_progress";
-        if (onboarding.discoveryStatus === "completed" && onboarding.brainstormStatus === "pending") return "discovery_complete";
-        if (onboarding.brainstormStatus === "in_progress") return "brainstorm_in_progress";
-        if (onboarding.brainstormStatus === "completed" && onboarding.prdStatus === "pending") return "brainstorm_complete";
-        if (onboarding.prdStatus === "completed") return "prd_complete";
+            // Legacy: discoveryBlocks-based flow
+            if (onboarding.discoveryStatus === "in_progress") return "discovery_in_progress";
+            if (onboarding.discoveryStatus === "completed" && onboarding.brainstormStatus === "pending") return "discovery_complete";
+            if (onboarding.brainstormStatus === "in_progress") return "brainstorm_in_progress";
+            if (onboarding.brainstormStatus === "completed" && onboarding.prdStatus === "pending") return "brainstorm_complete";
+            if (onboarding.prdStatus === "completed") return "prd_complete";
+        }
     }
 
     if (estado.fase_atual >= estado.total_fases && estado.gates_validados.includes(estado.total_fases)) {
@@ -366,6 +372,12 @@ export function getFlowProgress(estado: EstadoProjeto): FlowProgress {
  * Verifica se o projeto está no fluxo de onboarding
  */
 export function isInOnboarding(estado: EstadoProjeto): boolean {
+    // v8.0: Se onboarding está completo e specialistPhase foi limpo, NÃO é onboarding
+    const onboarding = (estado as any).onboarding;
+    if (onboarding?.phase === 'completed' && !onboarding.specialistPhase) {
+        return false;
+    }
+
     const phase = determineCurrentPhase(estado);
     return [
         "none", "setup", "iniciar", "confirmar",

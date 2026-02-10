@@ -24,6 +24,8 @@ import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { existsSync, readFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
 import { detectIDE, getSkillsDir, getSkillResourcePath, getSkillFilePath, type IDEType } from "../utils/ide-paths.js";
+import { classificarPRD } from "../flows/classifier.js";
+import { inferirContextoBalanceado } from "../utils/inferencia-contextual.js";
 
 /** Maximum number of automatic PRD validation retries before requiring user approval */
 const MAX_PRD_VALIDATION_RETRIES = 3;
@@ -559,7 +561,11 @@ async function handleValidating(
 }
 
 /**
- * Handler: approved — PRD aprovado, preparar transição
+ * Handler: approved — PRD aprovado, preparar transição para classificação
+ * 
+ * v8.0 Fix: Limpa specialistPhase do onboarding para que avancar.ts
+ * não redirecione de volta para o specialist handler.
+ * Classifica o PRD do disco e popula classificacao_sugerida.
  */
 async function handleApproved(
     args: SpecialistPhaseArgs,
@@ -574,63 +580,123 @@ async function handleApproved(
     onboarding.phase = 'completed';
     onboarding.completedAt = new Date().toISOString();
 
+    // v8.0 FIX (Bug A): LIMPAR specialistPhase para que avancar.ts não redirecione de volta
+    // Salvamos os dados finais antes de limpar
+    const finalScore = sp.validationScore || 0;
+    const finalInteractions = sp.interactionCount;
+    
+    // Remover specialistPhase do onboarding — onboarding está CONCLUÍDO
+    delete onboarding.specialistPhase;
+
+    // v8.0 FIX: Classificar PRD do disco para popular classificacao_sugerida
+    let prdContent = '';
+    const prdPath = getPrdOutputPath(diretorio);
+    const draftPath = getPrdDraftPath(diretorio);
+    if (existsSync(prdPath)) {
+        try { prdContent = readFileSync(prdPath, 'utf-8'); } catch { /* ignore */ }
+    }
+    if (!prdContent && existsSync(draftPath)) {
+        try { prdContent = readFileSync(draftPath, 'utf-8'); } catch { /* ignore */ }
+    }
+    if (!prdContent && sp.prdDraft) {
+        prdContent = sp.prdDraft;
+    }
+
+    // Classificar o PRD e preparar sugestão
+    let classificacaoInfo = '';
+    if (prdContent) {
+        const classificacao = classificarPRD(prdContent);
+        estado.classificacao_sugerida = {
+            nivel: classificacao.nivel,
+            pontuacao: classificacao.pontuacao,
+            criterios: classificacao.criterios,
+        };
+        // Inferência contextual para perguntas agrupadas
+        estado.inferencia_contextual = inferirContextoBalanceado(`${estado.nome} ${prdContent}`);
+        
+        const perguntas = estado.inferencia_contextual?.perguntas_prioritarias || [];
+        const perguntasMarkdown = perguntas.length
+            ? perguntas.map((p: any) => `- (${p.prioridade}) ${p.pergunta}${p.valor_inferido ? `\n  - Inferido: ${p.valor_inferido} (confiança ${((p.confianca_inferencia ?? 0) * 100).toFixed(0)}%)` : ""}`).join("\n")
+            : "- Informe domínio, stack preferida e integrações em um único prompt.";
+
+        classificacaoInfo = `
+
+## 🔍 Classificação do Projeto
+
+| Campo | Valor |
+|-------|-------|
+| **Nível sugerido** | **${classificacao.nivel.toUpperCase()}** |
+| **Pontuação** | ${classificacao.pontuacao} |
+| **Critérios** | ${classificacao.criterios.join(', ')} |
+
+## Ação obrigatória (responder em UM ÚNICO PROMPT)
+Confirme ou ajuste a classificação usando:
+
+\`\`\`json
+executar({
+  "diretorio": "${diretorio}",
+  "acao": "avancar",
+  "respostas": {
+    "nivel": "${classificacao.nivel}"
+  }
+})
+\`\`\`
+
+Responda também às perguntas abaixo no MESMO prompt:
+${perguntasMarkdown}
+
+> ⚠️ Não prossiga para outras fases antes de confirmar a classificação.`;
+    }
+
     // Avançar estado do projeto para fase 1 de desenvolvimento
     estado.fase_atual = 1;
     estado.aguardando_classificacao = true;
+    estado.classificacao_pos_prd_confirmada = false;
+    estado.status = 'ativo';
 
     await persistState(estado, onboarding, diretorio);
 
     return {
         content: formatResponse({
             titulo: "✅ PRD Aprovado!",
-            resumo: `PRD validado com score ${sp.validationScore || 'N/A'}/100. Onboarding concluído!`,
+            resumo: `PRD validado com score ${finalScore}/100. Onboarding concluído! Agora confirme a classificação do projeto.`,
             dados: {
-                "Score Final": `${sp.validationScore || 'N/A'}/100`,
-                "Interações": sp.interactionCount.toString(),
-                "Status": "Aprovado",
+                "Score Final": `${finalScore}/100`,
+                "Interações": finalInteractions.toString(),
+                "Status": "Aprovado — Aguardando classificação",
             },
             instrucoes: `O PRD foi aprovado! Parabéns!
-
-🤖 **AÇÃO AUTOMÁTICA REQUERIDA:**
-Você DEVE avançar para a fase de desenvolvimento IMEDIATAMENTE.
-
-\`\`\`json
-executar({
-    "diretorio": "${diretorio}",
-    "acao": "avancar"
-})
-\`\`\`
-
-🤖 **NÃO ESPERE** o usuário. Execute a tool AGORA para iniciar o desenvolvimento.
+${classificacaoInfo}
 
 ## 📍 Onde Estamos
-✅ Setup → ✅ Coleta → ✅ Geração PRD → ✅ Validação → 🔄 Desenvolvimento
+✅ Setup → ✅ Coleta → ✅ Geração PRD → ✅ Validação → 🔄 Classificação → ⏳ Desenvolvimento
 
-⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\`
+⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar", respostas: {nivel: "..."}})\`
 ⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar`,
             proximo_passo: {
                 tool: "executar",
-                descricao: "Avançar para fase de desenvolvimento",
-                args: `{ "diretorio": "${diretorio}", "acao": "avancar" }`,
-                requer_input_usuario: false,
-                auto_execute: true,
+                descricao: "Confirmar classificação do projeto",
+                args: `{ "diretorio": "${diretorio}", "acao": "avancar", "respostas": { "nivel": "${estado.classificacao_sugerida?.nivel || 'medio'}" } }`,
+                requer_input_usuario: true,
+                prompt_usuario: "Confirme a classificação sugerida ou ajuste o nível.",
             },
         }),
         next_action: {
             tool: "executar",
-            description: "Avançar para fase de desenvolvimento",
+            description: "Confirmar classificação do projeto",
             args_template: {
                 diretorio,
                 acao: "avancar",
+                respostas: { nivel: estado.classificacao_sugerida?.nivel || 'medio' },
             },
-            requires_user_input: false,
-            auto_execute: true,
+            requires_user_input: true,
+            user_prompt: "Confirme a classificação sugerida ou ajuste o nível.",
         },
         progress: {
-            current_phase: "specialist_approved",
-            total_phases: 5,
+            current_phase: "classificacao",
+            total_phases: 6,
             completed_phases: 4,
-            percentage: 85,
+            percentage: 70,
         },
     };
 }
