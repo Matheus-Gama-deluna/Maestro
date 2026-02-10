@@ -21,10 +21,57 @@ import { serializarEstado } from "../state/storage.js";
 import { saveFile } from "../utils/persistence.js";
 import { ContentResolverService } from "../services/content-resolver.service.js";
 import { SkillLoaderService } from "../services/skill-loader.service.js";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, mkdirSync } from "fs";
+import { dirname } from "path";
+import { detectIDE, getSkillsDir, getSkillResourcePath, getSkillFilePath, type IDEType } from "../utils/ide-paths.js";
 
 /** Maximum number of automatic PRD validation retries before requiring user approval */
 const MAX_PRD_VALIDATION_RETRIES = 3;
+
+/** Paths padrão para saída de documentos — a IA DEVE usar estes paths */
+const PRD_OUTPUT_PATHS = {
+    primary: 'docs/01-produto/PRD.md',
+    draft: '.maestro/entregaveis/prd-draft.md',
+} as const;
+
+/**
+ * Resolve a IDE efetiva para o projeto (estado > detecção > fallback windsurf)
+ */
+function resolveIDEForProject(estado: EstadoProjeto, diretorio: string): IDEType {
+    return estado.ide || detectIDE(diretorio) || 'windsurf';
+}
+
+/**
+ * Retorna o path absoluto padronizado para o PRD do projeto
+ */
+function getPrdOutputPath(diretorio: string): string {
+    return `${diretorio}/${PRD_OUTPUT_PATHS.primary}`;
+}
+
+/**
+ * Retorna o path absoluto do draft do PRD
+ */
+function getPrdDraftPath(diretorio: string): string {
+    return `${diretorio}/${PRD_OUTPUT_PATHS.draft}`;
+}
+
+/**
+ * Retorna o path relativo de skills adaptado para a IDE do projeto
+ */
+function getSkillPathForIDE(skillName: string, estado: EstadoProjeto, diretorio: string): {
+    skillFile: string;
+    templatePath: string;
+    checklistPath: string;
+    guidePath: string;
+} {
+    const ide = resolveIDEForProject(estado, diretorio);
+    return {
+        skillFile: getSkillFilePath(skillName, ide),
+        templatePath: `${getSkillsDir(ide)}/${skillName}/resources/templates/PRD.md`,
+        checklistPath: `${getSkillsDir(ide)}/${skillName}/resources/checklists/gate-checklist.md`,
+        guidePath: `${getSkillsDir(ide)}/${skillName}/SKILL.md`,
+    };
+}
 
 interface SpecialistPhaseArgs {
     estado: EstadoProjeto;
@@ -83,12 +130,15 @@ export async function handleSpecialistPhase(args: SpecialistPhaseArgs): Promise<
         case 'active':
         case 'collecting':
             return handleCollecting(args, onboarding, sp);
-        case 'generating':
-            if (args.entregavel) {
+        case 'generating': {
+            // v7.1: File-first — verificar disco OU param entregavel
+            const hasPrdOnDisk = existsSync(getPrdOutputPath(diretorio)) || existsSync(getPrdDraftPath(diretorio));
+            if (args.entregavel || hasPrdOnDisk) {
                 sp.status = 'validating';
                 return handleValidating(args, onboarding, sp);
             }
             return handleGenerating(args, onboarding, sp);
+        }
         case 'validating':
             return handleValidating(args, onboarding, sp);
         case 'approved':
@@ -257,6 +307,9 @@ async function handleGenerating(
         .map(([key, value]) => `- **${key}**: ${value}`)
         .join('\n');
 
+    // v7.0: Resolver paths de skills adaptados para a IDE do projeto
+    const skillPaths = getSkillPathForIDE(sp.skillName, estado, diretorio);
+
     sp.status = 'generating';
     await persistState(estado, onboarding, diretorio);
 
@@ -265,19 +318,24 @@ async function handleGenerating(
             titulo: "📝 Geração do PRD",
             resumo: "Todos os dados foram coletados. Gerando PRD draft usando o template do especialista.",
             instrucoes: `🤖 **AÇÃO AUTOMÁTICA REQUERIDA:**
-Você DEVE gerar o PRD e enviá-lo como entregável IMEDIATAMENTE, sem esperar comando do usuário.
+Você DEVE gerar o PRD e salvá-lo no disco IMEDIATAMENTE, sem esperar comando do usuário.
 
 ## Dados Coletados do Usuário
 
 ${collectedSummary}
 
-${templateContent ? `## 🔧 Recurso do Especialista
-> 💡 Para template completo: leia \`.agent/skills/specialist-gestao-produto/resources/templates/PRD.md\`
-> Ou execute: \`read_resource("maestro://especialista/gestao-produto")\`
+${templateContent ? `## 🔧 Recursos do Especialista
 
-## Template do PRD (ESTRUTURA — use como guia)
+� **Leia estes arquivos ANTES de gerar o PRD:**
+- Template: \`${skillPaths.templatePath}\` 
+- Checklist: \`${skillPaths.checklistPath}\` 
+- Guia: \`${skillPaths.guidePath}\` 
 
-${extractTemplateSkeleton(templateContent)}` : '## Template do PRD\\n\\nGere um PRD estruturado com: Visão, Problema, Público-alvo, Funcionalidades MVP, Métricas de Sucesso, Riscos.'}
+> ⚠️ Use \`view_file\` para ler os arquivos. NÃO dependa apenas do esqueleto abaixo.
+
+## Esqueleto do Template (referência rápida)
+
+${extractTemplateSkeleton(templateContent)}` : '## Template do PRD\n\nGere um PRD estruturado com: Visão, Problema, Público-alvo, Funcionalidades MVP, Métricas de Sucesso, Riscos.'}
 
 ---
 
@@ -285,38 +343,39 @@ ${extractTemplateSkeleton(templateContent)}` : '## Template do PRD\\n\\nGere um 
 1. Preencha CADA seção do template com os dados coletados
 2. Se um dado não foi coletado, marque como "A definir com o usuário"
 3. NÃO invente números, métricas ou dados que o usuário não forneceu
-4. Após gerar, envie o PRD como entregável IMEDIATAMENTE:
+4. **SALVE O PRD** no arquivo \`${PRD_OUTPUT_PATHS.primary}\`
+5. Após salvar, avance usando:
 
 \`\`\`json
 executar({
     "diretorio": "${diretorio}",
-    "acao": "avancar",
-    "entregavel": "<conteúdo completo do PRD>"
+    "acao": "avancar"
 })
 \`\`\`
 
-🤖 **NÃO ESPERE** o usuário dizer "pode seguir" ou "avançar". Execute a tool AGORA.
+⚠️ **NÃO passe o conteúdo via entregavel.** O MCP lê direto do arquivo.
+
+🤖 **NÃO ESPERE** o usuário dizer "pode seguir" ou "avançar". Salve o arquivo e execute a tool AGORA.
 
 ## 📍 Onde Estamos
 ✅ Setup → ✅ Coleta → 🔄 Geração PRD → ⏳ Validação → ⏳ Aprovação
 
-⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar", entregavel: "..."})\`
+⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\`
 ⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar`,
             proximo_passo: {
                 tool: "executar",
-                descricao: "Enviar PRD gerado como entregável",
-                args: `{ "diretorio": "${diretorio}", "acao": "avancar", "entregavel": "<PRD completo>" }`,
+                descricao: "Salvar PRD no disco e avançar para validação",
+                args: `{ "diretorio": "${diretorio}", "acao": "avancar" }`,
                 requer_input_usuario: false,
                 auto_execute: true,
             },
         }),
         next_action: {
             tool: "executar",
-            description: "Gerar e enviar PRD como entregável",
+            description: "Salvar PRD em docs/01-produto/PRD.md e avançar",
             args_template: {
                 diretorio,
                 acao: "avancar",
-                entregavel: "{{PRD_GERADO_COM_TEMPLATE}}",
             },
             requires_user_input: false,
             auto_execute: true,
@@ -346,20 +405,23 @@ async function handleValidating(
     sp: SpecialistPhaseState
 ): Promise<ToolResult> {
     const { estado, diretorio } = args;
-    let entregavel = args.entregavel;
+    let entregavel: string | undefined;
 
-    // v6.1 (Problem #7): File-based validation fallback
-    if (!entregavel) {
-        // Try reading from saved draft file
-        const draftPath = `${diretorio}/.maestro/entregaveis/prd-draft.md`;
-        const docsPath = `${diretorio}/docs/01-produto/PRD.md`;
+    // v7.0: File-first validation — prioriza disco sobre param JSON
+    // Isso elimina escape issues de JSON e economiza ~5-10k tokens por chamada
+    const docsPath = getPrdOutputPath(diretorio);
+    const draftPath = getPrdDraftPath(diretorio);
 
-        if (existsSync(docsPath)) {
-            try { entregavel = readFileSync(docsPath, 'utf-8'); } catch { /* ignore */ }
-        }
-        if (!entregavel && existsSync(draftPath)) {
-            try { entregavel = readFileSync(draftPath, 'utf-8'); } catch { /* ignore */ }
-        }
+    // PRIORIDADE 1: Ler do disco (file-first)
+    if (existsSync(docsPath)) {
+        try { entregavel = readFileSync(docsPath, 'utf-8'); } catch { /* ignore */ }
+    }
+    if (!entregavel && existsSync(draftPath)) {
+        try { entregavel = readFileSync(draftPath, 'utf-8'); } catch { /* ignore */ }
+    }
+    // PRIORIDADE 2: Fallback para param (compatibilidade)
+    if (!entregavel && args.entregavel) {
+        entregavel = args.entregavel;
     }
 
     if (!entregavel) {
@@ -388,10 +450,10 @@ async function handleValidating(
     onboarding.totalInteractions++;
     onboarding.lastInteractionAt = new Date().toISOString();
 
-    // Salvar PRD como arquivo
+    // Salvar PRD como arquivo (paths padronizados)
     try {
-        await saveFile(`${diretorio}/.maestro/entregaveis/prd-draft.md`, entregavel);
-        await saveFile(`${diretorio}/docs/01-produto/PRD.md`, entregavel);
+        await saveFile(getPrdDraftPath(diretorio), entregavel);
+        await saveFile(getPrdOutputPath(diretorio), entregavel);
     } catch (err) {
         console.warn('[specialist-phase] Falha ao salvar PRD:', err);
     }
@@ -436,9 +498,9 @@ async function handleValidating(
                 proximo_passo: {
                     tool: "executar",
                     descricao: "Aguardando decisão do usuário sobre o PRD",
-                    args: `{ "diretorio": "${diretorio}", "acao": "avancar", "entregavel": "<PRD final>" }`,
+                    args: `{ "diretorio": "${diretorio}", "acao": "avancar" }`,
                     requer_input_usuario: true,
-                    prompt_usuario: `PRD com score ${score}/100 após ${sp.validationAttempts} tentativas. Aprovar, melhorar ou recomeçar?`,
+                    prompt_usuario: `PRD com score ${score}/100 após ${sp.validationAttempts} tentativas. Aprovar, melhorar ou recomeçar? Se melhorar, edite o arquivo ${PRD_OUTPUT_PATHS.primary} e avance.`,
                 },
             }),
             next_action: {
@@ -468,22 +530,21 @@ async function handleValidating(
                 "Status": "⚠️ Precisa de melhorias",
                 "Mínimo": "70/100",
             },
-            instrucoes: `## 📊 Detalhamento do Score\n\n${scoreBreakdown}\n\n${gaps.length > 0 ? `## Gaps Identificados\n\n${gaps.map(g => `- ${g}`).join('\n')}\n\n` : ''}🤖 **AÇÃO REQUERIDA (tentativa ${sp.validationAttempts + 1}/${MAX_PRD_VALIDATION_RETRIES}):**\nMelhore o PRD nos pontos acima e reenvie.\n\n\`\`\`json\nexecutar({\n    "diretorio": "${diretorio}",\n    "acao": "avancar",\n    "entregavel": "<PRD melhorado>"\n})\n\`\`\`\n\n## 📍 Onde Estamos\n✅ Setup → ✅ Coleta → ✅ Geração PRD → 🔄 Validação → ⏳ Aprovação`,
+            instrucoes: `## 📊 Detalhamento do Score\n\n${scoreBreakdown}\n\n${gaps.length > 0 ? `## Gaps Identificados\n\n${gaps.map(g => `- ${g}`).join('\n')}\n\n` : ''}🤖 **AÇÃO REQUERIDA (tentativa ${sp.validationAttempts + 1}/${MAX_PRD_VALIDATION_RETRIES}):**\nMelhore o PRD nos pontos acima.\n\n1. **Edite o arquivo** \`${PRD_OUTPUT_PATHS.primary}\` com as melhorias\n2. Após salvar, avance:\n\n\`\`\`json\nexecutar({\n    "diretorio": "${diretorio}",\n    "acao": "avancar"\n})\n\`\`\`\n\n⚠️ **NÃO passe o conteúdo via entregavel.** O MCP lê direto do arquivo.\n\n## 📍 Onde Estamos\n✅ Setup → ✅ Coleta → ✅ Geração PRD → 🔄 Validação → ⏳ Aprovação`,
             proximo_passo: {
                 tool: "executar",
-                descricao: "Reenviar PRD melhorado",
-                args: `{ "diretorio": "${diretorio}", "acao": "avancar", "entregavel": "<PRD melhorado>" }`,
+                descricao: "Salvar PRD melhorado no disco e avançar",
+                args: `{ "diretorio": "${diretorio}", "acao": "avancar" }`,
                 requer_input_usuario: false,
                 auto_execute: true,
             },
         }),
         next_action: {
             tool: "executar",
-            description: "Melhorar e reenviar PRD",
+            description: "Salvar PRD melhorado em docs/01-produto/PRD.md e avançar",
             args_template: {
                 diretorio,
                 acao: "avancar",
-                entregavel: "{{PRD_MELHORADO}}",
             },
             requires_user_input: false,
             auto_execute: true,
@@ -850,14 +911,14 @@ interface SectionResult {
  * Also made patterns more permissive with optional numbering prefixes like "1." or "1.1".
  */
 const SECTION_CHECKS: SectionCheck[] = [
-    { heading: /^\d*\.?\d*\s*(sum[aá]rio|summary|executiv)/i, minContentLength: 100, weight: 10, label: 'Sumário Executivo' },
-    { heading: /^\d*\.?\d*\s*(problema|problem|oportunidade|dor)/i, minContentLength: 150, weight: 15, label: 'Problema e Oportunidade' },
-    { heading: /^\d*\.?\d*\s*(persona|jobs?\s*to\s*be|p[uú]blico|usu[aá]rio)/i, minContentLength: 100, weight: 15, label: 'Personas e Público-alvo' },
-    { heading: /^\d*\.?\d*\s*(mvp|funcionalidade|feature|solu[cç][aã]o)/i, minContentLength: 100, weight: 15, label: 'MVP e Funcionalidades' },
-    { heading: /^\d*\.?\d*\s*(m[eé]trica|kpi|north\s*star|sucesso|indicador)/i, minContentLength: 50, weight: 10, label: 'Métricas de Sucesso' },
-    { heading: /^\d*\.?\d*\s*(risco|mitiga[cç])/i, minContentLength: 80, weight: 10, label: 'Riscos e Mitigações' },
-    { heading: /^\d*\.?\d*\s*(timeline|cronograma|marco|prazo|roadmap)/i, minContentLength: 50, weight: 5, label: 'Timeline e Marcos' },
-    { heading: /^\d*\.?\d*\s*(vis[aã]o|estrat[eé]gia|go.to.market|escopo)/i, minContentLength: 50, weight: 5, label: 'Visão e Estratégia' },
+    { heading: /^[\d.\s]*(sum[aá]rio|summary|executiv)/i, minContentLength: 100, weight: 10, label: 'Sumário Executivo' },
+    { heading: /^[\d.\s]*(problema|problem|oportunidade|dor)/i, minContentLength: 150, weight: 15, label: 'Problema e Oportunidade' },
+    { heading: /^[\d.\s]*(persona|jobs?\s*to\s*be|p[uú]blico|usu[aá]rio)/i, minContentLength: 100, weight: 15, label: 'Personas e Público-alvo' },
+    { heading: /^[\d.\s]*(mvp|funcionalidade|feature|solu[cç][aã]o)/i, minContentLength: 100, weight: 15, label: 'MVP e Funcionalidades' },
+    { heading: /^[\d.\s]*(m[eé]trica|kpi|north\s*star|sucesso|indicador)/i, minContentLength: 50, weight: 10, label: 'Métricas de Sucesso' },
+    { heading: /^[\d.\s]*(risco|mitiga[cç])/i, minContentLength: 80, weight: 10, label: 'Riscos e Mitigações' },
+    { heading: /^[\d.\s]*(timeline|cronograma|marco|prazo|roadmap)/i, minContentLength: 50, weight: 5, label: 'Timeline e Marcos' },
+    { heading: /^[\d.\s]*(vis[aã]o|estrat[eé]gia|go.to.market|escopo)/i, minContentLength: 50, weight: 5, label: 'Visão e Estratégia' },
 ];
 
 /**
@@ -876,8 +937,11 @@ function splitPrdBySections(prd: string): { heading: string; content: string }[]
     let currentContent: string[] = [];
 
     for (const line of lines) {
-        const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
-        if (headingMatch) {
+        const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
+        const level = headingMatch ? headingMatch[1].length : 0;
+        // Só quebra seção em h1 ou h2 (nível top-level)
+        // Sub-headings (h3, h4) ficam como conteúdo da seção-pai
+        if (headingMatch && level <= 2) {
             if (currentHeading) {
                 sections.push({ heading: currentHeading, content: currentContent.join('\n').trim() });
             }
