@@ -12,12 +12,26 @@ export async function setupInicial(args: SetupInicialArgs, diretorio?: string): 
                 type: "text",
                 text: `# ⚙️ Setup Inicial Necessário
 
-Defina uma única vez suas preferências para evitar perguntas repetidas.
+⚠️ **OBRIGATÓRIO: Pergunte CADA item ao usuário. NÃO infira respostas. NÃO use valores padrão sem confirmação explícita.**
 
 Pergunte ao usuário:
-1. Qual IDE você usa? (windsurf / cursor / antigravity)
-2. Qual modo prefere? (economy = rápido / balanced = equilibrado / quality = completo)
-3. Deseja usar Stitch para prototipagem? (sim/não)
+
+### 1. Qual IDE você usa?
+- **windsurf** — Rules e skills injetados em .windsurf/rules/
+- **cursor** — Rules e skills injetados em .cursor/rules/
+- **antigravity** — Rules e skills injetados em .antigravity/rules/
+> 💡 Impacto: Define onde os arquivos de configuração serão criados
+
+### 2. Qual modo prefere?
+- **economy** — Rápido: 7 fases, perguntas mínimas, validação essencial
+- **balanced** — Equilibrado: 13 fases, perguntas moderadas, validação completa
+- **quality** — Completo: 17 fases, perguntas detalhadas, validação avançada
+> 💡 Impacto: Define profundidade do processo e número de fases
+
+### 3. Deseja usar Stitch para prototipagem?
+- **sim** — Habilita Google Stitch para prototipagem rápida de UI
+- **não** — Sem prototipagem automática
+> 💡 Impacto: Adiciona fase de prototipagem ao fluxo
 
 Depois EXECUTE:
 
@@ -26,15 +40,32 @@ maestro({
   "diretorio": "<diretorio>",
   "acao": "setup_inicial",
   "respostas": {
-    "ide": "windsurf",
-    "modo": "balanced",
-    "usar_stitch": false
+    "ide": "<resposta do usuário>",
+    "modo": "<resposta do usuário>",
+    "usar_stitch": <resposta do usuário>
   }
 })
 \`\`\`
 
+⚠️ **NUNCA preencha com valores inventados. Substitua pelos valores REAIS informados pelo usuário.**
+
 ${existente ? `Config atual detectada em ${getConfigPath()}. Envie novamente para atualizar.` : "Nenhuma configuração encontrada ainda."}`,
             }],
+            next_action: {
+                tool: "maestro",
+                description: "Configurar preferências após respostas do usuário",
+                args_template: {
+                    diretorio: diretorio || "<diretorio>",
+                    acao: "setup_inicial",
+                    respostas: {
+                        ide: "<resposta do usuário>",
+                        modo: "<resposta do usuário>",
+                        usar_stitch: "<resposta do usuário>",
+                    },
+                },
+                requires_user_input: true,
+                user_prompt: "Qual IDE você usa? Qual modo prefere? Deseja usar Stitch?",
+            },
         };
     }
 

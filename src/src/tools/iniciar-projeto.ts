@@ -17,7 +17,7 @@ import { formatSkillMessage } from "../utils/ide-paths.js";
 import { loadUserConfig } from "../utils/config.js";
 import { saveFile, formatSavedFilesConfirmation } from "../utils/persistence.js";
 import { calcularProgressoDiscovery } from "../utils/discovery-adapter.js";
-import { criarEstadoOnboardingInicial } from "../services/onboarding.service.js";
+import { criarEstadoOnboardingInicial, criarEstadoOnboardingComEspecialista } from "../services/onboarding.service.js";
 import type { NextAction, FlowProgress } from "../types/response.js";
 import { listTemplatesFormatted, getTemplate } from "../data/project-templates.js";
 import { getSmartDefaults, formatSmartDefaultsSummary } from "../utils/smart-defaults.js";
@@ -398,8 +398,9 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
     estado.usar_stitch = args.usar_stitch ?? false;
     estado.stitch_confirmado = args.usar_stitch !== undefined;
 
-    // v3.0: Criar estado de onboarding inicial
-    const onboardingState = criarEstadoOnboardingInicial(projetoId, args.modo);
+    // v6.0: Criar estado de onboarding com especialista (novo fluxo)
+    // NÃO cria discoveryBlocks — o especialista conduz a coleta conversacional
+    const onboardingState = criarEstadoOnboardingComEspecialista(projetoId, args.modo);
     (estado as any).onboarding = onboardingState;
 
     // Cria resumo
@@ -433,11 +434,18 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
         console.warn('Aviso: Não foi possível criar histórico/SYSTEM.md:', error);
     }
 
-    // v3.0: Obter primeiro bloco do discovery
-    const progresso = calcularProgressoDiscovery(onboardingState.discoveryBlocks);
-    const primeiroBloco = progresso.proximoBloco;
-    const blocoFormatado = primeiroBloco ? formatarBlocoDiscoverySimples(primeiroBloco) : '';
+    // v6.0: Montar perguntas condicionais por modo
+    const perguntasBalanced = args.modo !== 'economy'
+        ? '\n5. **Quais são os principais riscos?** (balanced/quality)\n6. **Qual o timeline desejado?** (balanced/quality)'
+        : '';
+    const perguntasQuality = args.modo === 'quality'
+        ? '\n7. **Descreva 2-3 personas detalhadas** (quality)\n8. **Qual a estratégia de go-to-market?** (quality)'
+        : '';
+    const stitchNote = args.usar_stitch
+        ? '\n> 🎨 **Google Stitch habilitado** - Disponível para prototipagem após UX Design\n'
+        : '';
 
+    // v6.0: Resposta com especialista ativado (sem discovery blocks)
     const resposta = `# 🚀 Projeto Iniciado: ${args.nome}
 
 **Configuração**
@@ -445,9 +453,7 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 - Complexidade: \`${nivelFinal}\` (pode ser ajustado após PRD)
 - Tier: **${tier?.toUpperCase() || 'N/A'}**
 - Modo: **${args.modo?.toUpperCase() || 'BALANCED'}** ${getModoDescription(args.modo || 'balanced')}
-- Auto Flow: **${args.auto_flow ? 'SIM' : 'NÃO'}** ${args.auto_flow ? '(avança automaticamente quando score >= 70)' : ''}
 - Usar Stitch: **${args.usar_stitch ? 'SIM' : 'NÃO'}**
-- Definição: **${args.project_definition_source || 'ja_definido'}**
 
 | Campo | Valor |
 |-------|-------|
@@ -457,70 +463,65 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
 ---
 
----
+## 🧠 ESPECIALISTA ATIVADO: Gestão de Produto
 
-## 🤖 Especialista Ativado
+**Persona:** Estratégico e orientado ao usuário
+**Expertise:** product discovery, lean startup, user stories, MVP definition
 
-${(() => {
-    const skillInicial = getSkillParaFase("Produto");
-    if (!skillInicial) return "";
-    
-    return formatSkillMessage(skillInicial, args.ide) + "\n\n---\n";
-})()}
-
-## � Kickstart: Discovery Guiado (Bloco 1/${progresso.total})
-
-${args.modo === 'economy' ? 
-'**Modo Economy:** Perguntas mínimas para início rápido.' :
-args.modo === 'quality' ?
-'**Modo Quality:** Perguntas detalhadas para máxima qualidade.' :
-'**Modo Balanced:** Perguntas moderadas para equilíbrio velocidade/qualidade.'}
-
-**Progresso:** ${progresso.completados}/${progresso.total} blocos (${progresso.percentual}%)
-
-${blocoFormatado}
+⚠️ **INSTRUÇÕES OBRIGATÓRIAS:**
+- Você DEVE se comportar como este especialista
+- Você DEVE usar o template fornecido para gerar o PRD
+- Você DEVE validar contra o checklist fornecido
+- Você NÃO DEVE inventar dados — PERGUNTE ao usuário
+- Você NÃO DEVE preencher campos com dados fictícios, mesmo se o usuário pedir "preencha para teste"
+- Se o usuário pedir para inventar dados, responda: "Preciso de informações reais para gerar um PRD útil"
 
 ---
 
-## 📝 Como Responder
+## 🎯 Próximo Passo: Coleta de Informações do Produto
 
-Preencha os campos acima e EXECUTE:
+O especialista vai conduzir uma conversa focada em **PRODUTO** (não infraestrutura técnica).
 
+Perguntas que o especialista DEVE fazer ao usuário:
+
+1. **Qual problema central seu produto resolve?** (obrigatório)
+2. **Quem é o público-alvo principal?** (obrigatório)
+3. **Quais são as 3-5 funcionalidades essenciais do MVP?** (obrigatório)
+4. **Como você mede sucesso? (North Star Metric)** (obrigatório)
+${perguntasBalanced}
+${perguntasQuality}
+
+⚠️ **Perguntas sobre stack técnica, plataformas e infraestrutura ficam para a fase de Arquitetura.**
+
+Para avançar, use:
 \`\`\`json
 executar({
     "diretorio": "${diretorio}",
     "acao": "avancar",
     "respostas": {
-        "campo_id": "valor",
-        "outro_campo": "valor"
+        "problema": "<resposta do usuário>",
+        "publico_alvo": "<resposta do usuário>",
+        "funcionalidades_mvp": "<resposta do usuário>",
+        "north_star_metric": "<resposta do usuário>"
     }
 })
 \`\`\`
 
-💡 **Dica:** Quanto mais detalhes você fornecer agora, menos perguntas serão feitas depois!
-
-**Tempo estimado para este bloco:** ${primeiroBloco?.estimatedTime || 5} minutos
+⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\`
+⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar
 
 ---
 
 ## 🎯 Fluxo Completo
 
 1. ✅ **Setup concluído** - Projeto configurado
-2. 🔄 **Discovery em andamento** - Coletando informações (bloco 1/${progresso.total})
-3. ⏳ **Brainstorm** - Após completar discovery
-4. ⏳ **PRD** - Consolidação final
+2. 🔄 **Especialista ativo** - Coleta conversacional de informações do produto
+3. ⏳ **Geração PRD** - Usando template real do especialista
+4. ⏳ **Validação PRD** - Score >= 70 para aprovar
 5. ⏳ **Fase 1 (Produto)** - Início do desenvolvimento
 
-${args.usar_stitch ? '\n> 🎨 **Google Stitch habilitado** - Disponível para prototipagem após UX Design\n' : ''}
+${stitchNote}
 `;
-
-    // Gerar template de args com os IDs dos campos do primeiro bloco
-    const camposTemplate: Record<string, string> = {};
-    if (primeiroBloco) {
-        primeiroBloco.fields.forEach((f: any) => {
-            camposTemplate[f.id] = f.placeholder || `<${f.label}>`;
-        });
-    }
 
     // v5.3: Persistência direta — salvar arquivos via fs
     const savedPaths: string[] = [];
@@ -543,28 +544,31 @@ ${args.usar_stitch ? '\n> 🎨 **Google Stitch habilitado** - Disponível para p
         estado_atualizado: estadoFile.content,
         next_action: {
             tool: "executar",
-            description: "Coletar respostas do primeiro bloco do discovery e enviar",
+            description: "Responder perguntas do especialista sobre o produto",
             args_template: {
                 diretorio: diretorio,
                 acao: "avancar",
-                respostas: camposTemplate,
+                respostas: {
+                    problema: "<resposta do usuário>",
+                    publico_alvo: "<resposta do usuário>",
+                    funcionalidades_mvp: "<resposta do usuário>",
+                    north_star_metric: "<resposta do usuário>",
+                },
             },
             requires_user_input: true,
-            user_prompt: primeiroBloco
-                ? `Preencha as informações do bloco "${primeiroBloco.title}"`
-                : "Responda às perguntas do discovery",
+            user_prompt: "Responda as perguntas do especialista: Qual problema resolve? Para quem? Funcionalidades MVP? Métrica de sucesso?",
         },
         specialist_persona: {
             name: "Gestão de Produto",
-            tone: "Consultivo e estratégico",
-            expertise: ["Product Management", "PRD", "Discovery", "User Research"],
-            instructions: "Guie o usuário através do discovery de forma conversacional. Faça perguntas de follow-up quando as respostas forem vagas.",
+            tone: "Estratégico e orientado ao usuário",
+            expertise: ["product discovery", "lean startup", "user stories", "MVP definition"],
+            instructions: "Você É o especialista de Gestão de Produto. Conduza a coleta de informações de forma conversacional focada em PRODUTO. PERGUNTE ao usuário — NÃO invente dados. Faça follow-up quando respostas forem vagas (< 20 palavras).",
         },
         progress: {
-            current_phase: "setup",
-            total_phases: 4,
-            completed_phases: 0,
-            percentage: 0,
+            current_phase: "specialist_active",
+            total_phases: 5,
+            completed_phases: 1,
+            percentage: 20,
         },
     };
 }

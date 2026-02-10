@@ -5,7 +5,7 @@
  */
 
 import type { EstadoProjeto } from "../types/index.js";
-import type { OnboardingState } from "../types/onboarding.js";
+import type { OnboardingState, SpecialistPhaseState } from "../types/onboarding.js";
 import { gerarBlocosDiscovery } from "../utils/discovery-adapter.js";
 
 /**
@@ -44,6 +44,41 @@ export function criarEstadoOnboardingInicial(
  */
 export function obterEstadoOnboarding(estado: EstadoProjeto): OnboardingState | null {
     return (estado as any).onboarding || null;
+}
+
+/**
+ * v6.0: Cria estado de onboarding com specialistPhase (novo fluxo)
+ * Não cria discoveryBlocks — o especialista conduz a coleta conversacional
+ */
+export function criarEstadoOnboardingComEspecialista(
+    projectId: string,
+    modo: 'economy' | 'balanced' | 'quality',
+    skillName: string = 'specialist-gestao-produto'
+): OnboardingState {
+    const specialistPhase: SpecialistPhaseState = {
+        skillName,
+        status: 'active',
+        collectedData: {},
+        interactionCount: 0,
+        activatedAt: new Date().toISOString(),
+    };
+
+    return {
+        projectId,
+        phase: 'specialist_active',
+        specialistPhase,
+        // Legacy fields (vazios — não usados no novo fluxo)
+        discoveryStatus: 'pending',
+        discoveryBlocks: [],
+        discoveryResponses: {},
+        brainstormStatus: 'pending',
+        brainstormSections: [],
+        prdStatus: 'pending',
+        prdScore: 0,
+        mode: modo,
+        totalInteractions: 0,
+        lastInteractionAt: new Date().toISOString(),
+    };
 }
 
 /**

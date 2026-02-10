@@ -12,10 +12,12 @@
 import type { ToolResult, EstadoProjeto } from "../../types/index.js";
 import { formatResponse, formatError } from "../../utils/response-formatter.js";
 import { parsearEstado } from "../../state/storage.js";
+import { createStateService } from "../../services/state.service.js";
 import { isInOnboarding } from "../../services/flow-engine.js";
 import { proximo } from "../proximo.js";
 import { onboardingOrchestrator } from "../../flows/onboarding-orchestrator.js";
 import { brainstorm } from "../brainstorm.js";
+import { resolveProjectPath } from "../../utils/files.js";
 
 interface AvancarArgs {
     diretorio: string;
@@ -41,22 +43,34 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
         };
     }
 
+    const diretorio = resolveProjectPath(args.diretorio);
+
     // Determinar contexto
     let estado: EstadoProjeto | null = null;
     if (args.estado_json) {
         estado = parsearEstado(args.estado_json);
     }
-
-    // Se não tem estado, delegar para onboarding (projeto novo ou carregando)
+    
+    // v6.0: Auto-carregar estado do filesystem se não fornecido
     if (!estado) {
-        return onboardingOrchestrator({
-            diretorio: args.diretorio,
-            estado_json: args.estado_json || "",
-            acao: args.acao || "proximo_bloco",
-            // v5.3: Normalizar respostas → respostas_bloco para onboarding
-            respostas_bloco: args.respostas,
-            respostas: args.respostas,
-        } as any);
+        try {
+            const stateService = createStateService(diretorio);
+            estado = await stateService.load();
+        } catch {
+            // Fallback silencioso
+        }
+    }
+
+    // Se não tem estado, retornar erro com recovery path
+    if (!estado) {
+        return {
+            content: formatError(
+                "avancar",
+                "Nenhum projeto encontrado neste diretório.",
+                "Use `maestro({diretorio: \"" + diretorio + "\"})` para iniciar um novo projeto."
+            ),
+            isError: true,
+        };
     }
 
     // Verificar se está em onboarding
@@ -64,9 +78,31 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
     const onboarding = (estado as any).onboarding;
 
     if (inOnboarding) {
-        // Se brainstorm está em progresso
+        // v6.0: Novo fluxo com specialistPhase
+        if (onboarding?.specialistPhase) {
+            try {
+                const { handleSpecialistPhase } = await import("../../handlers/specialist-phase-handler.js");
+                return handleSpecialistPhase({
+                    estado,
+                    diretorio,
+                    respostas: args.respostas,
+                    entregavel: args.entregavel,
+                });
+            } catch (err) {
+                // v6.0 (P14): Recovery path claro em caso de erro
+                return {
+                    content: formatError(
+                        "avancar",
+                        `Erro ao processar fase do especialista: ${err instanceof Error ? err.message : String(err)}`,
+                        `Tente novamente com: executar({diretorio: "${diretorio}", acao: "avancar", respostas: {problema: "...", publico_alvo: "..."}})`
+                    ),
+                    isError: true,
+                };
+            }
+        }
+
+        // Legacy: Se brainstorm está em progresso
         if (onboarding?.brainstormStatus === "in_progress") {
-            // v5.3: Extrair resposta_secao de respostas se presente
             const respostasObj = args.respostas || {};
             const respostaSecao = (respostasObj.resposta_secao as string) || "";
             return brainstorm({
@@ -77,12 +113,11 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
             } as any);
         }
 
-        // Caso contrário, delegar para onboarding orchestrator
+        // Legacy: Delegar para onboarding orchestrator (discoveryBlocks)
         return onboardingOrchestrator({
             diretorio: args.diretorio,
             estado_json: args.estado_json || "",
             acao: args.acao || "proximo_bloco",
-            // v5.3: Normalizar respostas → respostas_bloco para onboarding
             respostas_bloco: args.respostas,
             respostas: args.respostas,
         } as any);

@@ -190,6 +190,188 @@ export class SkillLoaderService {
     }
 
     /**
+     * v6.0 (P6): Carrega pacote COMPLETO de uma skill SEM truncamento de tokens.
+     * Usado pelo specialist-activator para injetar recursos reais no contexto.
+     * Diferente de loadForPhase que respeita budget de tokens.
+     */
+    async loadFullPackage(
+        skillName: string
+    ): Promise<ContextPackage | null> {
+        const cacheKey = `skill-full:${skillName}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            try {
+                return JSON.parse(cached) as ContextPackage;
+            } catch {
+                // Cache corrompido
+            }
+        }
+
+        const specialist = getSpecialistPersona(
+            this.skillNameToFaseName(skillName)
+        );
+
+        // Carregar TUDO em paralelo, sem truncamento
+        const [rawSkill, rawTemplate, rawChecklist, templateFiles, checklistFiles, rawExamples, rawReference] =
+            await Promise.all([
+                this.contentResolver.readSkillFile(skillName, "SKILL.md"),
+                this.contentResolver.readFirstTemplate(skillName),
+                this.contentResolver.readFirstChecklist(skillName),
+                this.contentResolver.listSkillResources(skillName, "templates"),
+                this.contentResolver.listSkillResources(skillName, "checklists"),
+                this.safeReadResource(skillName, "examples"),
+                this.safeReadResource(skillName, "reference"),
+            ]);
+
+        const skillContent = rawSkill || "";
+        const templateContent = rawTemplate || "";
+        const checklistContent = rawChecklist || "";
+
+        // Incluir exemplos e referência no skillContent se disponíveis
+        let fullSkillContent = skillContent;
+        if (rawExamples) {
+            fullSkillContent += `\n\n## Exemplos\n\n${rawExamples}`;
+        }
+        if (rawReference) {
+            fullSkillContent += `\n\n## Referência\n\n${rawReference}`;
+        }
+
+        const referenceLinks: string[] = [];
+        for (const t of templateFiles) {
+            referenceLinks.push(`maestro://skills/${skillName}/templates/${t}`);
+        }
+        for (const c of checklistFiles) {
+            referenceLinks.push(`maestro://skills/${skillName}/checklists/${c}`);
+        }
+
+        const totalTokens =
+            this.estimateTokens(fullSkillContent) +
+            this.estimateTokens(templateContent) +
+            this.estimateTokens(checklistContent);
+
+        const result: ContextPackage = {
+            skillName,
+            specialist,
+            skillContent: fullSkillContent,
+            templateContent,
+            checklistContent,
+            referenceLinks,
+            tokenEstimate: totalTokens,
+            mode: "full",
+        };
+
+        setCache(cacheKey, JSON.stringify(result));
+        return result;
+    }
+
+    /**
+     * v6.0: Carrega por nome da skill diretamente (sem mapear de fase)
+     */
+    async loadBySkillName(
+        skillName: string,
+        mode: "economy" | "balanced" | "quality" = "balanced"
+    ): Promise<ContextPackage | null> {
+        const cacheKey = `skill:${skillName}:${mode}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            try {
+                return JSON.parse(cached) as ContextPackage;
+            } catch {
+                // Cache corrompido
+            }
+        }
+
+        const budget = TOKEN_BUDGETS[mode];
+        const specialist = getSpecialistPersona(
+            this.skillNameToFaseName(skillName)
+        );
+
+        const [rawSkill, rawTemplate, rawChecklist, templateFiles, checklistFiles] =
+            await Promise.all([
+                this.contentResolver.readSkillFile(skillName, "SKILL.md"),
+                this.contentResolver.readFirstTemplate(skillName),
+                this.contentResolver.readFirstChecklist(skillName),
+                this.contentResolver.listSkillResources(skillName, "templates"),
+                this.contentResolver.listSkillResources(skillName, "checklists"),
+            ]);
+
+        const skillContent = rawSkill
+            ? this.processSkillContent(rawSkill, mode, budget.skill)
+            : "";
+        const templateContent = rawTemplate
+            ? this.processTemplateContent(rawTemplate, mode, budget.template)
+            : "";
+        const checklistContent = rawChecklist
+            ? this.truncateToTokenBudget(rawChecklist, budget.checklist)
+            : "";
+
+        const referenceLinks: string[] = [];
+        for (const t of templateFiles) {
+            referenceLinks.push(`maestro://skills/${skillName}/templates/${t}`);
+        }
+        for (const c of checklistFiles) {
+            referenceLinks.push(`maestro://skills/${skillName}/checklists/${c}`);
+        }
+
+        const totalTokens =
+            this.estimateTokens(skillContent) +
+            this.estimateTokens(templateContent) +
+            this.estimateTokens(checklistContent);
+
+        const resultMode: ContextPackage["mode"] =
+            mode === "economy" ? "summary" : mode === "balanced" ? "summary" : "full";
+
+        const result: ContextPackage = {
+            skillName,
+            specialist,
+            skillContent,
+            templateContent,
+            checklistContent,
+            referenceLinks,
+            tokenEstimate: totalTokens,
+            mode: resultMode,
+        };
+
+        setCache(cacheKey, JSON.stringify(result));
+        return result;
+    }
+
+    /**
+     * v6.0: Helper para ler primeiro recurso de um tipo (examples, reference)
+     */
+    private async safeReadResource(skillName: string, resourceType: "examples" | "templates" | "checklists" | "reference"): Promise<string | null> {
+        try {
+            const files = await this.contentResolver.listSkillResources(skillName, resourceType);
+            if (files.length > 0) {
+                return this.contentResolver.readSkillFile(skillName, `resources/${resourceType}/${files[0]}`);
+            }
+        } catch {
+            // Recurso não encontrado
+        }
+        return null;
+    }
+
+    /**
+     * v6.0: Mapeia nome da skill para nome da fase (para buscar persona)
+     */
+    private skillNameToFaseName(skillName: string): string {
+        const map: Record<string, string> = {
+            "specialist-gestao-produto": "Produto",
+            "specialist-requisitos": "Requisitos",
+            "specialist-ux-design": "UX Design",
+            "specialist-arquitetura": "Arquitetura",
+            "specialist-backlog": "Backlog",
+            "specialist-frontend": "Frontend",
+            "specialist-backend": "Backend",
+            "specialist-devops": "DevOps",
+            "specialist-testes": "Testes",
+            "specialist-seguranca": "Segurança",
+            "specialist-integracao": "Integração",
+        };
+        return map[skillName] || skillName;
+    }
+
+    /**
      * Formata ContextPackage como markdown para injeção na resposta.
      */
     formatAsMarkdown(pkg: ContextPackage): string {

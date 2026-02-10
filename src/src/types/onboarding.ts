@@ -2,7 +2,7 @@
  * Tipos para o fluxo de onboarding otimizado
  */
 
-export type OnboardingPhase = 'discovery' | 'brainstorm' | 'prd_draft' | 'validation' | 'completed';
+export type OnboardingPhase = 'discovery' | 'brainstorm' | 'prd_draft' | 'validation' | 'completed' | 'specialist_active' | 'specialist_collecting' | 'specialist_generating' | 'specialist_validating' | 'specialist_approved';
 export type DiscoveryBlockStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type BrainstormStatus = 'pending' | 'in_progress' | 'completed';
 
@@ -51,20 +51,37 @@ export interface BrainstormSection {
 }
 
 /**
+ * Estado da fase do especialista (v6.0 — novo fluxo unificado)
+ */
+export interface SpecialistPhaseState {
+  skillName: string;
+  status: 'active' | 'collecting' | 'generating' | 'validating' | 'approved';
+  collectedData: Record<string, any>;
+  prdDraft?: string;
+  validationScore?: number;
+  interactionCount: number;
+  activatedAt?: string;
+  completedAt?: string;
+}
+
+/**
  * Estado do onboarding
  */
 export interface OnboardingState {
   projectId: string;
   phase: OnboardingPhase;
   
-  // Discovery
+  // v6.0: Fase do especialista (novo fluxo unificado)
+  specialistPhase?: SpecialistPhaseState;
+  
+  // Discovery (legacy — mantido para backward compat)
   discoveryStatus: 'pending' | 'in_progress' | 'completed';
   discoveryBlocks: DiscoveryBlock[];
   discoveryResponses: Record<string, any>;
   discoveryStartedAt?: string;
   discoveryCompletedAt?: string;
   
-  // Brainstorm
+  // Brainstorm (legacy — mantido para backward compat)
   brainstormStatus: BrainstormStatus;
   brainstormSections: BrainstormSection[];
   brainstormStartedAt?: string;

@@ -83,6 +83,32 @@ export async function getPrompt(name: string, diretorio: string): Promise<Prompt
     }
 }
 
+// === v6.0: REGRAS ANTI-INFERÊNCIA (P1, P5, P9) ===
+
+const ANTI_INFERENCE_RULES = `---
+
+## ⛔ REGRAS OBRIGATÓRIAS — Anti-Inferência
+
+1. **NUNCA invente dados** que o usuário não forneceu explicitamente
+2. **NUNCA preencha campos** com valores fictícios, placeholder ou "exemplo"
+3. **NUNCA assuma** preferências do usuário (IDE, modo, stack, etc.)
+4. **SEMPRE pergunte** quando uma informação for necessária e não estiver disponível
+5. Se o usuário pedir "preencha para teste" ou "invente dados", responda: "Preciso de informações reais para gerar um resultado útil. Quais são os dados reais?"
+6. **NUNCA use** \`maestro({acao: "status"})\` para tentar avançar — use \`executar({acao: "avancar"})\`
+7. Quando respostas forem vagas (< 20 palavras), faça perguntas de follow-up antes de prosseguir`;
+
+const FLOW_RULES = `## 🔄 REGRAS DE FLUXO — Ferramentas Corretas
+
+| Ação | Ferramenta Correta | ❌ NÃO use |
+|------|-------------------|------------|
+| Avançar fase | \`executar({acao: "avancar"})\` | \`maestro({acao: "status"})\` |
+| Enviar respostas | \`executar({acao: "avancar", respostas: {...}})\` | \`maestro({respostas: {...}})\` |
+| Enviar entregável | \`executar({acao: "avancar", entregavel: "..."})\` | \`maestro({entregavel: "..."})\` |
+| Ver status | \`maestro({diretorio: "..."})\` | — |
+| Validar gate | \`validar({diretorio: "..."})\` | — |
+
+⚠️ **IMPORTANTE:** O parâmetro \`diretorio\` é SEMPRE obrigatório em todas as chamadas.`;
+
 // === BUILDERS ===
 
 function noProjectResult(msg?: string): PromptResult {
@@ -100,6 +126,12 @@ async function buildSpecialistPrompt(diretorio: string): Promise<PromptResult> {
     const estado = await stateService.load();
 
     if (!estado) return noProjectResult();
+
+    // v6.0: Detectar novo fluxo com specialistPhase
+    const onboarding = (estado as any).onboarding;
+    if (onboarding?.specialistPhase) {
+        return buildSpecialistPhasePrompt(diretorio, estado, onboarding);
+    }
 
     const faseInfo = getFaseComStitch(estado.nivel as any, estado.fase_atual, estado.usar_stitch);
     if (!faseInfo) {
@@ -125,7 +157,7 @@ async function buildSpecialistPrompt(diretorio: string): Promise<PromptResult> {
                     role: "user",
                     content: {
                         type: "text",
-                        text: `# Especialista da Fase: ${faseInfo.nome}\n\n${skillLoader.formatAsMarkdown(contextPkg)}`,
+                        text: `# Especialista da Fase: ${faseInfo.nome}\n\n${skillLoader.formatAsMarkdown(contextPkg)}\n\n${ANTI_INFERENCE_RULES}`,
                     },
                 }],
             };
@@ -143,9 +175,94 @@ async function buildSpecialistPrompt(diretorio: string): Promise<PromptResult> {
             content: {
                 type: "text",
                 text: specialist
-                    ? `# ${specialist.name}\n\n**Tom:** ${specialist.tone}\n**Expertise:** ${specialist.expertise.join(", ")}\n**Instruções:** ${specialist.instructions}`
-                    : `Fase ${estado.fase_atual}: ${faseInfo.nome}`,
+                    ? `# ${specialist.name}\n\n**Tom:** ${specialist.tone}\n**Expertise:** ${specialist.expertise.join(", ")}\n**Instruções:** ${specialist.instructions}\n\n${ANTI_INFERENCE_RULES}`
+                    : `Fase ${estado.fase_atual}: ${faseInfo.nome}\n\n${ANTI_INFERENCE_RULES}`,
             },
+        }],
+    };
+}
+
+/**
+ * v6.0: Prompt específico para o novo fluxo com specialistPhase
+ * Injeta recursos reais + regras anti-inferência + instruções de fluxo
+ */
+async function buildSpecialistPhasePrompt(
+    diretorio: string,
+    estado: any,
+    onboarding: any
+): Promise<PromptResult> {
+    const sp = onboarding.specialistPhase;
+    const mode = (onboarding.mode || "balanced") as "economy" | "balanced" | "quality";
+
+    let skillContent = "";
+    let templateContent = "";
+    let checklistContent = "";
+
+    // Carregar recursos reais da skill
+    try {
+        const contentResolver = new ContentResolverService(diretorio);
+        const skillLoader = new SkillLoaderService(contentResolver);
+        const pkg = await skillLoader.loadFullPackage(sp.skillName);
+        if (pkg) {
+            skillContent = pkg.skillContent;
+            templateContent = pkg.templateContent;
+            checklistContent = pkg.checklistContent;
+        }
+    } catch (err) {
+        console.warn("[Prompt] Falha ao carregar skill para specialistPhase:", err);
+    }
+
+    // Montar dados coletados até agora
+    const collectedEntries = Object.entries(sp.collectedData || {});
+    const collectedSummary = collectedEntries.length > 0
+        ? collectedEntries.map(([k, v]) => `- **${k}**: ${v}`).join("\n")
+        : "Nenhum dado coletado ainda.";
+
+    const statusLabel: Record<string, string> = {
+        active: "Aguardando início da coleta",
+        collecting: "Coletando informações do produto",
+        generating: "Gerando PRD",
+        validating: "Validando PRD",
+        approved: "PRD aprovado",
+    };
+
+    const promptText = `# 🧠 Especialista: Gestão de Produto
+
+**Status:** ${statusLabel[sp.status] || sp.status}
+**Interações:** ${sp.interactionCount}
+**Modo:** ${mode.toUpperCase()}
+
+---
+
+## Persona
+
+Você É o especialista de Gestão de Produto. Conduza a coleta de informações de forma conversacional focada em **PRODUTO** (não infraestrutura técnica).
+
+${skillContent ? `## Instruções da Skill\n\n${skillContent}\n` : ""}
+${templateContent ? `## Template do Entregável (PRD)\n\n${templateContent}\n` : ""}
+${checklistContent ? `## Checklist de Validação\n\n${checklistContent}\n` : ""}
+
+## Dados Coletados
+
+${collectedSummary}
+
+${ANTI_INFERENCE_RULES}
+
+${FLOW_RULES}
+
+---
+
+⚠️ **LEMBRETE FINAL:**
+- Para avançar: \`executar({diretorio: "${diretorio}", acao: "avancar", respostas: {...}})\`
+- Para enviar PRD: \`executar({diretorio: "${diretorio}", acao: "avancar", entregavel: "..."})\`
+- NUNCA use \`maestro({acao: "status"})\` para tentar avançar
+- NUNCA invente dados — PERGUNTE ao usuário`;
+
+    return {
+        description: `Especialista: Gestão de Produto — ${statusLabel[sp.status] || sp.status}`,
+        messages: [{
+            role: "user",
+            content: { type: "text", text: promptText },
         }],
     };
 }
@@ -323,6 +440,9 @@ ${toolsList}`,
     const tools = getRegisteredTools();
     sessionContent += `## 🔧 Tools Disponíveis\n\n`;
     sessionContent += tools.map(t => `- **${t.name}** — ${t.description.replace(/^[^\s]+ /, "")}`).join("\n");
+
+    // v6.0 (P1/P5/P9): Regras anti-inferência
+    sessionContent += `\n\n${ANTI_INFERENCE_RULES}\n\n${FLOW_RULES}`;
 
     return {
         description: `Sessão: ${estado.nome} — Fase ${estado.fase_atual}`,

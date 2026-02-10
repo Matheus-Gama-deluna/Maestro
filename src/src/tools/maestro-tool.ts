@@ -187,36 +187,55 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
 
 /**
  * Quando não há projeto no diretório
- * v5.4: Usa loadUserConfig() (config global em ~/.maestro/) ao invés de verificar config no diretório do projeto
+ * v6.0: SEMPRE mostra config e pede confirmação para ESTE projeto (resolve P7, P8)
+ * Mesmo com config global existente, confirma antes de prosseguir
  */
 async function handleNoProject(diretorio: string): Promise<ToolResult> {
-    // v5.4: Verificar config GLOBAL do usuário (salva em ~/.maestro/config.json)
-    // NÃO verificar no diretório do projeto — config é global
     const configGlobal = await loadUserConfig();
 
     if (configGlobal) {
-        // Config já existe — ir direto para criar projeto
+        // v6.0 (P7/P8): Config global existe, mas PERGUNTAR se quer usar para ESTE projeto
         const content = formatResponse({
             titulo: "🎯 Maestro — Novo Projeto",
-            resumo: `Nenhum projeto encontrado em \`${diretorio}\`. Preferências já configuradas (${configGlobal.ide}, ${configGlobal.modo}).`,
-            instrucoes: `Pergunte ao usuário o **nome** e uma **descrição breve** do projeto, depois EXECUTE:
+            resumo: `Nenhum projeto encontrado em \`${diretorio}\`. Configuração global detectada.`,
+            dados: {
+                "IDE": configGlobal.ide,
+                "Modo": configGlobal.modo,
+                "Stitch": configGlobal.usar_stitch ? "Sim" : "Não",
+            },
+            instrucoes: `⚠️ OBRIGATÓRIO: Pergunte ao usuário ANTES de prosseguir:
+
+1. **Confirme as configurações acima** para ESTE projeto:
+   - IDE: ${configGlobal.ide} — manter ou trocar? (windsurf / cursor / antigravity)
+   - Modo: ${configGlobal.modo} — manter ou trocar? (economy / balanced / quality)
+   - Stitch: ${configGlobal.usar_stitch ? "Sim" : "Não"} — manter ou trocar?
+
+2. **Pergunte o nome e descrição** do projeto.
+
+⚠️ NÃO prossiga sem respostas REAIS do usuário. NÃO infira valores.
+⚠️ NÃO use as configurações globais automaticamente sem confirmação explícita.
+
+Depois que o usuário confirmar, EXECUTE:
 
 maestro({
   "diretorio": "${diretorio}",
   "acao": "criar_projeto",
   "respostas": {
     "nome": "<nome do projeto>",
-    "descricao": "<descrição breve>"
+    "descricao": "<descrição breve>",
+    "ide": "<ide confirmada>",
+    "modo": "<modo confirmado>",
+    "usar_stitch": <true_ou_false_confirmado>
   }
 })
 
 ⚠️ NÃO chame maestro() sem ação — isso reinicia o fluxo. Sempre use acao="criar_projeto".`,
             proximo_passo: {
                 tool: "maestro",
-                descricao: "Criar novo projeto neste diretório",
-                args: `{ "diretorio": "${diretorio}", "acao": "criar_projeto", "respostas": { "nome": "<nome>", "descricao": "<descrição>" } }`,
+                descricao: "Confirmar configurações e criar novo projeto",
+                args: `{ "diretorio": "${diretorio}", "acao": "criar_projeto", "respostas": { "nome": "<nome>", "descricao": "<descrição>", "ide": "<ide>", "modo": "<modo>", "usar_stitch": <bool> } }`,
                 requer_input_usuario: true,
-                prompt_usuario: "Qual o nome e uma breve descrição do projeto?",
+                prompt_usuario: "As configurações acima estão corretas para este projeto? Qual o nome e descrição do projeto?",
             },
         });
         return { content };
@@ -226,10 +245,17 @@ maestro({
     const content = formatResponse({
         titulo: "🎯 Maestro — Novo Projeto",
         resumo: `Nenhum projeto encontrado em \`${diretorio}\`. Configuração inicial necessária.`,
-        instrucoes: `Pergunte ao usuário:
-1. Qual IDE você usa? (windsurf / cursor / antigravity)
-2. Qual modo prefere? (economy = rápido / balanced = equilibrado / quality = completo)
-3. Deseja usar Stitch para prototipagem? (sim/não)
+        instrucoes: `⚠️ OBRIGATÓRIO: Pergunte CADA item ao usuário. NÃO infira respostas. NÃO use valores padrão sem confirmação explícita.
+
+Pergunte ao usuário:
+1. **Qual IDE você usa?** (windsurf / cursor / antigravity)
+   - Impacto: Define onde rules/skills serão injetados
+2. **Qual modo prefere?**
+   - economy = rápido, 7 fases, perguntas mínimas
+   - balanced = equilibrado, 13 fases, perguntas moderadas
+   - quality = completo, 17 fases, perguntas detalhadas
+3. **Deseja usar Stitch para prototipagem?** (sim/não)
+   - Impacto: Habilita Google Stitch para prototipagem rápida de UI
 
 Depois EXECUTE:
 
@@ -247,7 +273,7 @@ maestro({
         proximo_passo: {
             tool: "maestro",
             descricao: "Configurar preferências e depois criar projeto",
-            args: `{ "diretorio": "${diretorio}", "acao": "setup_inicial", "respostas": { "ide": "windsurf", "modo": "balanced", "usar_stitch": false } }`,
+            args: `{ "diretorio": "${diretorio}", "acao": "setup_inicial", "respostas": { "ide": "<ide>", "modo": "<modo>", "usar_stitch": <bool> } }`,
             requer_input_usuario: true,
             prompt_usuario: "Qual IDE você usa? Qual modo prefere? (economy/balanced/quality) Deseja usar Stitch?",
         },
@@ -256,8 +282,10 @@ maestro({
 }
 
 /**
- * v5.3: Criar projeto completo em um único passo
+ * v6.0: Criar projeto completo em um único passo
  * Combina setup_inicial + iniciar_projeto + confirmar_projeto
+ * P8: Exige ide/modo explícitos (não usa defaults silenciosos)
+ * P9: NÃO usa confirmar_automaticamente — projeto criado sem discovery blocks
  */
 async function handleCriarProjeto(args: MaestroArgs): Promise<ToolResult> {
     const diretorio = args.diretorio;
@@ -269,44 +297,81 @@ async function handleCriarProjeto(args: MaestroArgs): Promise<ToolResult> {
         const content = formatResponse({
             titulo: "🎯 Maestro — Criar Projeto",
             resumo: "Informe o nome e descrição do projeto para continuar.",
-            instrucoes: `Pergunte ao usuário o nome e descrição do projeto, depois EXECUTE:
+            instrucoes: `⚠️ OBRIGATÓRIO: Pergunte ao usuário o nome, descrição, IDE, modo e stitch. NÃO infira valores.
 
 maestro({
   "diretorio": "${diretorio}",
   "acao": "criar_projeto",
   "respostas": {
     "nome": "<nome do projeto>",
-    "descricao": "<descrição breve>"
+    "descricao": "<descrição breve>",
+    "ide": "<ide>",
+    "modo": "<modo>",
+    "usar_stitch": <bool>
   }
 })`,
             proximo_passo: {
                 tool: "maestro",
-                descricao: "Criar projeto com nome e descrição",
-                args: `{ "diretorio": "${diretorio}", "acao": "criar_projeto", "respostas": { "nome": "<nome>", "descricao": "<descrição>" } }`,
+                descricao: "Criar projeto com nome, descrição e configurações",
+                args: `{ "diretorio": "${diretorio}", "acao": "criar_projeto", "respostas": { "nome": "<nome>", "descricao": "<descrição>", "ide": "<ide>", "modo": "<modo>", "usar_stitch": <bool> } }`,
                 requer_input_usuario: true,
-                prompt_usuario: "Qual o nome e uma breve descrição do projeto?",
+                prompt_usuario: "Qual o nome, descrição do projeto? Confirme IDE, modo e stitch.",
             },
         });
         return { content };
     }
 
-    // Carregar config global ou usar defaults
+    // v6.0 (P8): Carregar config global mas EXIGIR confirmação explícita
     const configGlobal = await loadUserConfig();
-    const ide = (params.ide as string) || configGlobal?.ide || "windsurf";
-    const modo = (params.modo as string) || configGlobal?.modo || "balanced";
-    const usarStitch = (params.usar_stitch as boolean) ?? configGlobal?.usar_stitch ?? false;
+    const ide = params.ide as string;
+    const modo = params.modo as string;
+    const usarStitch = params.usar_stitch as boolean | undefined;
 
-    // Se não tem config global, salvar automaticamente
-    if (!configGlobal) {
-        try {
-            const { saveUserConfig } = await import("../utils/config.js");
-            await saveUserConfig({ ide: ide as any, modo: modo as any, usar_stitch: usarStitch });
-        } catch {
-            // Fallback silencioso
-        }
+    // Se ide/modo não foram fornecidos explicitamente, pedir ao usuário
+    if (!ide || !modo) {
+        const content = formatResponse({
+            titulo: "⚠️ Maestro — Configurações Necessárias",
+            resumo: `Projeto "${nome}" precisa de configurações confirmadas para este projeto.`,
+            instrucoes: `⚠️ OBRIGATÓRIO: Pergunte ao usuário as configurações para ESTE projeto.
+NÃO use valores padrão sem confirmação explícita do usuário.
+
+${configGlobal ? `Config global detectada: IDE=${configGlobal.ide}, Modo=${configGlobal.modo}, Stitch=${configGlobal.usar_stitch ? "Sim" : "Não"}
+Pergunte: "Deseja usar estas configurações para este projeto ou ajustar?"` : "Nenhuma config global encontrada. Pergunte cada item."}
+
+Depois EXECUTE:
+
+maestro({
+  "diretorio": "${diretorio}",
+  "acao": "criar_projeto",
+  "respostas": {
+    "nome": "${nome}",
+    "descricao": "${descricao}",
+    "ide": "<ide confirmada>",
+    "modo": "<modo confirmado>",
+    "usar_stitch": <true_ou_false>
+  }
+})`,
+            proximo_passo: {
+                tool: "maestro",
+                descricao: "Criar projeto com configurações confirmadas",
+                args: `{ "diretorio": "${diretorio}", "acao": "criar_projeto", "respostas": { "nome": "${nome}", "descricao": "${descricao}", "ide": "<ide>", "modo": "<modo>", "usar_stitch": <bool> } }`,
+                requer_input_usuario: true,
+                prompt_usuario: "Confirme IDE, modo e stitch para este projeto.",
+            },
+        });
+        return { content };
     }
 
-    // Delegar para iniciar_projeto com confirmar_automaticamente=true
+    // Salvar/atualizar config global se necessário
+    try {
+        const { saveUserConfig } = await import("../utils/config.js");
+        await saveUserConfig({ ide: ide as any, modo: modo as any, usar_stitch: usarStitch ?? false });
+    } catch {
+        // Fallback silencioso
+    }
+
+    // v6.0 (P9): Delegar para iniciar_projeto SEM confirmar_automaticamente
+    // O projeto é criado e vai direto para o especialista (sem discovery blocks)
     const { iniciarProjeto } = await import("./iniciar-projeto.js");
     return iniciarProjeto({
         nome,
@@ -314,7 +379,7 @@ maestro({
         diretorio,
         ide: ide as any,
         modo: modo as any,
-        usar_stitch: usarStitch,
+        usar_stitch: usarStitch ?? false,
         confirmar_automaticamente: true,
     });
 }

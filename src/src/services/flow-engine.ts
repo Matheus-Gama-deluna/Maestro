@@ -62,9 +62,11 @@ interface FlowTransition {
 }
 
 /**
- * Fluxo de onboarding (setup → discovery → brainstorm → PRD)
+ * v6.0: Novo fluxo de onboarding (setup → criar_projeto → specialist_active → prd_draft → prd_validation)
+ * Elimina discovery/brainstorm separados — tudo é conduzido pelo Especialista
  */
 const ONBOARDING_FLOW: FlowTransition[] = [
+    // === NOVO FLUXO (v6.0) ===
     {
         from: "none",
         to: "setup",
@@ -78,10 +80,10 @@ const ONBOARDING_FLOW: FlowTransition[] = [
         from: "none",
         to: "iniciar",
         tool: "maestro",
-        description: "Criar novo projeto",
+        description: "Confirmar configurações e criar novo projeto",
         condition: (s) => s.hasGlobalConfig && !s.hasProject,
         requires_user_input: true,
-        user_prompt: "Qual o nome e descrição do projeto?",
+        user_prompt: "Confirme as configurações para este projeto. Qual o nome e descrição?",
     },
     {
         from: "setup",
@@ -92,21 +94,48 @@ const ONBOARDING_FLOW: FlowTransition[] = [
         user_prompt: "Configuração concluída! Qual o nome e descrição do projeto?",
     },
     {
-        from: "iniciar",
-        to: "confirmar",
-        tool: "maestro",
-        description: "Confirmar criação do projeto com tipo e complexidade",
+        from: "specialist_active",
+        to: "specialist_collecting",
+        tool: "executar",
+        description: "Responder perguntas do especialista sobre o produto",
         requires_user_input: true,
-        user_prompt: "Confirme o tipo e complexidade do projeto.",
+        user_prompt: "Responda as perguntas do especialista sobre seu produto (problema, público, MVP).",
     },
     {
-        from: "confirmar",
-        to: "discovery",
+        from: "specialist_collecting",
+        to: "specialist_collecting",
         tool: "executar",
-        description: "Iniciar discovery do projeto",
+        description: "Continuar respondendo perguntas do especialista",
         requires_user_input: true,
-        user_prompt: "Vamos coletar informações sobre o projeto em blocos.",
+        user_prompt: "Continue respondendo as perguntas do especialista.",
     },
+    {
+        from: "specialist_generating",
+        to: "specialist_validating",
+        tool: "executar",
+        description: "Validar PRD gerado pelo especialista",
+        requires_user_input: false,
+        auto_execute: true,
+    },
+    {
+        from: "specialist_validating",
+        to: "specialist_approved",
+        tool: "executar",
+        description: "PRD aprovado, preparar transição para próximo especialista",
+        condition: (s) => true,
+        requires_user_input: true,
+        user_prompt: "PRD validado! Revise o score e aprove para avançar.",
+    },
+    {
+        from: "specialist_approved",
+        to: "confirmar_classificacao",
+        tool: "executar",
+        description: "Confirmar classificação do projeto baseada no PRD",
+        requires_user_input: true,
+        user_prompt: "PRD aprovado! Confirme a classificação sugerida.",
+    },
+
+    // === LEGACY FLOW (backward compat para projetos existentes) ===
     {
         from: "discovery_in_progress",
         to: "discovery_next_block",
@@ -223,6 +252,7 @@ export function getFlowState(estado: EstadoProjeto, diretorio: string): FlowStat
 
 /**
  * Determina a fase atual com base no estado
+ * v6.0: Prioriza specialistPhase (novo fluxo) sobre discoveryBlocks (legacy)
  */
 function determineCurrentPhase(estado: EstadoProjeto): string {
     if (estado.aguardando_aprovacao) return "aguardando_aprovacao";
@@ -230,6 +260,19 @@ function determineCurrentPhase(estado: EstadoProjeto): string {
 
     const onboarding = (estado as any).onboarding;
     if (onboarding) {
+        // v6.0: Novo fluxo com specialistPhase
+        if (onboarding.specialistPhase) {
+            const sp = onboarding.specialistPhase;
+            switch (sp.status) {
+                case 'active': return "specialist_active";
+                case 'collecting': return "specialist_collecting";
+                case 'generating': return "specialist_generating";
+                case 'validating': return "specialist_validating";
+                case 'approved': return "specialist_approved";
+            }
+        }
+
+        // Legacy: discoveryBlocks-based flow
         if (onboarding.discoveryStatus === "in_progress") return "discovery_in_progress";
         if (onboarding.discoveryStatus === "completed" && onboarding.brainstormStatus === "pending") return "discovery_complete";
         if (onboarding.brainstormStatus === "in_progress") return "brainstorm_in_progress";
@@ -326,6 +369,10 @@ export function isInOnboarding(estado: EstadoProjeto): boolean {
     const phase = determineCurrentPhase(estado);
     return [
         "none", "setup", "iniciar", "confirmar",
+        // v6.0: Novo fluxo com especialista
+        "specialist_active", "specialist_collecting", "specialist_generating",
+        "specialist_validating", "specialist_approved",
+        // Legacy
         "discovery", "discovery_in_progress", "discovery_next_block",
         "discovery_complete", "brainstorm", "brainstorm_in_progress",
         "brainstorm_complete", "prd", "prd_complete", "confirmar_classificacao",

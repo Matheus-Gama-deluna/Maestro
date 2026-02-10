@@ -11,6 +11,8 @@ import { formatSkillMessage, detectIDE } from "../utils/ide-paths.js";
 import { getSpecialistPersona } from "../services/specialist.service.js";
 import { formatError, embedAllMetadata } from "../utils/response-formatter.js";
 import { withStructuredContent } from "../services/structured-content.service.js";
+import { ContentResolverService } from "../services/content-resolver.service.js";
+import { SkillLoaderService } from "../services/skill-loader.service.js";
 
 interface ContextoArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -63,6 +65,44 @@ export async function contexto(args: ContextoArgs): Promise<ToolResult> {
     // Identificar stack e modelo (se disponíveis nas fases anteriores)
     const fasesCompletas = estado.gates_validados.map(num => getFase(estado.nivel, num)?.nome).join(", ");
 
+    // v6.0 (P13): Carregar conteúdo real da skill ANTES do template
+    let skillInjectionContent = "";
+    if (faseAtual) {
+        const proximaSkill = getSkillParaFase(faseAtual.nome);
+        if (proximaSkill) {
+            try {
+                const contentResolver = new ContentResolverService(diretorio);
+                const skillLoader = new SkillLoaderService(contentResolver);
+                const mode = (estado.config?.mode || 'balanced') as 'economy' | 'balanced' | 'quality';
+                const pkg = await skillLoader.loadBySkillName(proximaSkill, mode);
+                
+                if (pkg) {
+                    const parts: string[] = [];
+                    parts.push(`### 💡 Conteúdo do Especialista: ${pkg.specialist?.name || proximaSkill}\n`);
+                    
+                    if (pkg.skillContent) {
+                        parts.push(`#### Instruções\n${pkg.skillContent}\n`);
+                    }
+                    if (pkg.templateContent) {
+                        parts.push(`#### Template do Entregável\n${pkg.templateContent}\n`);
+                    }
+                    if (pkg.checklistContent) {
+                        parts.push(`#### Checklist de Validação\n${pkg.checklistContent}\n`);
+                    }
+                    
+                    skillInjectionContent = parts.join("\n");
+                }
+            } catch (err) {
+                console.warn('[contexto] Falha ao carregar recursos da skill:', err);
+            }
+            
+            // Fallback se não conseguiu carregar
+            if (!skillInjectionContent) {
+                skillInjectionContent = `### 💡 Próximos Passos com Skill\n\n${formatSkillMessage(proximaSkill, estado.ide || detectIDE(args.diretorio) || 'windsurf')}\n`;
+            }
+        }
+    }
+
     const resposta = `# 📋 Contexto do Projeto
 
 ## Informações Gerais
@@ -109,21 +149,7 @@ ${faseAtual ? `
 | **Especialista** | ${faseAtual.especialista} |
 | **Entregável esperado** | ${faseAtual.entregavel_esperado} |
 
-${(() => {
-    const proximaSkill = getSkillParaFase(faseAtual.nome);
-    if (!proximaSkill) return "";
-    
-    return `
-### 💡 Próximos Passos com Skill
-
-${formatSkillMessage(proximaSkill, estado.ide || detectIDE(args.diretorio) || 'windsurf')}
-
-1. Ativar skill: \`@${proximaSkill}\`
-2. Ler \`SKILL.md\` para instruções da fase
-3. Consultar templates em \`resources/templates/\`
-4. Seguir checklist em \`resources/checklists/\`
-`;
-})()}
+${skillInjectionContent}
 
 ### Checklist de Gate
 ${faseAtual.gate_checklist.map(item => `- [ ] ${item}`).join("\n")}
