@@ -22,6 +22,8 @@ import type { NextAction, FlowProgress } from "../types/response.js";
 import { listTemplatesFormatted, getTemplate } from "../data/project-templates.js";
 import { getSmartDefaults, formatSmartDefaultsSummary } from "../utils/smart-defaults.js";
 import { getSpecialistPersona } from "../services/specialist.service.js";
+import { ContentResolverService } from "../services/content-resolver.service.js";
+import { SkillLoaderService } from "../services/skill-loader.service.js";
 
 interface IniciarProjetoArgs {
     nome: string;
@@ -436,14 +438,27 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
     // v6.0: Montar perguntas condicionais por modo
     const perguntasBalanced = args.modo !== 'economy'
-        ? '\n5. **Quais são os principais riscos?** (balanced/quality)\n6. **Qual o timeline desejado?** (balanced/quality)'
+        ? '\n5. **O que pode dar errado? Quais riscos você vê?** (balanced/quality)\n6. **Em quanto tempo quer lançar a primeira versão?** (balanced/quality)'
         : '';
     const perguntasQuality = args.modo === 'quality'
-        ? '\n7. **Descreva 2-3 personas detalhadas** (quality)\n8. **Qual a estratégia de go-to-market?** (quality)'
+        ? '\n7. **Descreva 2-3 tipos de pessoas que vão usar (nome fictício, cargo, rotina)** (quality)\n8. **Como pretende conseguir os primeiros usuários?** (quality)'
         : '';
     const stitchNote = args.usar_stitch
         ? '\n> 🎨 **Google Stitch habilitado** - Disponível para prototipagem após UX Design\n'
         : '';
+
+    // Sprint 2 (NP6, NP8): Carregar esqueleto do template para injeção na ativação
+    let templateSkeletonSection = '';
+    try {
+        const contentResolver = new ContentResolverService(diretorio);
+        const skillLoader = new SkillLoaderService(contentResolver);
+        const collectingPkg = await skillLoader.loadCollectingPackage('specialist-gestao-produto');
+        if (collectingPkg?.templateSkeleton) {
+            templateSkeletonSection = `\n---\n\n## 📋 Estrutura do PRD Final (referência)\n\nO PRD que será gerado deve seguir esta estrutura. Use-a como guia para suas perguntas:\n\n${collectingPkg.templateSkeleton}\n\n> 📊 Contexto injetado: ~${collectingPkg.tokenEstimate} tokens\n`;
+        }
+    } catch (err) {
+        console.warn('[iniciar-projeto] Falha ao carregar collecting package:', err);
+    }
 
     // v6.0: Resposta com especialista ativado (sem discovery blocks)
     const resposta = `# 🚀 Projeto Iniciado: ${args.nome}
@@ -482,12 +497,12 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
 O especialista vai conduzir uma conversa focada em **PRODUTO** (não infraestrutura técnica).
 
-Perguntas que o especialista DEVE fazer ao usuário:
+Perguntas que o especialista DEVE fazer ao usuário (em linguagem simples):
 
-1. **Qual problema central seu produto resolve?** (obrigatório)
-2. **Quem é o público-alvo principal?** (obrigatório)
-3. **Quais são as 3-5 funcionalidades essenciais do MVP?** (obrigatório)
-4. **Como você mede sucesso? (North Star Metric)** (obrigatório)
+1. **Qual problema seu produto resolve?** (obrigatório) _Ex: "Equipes perdem controle de tarefas por usar planilhas"_
+2. **Quem vai usar seu produto?** (obrigatório) _Ex: "Pequenas empresas de 5-30 pessoas"_
+3. **Quais as 3-5 coisas mais importantes que o produto precisa fazer?** (obrigatório) _Ex: "Criar checklists, atribuir tarefas, ver status"_
+4. **Qual número mostra que o produto está funcionando?** (obrigatório) _Ex: "% de checklists concluídos no prazo"_
 ${perguntasBalanced}
 ${perguntasQuality}
 
@@ -520,6 +535,7 @@ executar({
 4. ⏳ **Validação PRD** - Score >= 70 para aprovar
 5. ⏳ **Fase 1 (Produto)** - Início do desenvolvimento
 
+${templateSkeletonSection}
 ${stitchNote}
 `;
 

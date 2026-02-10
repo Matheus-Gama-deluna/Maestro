@@ -26,6 +26,31 @@ interface SpecialistPhaseArgs {
     entregavel?: string;
 }
 
+// === Sprint 5 (NP2, NP3): Fuzzy Field Matching ===
+
+const FIELD_ALIASES: Record<string, string[]> = {
+    'problema': ['problema_central', 'problem', 'pain_point', 'dor', 'problema_principal'],
+    'publico_alvo': ['publico', 'target', 'audience', 'usuarios', 'usuarios_alvo', 'target_audience'],
+    'funcionalidades_mvp': ['features', 'funcionalidades', 'mvp', 'features_mvp', 'funcionalidades_principais'],
+    'north_star_metric': ['metrica', 'metric', 'kpi', 'north_star', 'metrica_sucesso', 'metrica_principal'],
+    'riscos': ['riscos_principais', 'risks', 'riscos_mercado', 'riscos_tecnicos', 'riscos_negocio'],
+    'timeline': ['cronograma', 'prazo', 'timeline_desejado', 'quando', 'prazo_lancamento'],
+    'personas': ['persona', 'persona_principal', 'personas_detalhadas', 'perfil_usuario'],
+    'go_to_market': ['gtm', 'lancamento', 'estrategia_lancamento', 'go_to_market_strategy', 'estrategia_gtm'],
+    'diferencial': ['diferencial_competitivo', 'vantagem', 'competitive_advantage', 'proposta_valor'],
+    'visao_produto': ['visao', 'vision', 'missao', 'mission', 'visao_estrategica'],
+};
+
+function normalizeFieldKey(key: string): string {
+    const normalized = key.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    for (const [canonical, aliases] of Object.entries(FIELD_ALIASES)) {
+        if (normalized === canonical || aliases.includes(normalized)) {
+            return canonical;
+        }
+    }
+    return normalized;
+}
+
 /**
  * Entry point do specialist phase handler.
  * Detecta o status atual e delega para o handler correto.
@@ -52,6 +77,10 @@ export async function handleSpecialistPhase(args: SpecialistPhaseArgs): Promise<
         case 'collecting':
             return handleCollecting(args, onboarding, sp);
         case 'generating':
+            if (args.entregavel) {
+                sp.status = 'validating';
+                return handleValidating(args, onboarding, sp);
+            }
             return handleGenerating(args, onboarding, sp);
         case 'validating':
             return handleValidating(args, onboarding, sp);
@@ -85,10 +114,11 @@ async function handleCollecting(
         return buildCollectionPrompt(diretorio, sp, mode);
     }
 
-    // Acumular dados recebidos
+    // Acumular dados recebidos (com fuzzy matching de campos — Sprint 5)
     for (const [key, value] of Object.entries(respostas)) {
         if (value !== undefined && value !== null && value !== '') {
-            sp.collectedData[key] = value;
+            const normalizedKey = normalizeFieldKey(key);
+            sp.collectedData[normalizedKey] = value;
         }
     }
     sp.interactionCount++;
@@ -102,7 +132,14 @@ async function handleCollecting(
     const collected = required.filter(f => sp.collectedData[f.id]);
 
     if (missing.length === 0) {
-        // Todos os campos obrigatórios preenchidos → gerar PRD
+        // Todos os campos obrigatórios preenchidos
+        if (args.entregavel) {
+            // Entregável já presente → skip generating, ir direto para validating
+            sp.status = 'validating';
+            await persistState(estado, onboarding, diretorio);
+            return handleValidating(args, onboarding, sp);
+        }
+        // Sem entregável → gerar PRD
         sp.status = 'generating';
         await persistState(estado, onboarding, diretorio);
         return handleGenerating(args, onboarding, sp);
@@ -130,11 +167,21 @@ async function handleCollecting(
             },
             instrucoes: `⚠️ OBRIGATÓRIO: Pergunte ao usuário os campos que ainda faltam. NÃO invente dados.
 
+${await loadCollectingContext(diretorio, sp.skillName)}
+
 Campos já coletados:
 ${collected.map(f => `✅ **${f.label}**: ${truncateValue(sp.collectedData[f.id])}`).join('\n')}
 
-Campos que FALTAM (pergunte ao usuário):
-${missing.map(f => `❌ **${f.label}** — ${f.hint}`).join('\n')}
+${formatMissingFieldsByBlock(missing, mode)}
+
+⚠️ REGRA CRÍTICA: Os dados devem vir DIRETAMENTE do usuário.
+Se o usuário pedir "crie os dados", "invente para teste" ou "preencha para mim":
+→ Responda: "Preciso que VOCÊ me conte sobre o seu produto. Mesmo que seja simples, suas respostas reais vão gerar um PRD muito melhor do que dados inventados."
+→ Reformule as perguntas de forma mais simples se o usuário parecer travado.
+→ Ofereça exemplos para inspirar, mas NÃO use os exemplos como resposta.
+
+## 📍 Onde Estamos
+✅ Setup → 🔄 Coleta (${progressPct}%) → ⏳ Geração PRD → ⏳ Validação → ⏳ Aprovação
 
 ⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\`
 ⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar`,
@@ -210,7 +257,8 @@ async function handleGenerating(
         content: formatResponse({
             titulo: "📝 Geração do PRD",
             resumo: "Todos os dados foram coletados. Gerando PRD draft usando o template do especialista.",
-            instrucoes: `⚠️ OBRIGATÓRIO: Use o template abaixo para gerar o PRD. NÃO invente dados que não foram coletados.
+            instrucoes: `🤖 **AÇÃO AUTOMÁTICA REQUERIDA:**
+Você DEVE gerar o PRD e enviá-lo como entregável IMEDIATAMENTE, sem esperar comando do usuário.
 
 ## Dados Coletados do Usuário
 
@@ -230,7 +278,7 @@ ${checklistContent}` : ''}
 1. Preencha CADA seção do template com os dados coletados
 2. Se um dado não foi coletado, marque como "A definir com o usuário"
 3. NÃO invente números, métricas ou dados que o usuário não forneceu
-4. Após gerar, envie o PRD como entregável:
+4. Após gerar, envie o PRD como entregável IMEDIATAMENTE:
 
 \`\`\`json
 executar({
@@ -239,6 +287,11 @@ executar({
     "entregavel": "<conteúdo completo do PRD>"
 })
 \`\`\`
+
+🤖 **NÃO ESPERE** o usuário dizer "pode seguir" ou "avançar". Execute a tool AGORA.
+
+## 📍 Onde Estamos
+✅ Setup → ✅ Coleta → 🔄 Geração PRD → ⏳ Validação → ⏳ Aprovação
 
 ⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar", entregavel: "..."})\`
 ⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar`,
@@ -336,7 +389,8 @@ async function handleValidating(
                 "Status": score >= 70 ? "✅ Aprovado" : "⚠️ Precisa de melhorias",
                 "Mínimo": "70/100",
             },
-            instrucoes: `${gaps.length > 0 ? `## Gaps Identificados\n\n${gaps.map(g => `- ❌ ${g}`).join('\n')}\n\n` : ''}⚠️ Melhore o PRD nos pontos acima e reenvie:
+            instrucoes: `${gaps.length > 0 ? `## Gaps Identificados\n\n${gaps.map(g => `- ❌ ${g}`).join('\n')}\n\n` : ''}🤖 **AÇÃO AUTOMÁTICA REQUERIDA:**
+Você DEVE melhorar o PRD nos pontos acima e reenviá-lo IMEDIATAMENTE, sem esperar comando do usuário.
 
 \`\`\`json
 executar({
@@ -345,6 +399,11 @@ executar({
     "entregavel": "<PRD melhorado>"
 })
 \`\`\`
+
+🤖 **NÃO ESPERE** o usuário dizer "pode seguir". Corrija os gaps e execute a tool AGORA.
+
+## 📍 Onde Estamos
+✅ Setup → ✅ Coleta → ✅ Geração PRD → 🔄 Validação → ⏳ Aprovação
 
 ⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar", entregavel: "..."})\``,
             proximo_passo: {
@@ -406,9 +465,10 @@ async function handleApproved(
                 "Interações": sp.interactionCount.toString(),
                 "Status": "Aprovado",
             },
-            instrucoes: `O PRD foi aprovado. O projeto agora avança para a fase de desenvolvimento.
+            instrucoes: `O PRD foi aprovado! Parabéns!
 
-⚠️ Próximo passo: Confirmar classificação do projeto baseada no PRD gerado.
+🤖 **AÇÃO AUTOMÁTICA REQUERIDA:**
+Você DEVE avançar para a fase de desenvolvimento IMEDIATAMENTE.
 
 \`\`\`json
 executar({
@@ -416,6 +476,11 @@ executar({
     "acao": "avancar"
 })
 \`\`\`
+
+🤖 **NÃO ESPERE** o usuário. Execute a tool AGORA para iniciar o desenvolvimento.
+
+## 📍 Onde Estamos
+✅ Setup → ✅ Coleta → ✅ Geração PRD → ✅ Validação → 🔄 Desenvolvimento
 
 ⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\`
 ⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar`,
@@ -449,13 +514,87 @@ executar({
 // === HELPERS ===
 
 /**
+ * Sprint 3 (NP1, NP5, NP9): Formata campos faltantes organizados por blocos temáticos com exemplos.
+ */
+function formatMissingFieldsByBlock(missing: RequiredField[], mode: string): string {
+    const blockTitles: Record<string, string> = {
+        'problema': '🔍 **O Problema**',
+        'solucao': '💡 **A Solução**',
+        'planejamento': '📅 **Planejamento**',
+    };
+
+    const blockOrder = ['problema', 'solucao', 'planejamento'];
+    const grouped: Record<string, RequiredField[]> = {};
+
+    for (const f of missing) {
+        if (!grouped[f.block]) grouped[f.block] = [];
+        grouped[f.block].push(f);
+    }
+
+    const parts: string[] = ['## Campos que FALTAM (pergunte ao usuário):\n'];
+
+    for (const block of blockOrder) {
+        const fields = grouped[block];
+        if (!fields || fields.length === 0) continue;
+
+        parts.push(`### ${blockTitles[block] || block}\n`);
+        for (const f of fields) {
+            parts.push(`❌ **${f.label}**`);
+            parts.push(`   _${f.hint}_`);
+            parts.push(`   ${f.example}\n`);
+        }
+    }
+
+    return parts.join('\n');
+}
+
+/**
+ * Sprint 2 (NP6, NP8): Carrega contexto resumido do especialista para injeção na fase collecting.
+ * Retorna markdown com esqueleto do template + checklist resumido + guia da skill.
+ */
+async function loadCollectingContext(diretorio: string, skillName: string): Promise<string> {
+    try {
+        const contentResolver = new ContentResolverService(diretorio);
+        const skillLoader = new SkillLoaderService(contentResolver);
+        const pkg = await skillLoader.loadCollectingPackage(skillName);
+        if (!pkg) return '';
+
+        const parts: string[] = [];
+
+        if (pkg.templateSkeleton) {
+            parts.push(`## 📋 Estrutura do PRD Final (use como guia para suas perguntas)
+
+${pkg.templateSkeleton}`);
+        }
+
+        if (pkg.checklistSummary) {
+            parts.push(`## ✅ Checklist de Validação (resumo)
+
+${pkg.checklistSummary}`);
+        }
+
+        if (pkg.skillGuide) {
+            parts.push(`## 🧠 Guia do Especialista
+
+${pkg.skillGuide}`);
+        }
+
+        if (parts.length === 0) return '';
+        return parts.join('\n\n') + `\n\n> 📊 Contexto injetado: ~${pkg.tokenEstimate} tokens`;
+    } catch (err) {
+        console.warn('[specialist-phase] Falha ao carregar collecting context:', err);
+        return '';
+    }
+}
+
+/**
  * Constrói prompt de coleta quando não há respostas
  */
-function buildCollectionPrompt(
+async function buildCollectionPrompt(
     diretorio: string,
     sp: SpecialistPhaseState,
     mode: string
-): ToolResult {
+): Promise<ToolResult> {
     const required = getRequiredFields(mode);
     const missing = required.filter(f => !sp.collectedData[f.id]);
     const collected = required.filter(f => sp.collectedData[f.id]);
@@ -469,15 +608,25 @@ function buildCollectionPrompt(
         ? `\n\nCampos já coletados:\n${collected.map(f => `✅ **${f.label}**: ${truncateValue(sp.collectedData[f.id])}`).join('\n')}`
         : '';
 
+    // Sprint 2 (NP6, NP8): Injetar contexto do especialista desde a coleta
+    const collectingContext = await loadCollectingContext(diretorio, sp.skillName);
+
     return {
         content: formatResponse({
             titulo: "🧠 Especialista: Gestão de Produto",
             resumo: `Coleta de informações do produto. ${collected.length}/${required.length} campos preenchidos.`,
             instrucoes: `⚠️ OBRIGATÓRIO: Pergunte ao usuário os campos abaixo. NÃO invente dados.
+
+${collectingContext}
 ${collectedInfo}
 
-Campos que FALTAM (pergunte ao usuário):
-${missing.map(f => `❌ **${f.label}** — ${f.hint}`).join('\n')}
+${formatMissingFieldsByBlock(missing, mode)}
+
+⚠️ REGRA CRÍTICA: Os dados devem vir DIRETAMENTE do usuário.
+Se o usuário pedir "crie os dados", "invente para teste" ou "preencha para mim":
+→ Responda: "Preciso que VOCÊ me conte sobre o seu produto. Mesmo que seja simples, suas respostas reais vão gerar um PRD muito melhor do que dados inventados."
+→ Reformule as perguntas de forma mais simples se o usuário parecer travado.
+→ Ofereça exemplos para inspirar, mas NÃO use os exemplos como resposta.
 
 Após coletar as respostas, EXECUTE:
 
@@ -488,6 +637,9 @@ executar({
     "respostas": ${JSON.stringify(missingTemplate, null, 4)}
 })
 \`\`\`
+
+## 📍 Onde Estamos
+✅ Setup → 🔄 Coleta → ⏳ Geração PRD → ⏳ Validação → ⏳ Aprovação
 
 ⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\`
 ⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar`,
@@ -529,80 +681,191 @@ interface RequiredField {
     id: string;
     label: string;
     hint: string;
+    example: string;
+    block: 'problema' | 'solucao' | 'planejamento';
     modes: string[];
 }
 
 /**
- * Retorna campos obrigatórios por modo
+ * Sprint 3 (NP1, NP5, NP9): Campos com linguagem simples, exemplos práticos e blocos temáticos.
+ * Alinhados com seções do template PRD para eliminar gap campos vs template.
  */
 function getRequiredFields(mode: string): RequiredField[] {
     const fields: RequiredField[] = [
-        { id: 'problema', label: 'Problema central', hint: 'Qual problema o produto resolve?', modes: ['economy', 'balanced', 'quality'] },
-        { id: 'publico_alvo', label: 'Público-alvo', hint: 'Quem são os usuários principais?', modes: ['economy', 'balanced', 'quality'] },
-        { id: 'funcionalidades_mvp', label: 'Funcionalidades MVP', hint: '3-5 features essenciais', modes: ['economy', 'balanced', 'quality'] },
-        { id: 'north_star_metric', label: 'North Star Metric', hint: 'Como medir sucesso?', modes: ['economy', 'balanced', 'quality'] },
-        { id: 'riscos', label: 'Riscos principais', hint: 'Riscos de mercado, técnicos, negócio', modes: ['balanced', 'quality'] },
-        { id: 'timeline', label: 'Timeline desejado', hint: 'Cronograma esperado', modes: ['balanced', 'quality'] },
-        { id: 'personas', label: 'Personas detalhadas', hint: '2-3 personas com JTBD', modes: ['quality'] },
-        { id: 'go_to_market', label: 'Estratégia go-to-market', hint: 'Como alcançar os primeiros usuários', modes: ['quality'] },
+        // Bloco 1 — O Problema (todos os modos)
+        { id: 'problema', label: 'Qual problema seu produto resolve?', hint: 'Descreva a dor principal que seus usuários sentem hoje', example: 'Ex: "Equipes perdem controle de tarefas por usar planilhas"', block: 'problema', modes: ['economy', 'balanced', 'quality'] },
+        { id: 'publico_alvo', label: 'Quem vai usar seu produto?', hint: 'Descreva o perfil das pessoas que mais precisam da solução', example: 'Ex: "Pequenas empresas de 5-30 pessoas, coordenadores de equipe"', block: 'problema', modes: ['economy', 'balanced', 'quality'] },
+
+        // Bloco 2 — A Solução (todos os modos)
+        { id: 'funcionalidades_mvp', label: 'Quais as 3-5 coisas mais importantes que o produto precisa fazer?', hint: 'Liste as funcionalidades essenciais para a primeira versão', example: 'Ex: "Criar checklists, atribuir tarefas, ver status, notificar prazos"', block: 'solucao', modes: ['economy', 'balanced', 'quality'] },
+        { id: 'north_star_metric', label: 'Qual número mostra que o produto está funcionando?', hint: 'A métrica mais importante para saber se o produto dá certo', example: 'Ex: "% de checklists concluídos no prazo" ou "Quantos pedidos por semana"', block: 'solucao', modes: ['economy', 'balanced', 'quality'] },
+
+        // Bloco 3 — Planejamento (balanced/quality)
+        { id: 'riscos', label: 'O que pode dar errado?', hint: 'Riscos que podem atrapalhar o sucesso do produto', example: 'Ex: "Usuários não adotarem, custo alto de servidor, concorrente lançar antes"', block: 'planejamento', modes: ['balanced', 'quality'] },
+        { id: 'timeline', label: 'Em quanto tempo quer lançar a primeira versão?', hint: 'Prazo desejado para o MVP estar no ar', example: 'Ex: "8 semanas para MVP + 2 semanas piloto"', block: 'planejamento', modes: ['balanced', 'quality'] },
+
+        // Campos extras balanced (alinhados com template PRD)
+        { id: 'diferencial', label: 'O que torna seu produto diferente dos concorrentes?', hint: 'Sua vantagem competitiva ou proposta de valor única', example: 'Ex: "Integração nativa com WhatsApp, que nenhum concorrente tem"', block: 'solucao', modes: ['balanced', 'quality'] },
+
+        // Campos extras quality (alinhados com template PRD)
+        { id: 'personas', label: 'Descreva 2-3 tipos de pessoas que vão usar (nome fictício, cargo, rotina)', hint: 'Perfis detalhados dos usuários principais', example: 'Ex: "Maria, coordenadora, monitora equipes pelo celular entre reuniões"', block: 'problema', modes: ['quality'] },
+        { id: 'go_to_market', label: 'Como pretende conseguir os primeiros usuários?', hint: 'Estratégia para lançamento e adoção inicial', example: 'Ex: "Piloto com 2 clientes atuais, depois indicação boca-a-boca"', block: 'planejamento', modes: ['quality'] },
+        { id: 'visao_produto', label: 'Onde você quer que o produto esteja em 1 ano?', hint: 'Visão de longo prazo do produto', example: 'Ex: "Ser a ferramenta padrão de gestão de tarefas para PMEs no Brasil"', block: 'solucao', modes: ['quality'] },
     ];
 
     return fields.filter(f => f.modes.includes(mode));
 }
 
 /**
- * Calcula score básico do PRD
+ * Sprint 3: Agrupa campos por bloco temático para coleta em etapas
  */
-function calculatePrdScore(prd: string, mode: string): number {
-    let score = 0;
-    const checks = [
-        { pattern: /proble?ma|pain\s*point/i, weight: 15, label: 'Problema definido' },
-        { pattern: /p[uú]blico|target|persona|usu[aá]rio/i, weight: 15, label: 'Público-alvo' },
-        { pattern: /funcionalidade|feature|mvp/i, weight: 15, label: 'Funcionalidades MVP' },
-        { pattern: /m[eé]trica|kpi|north\s*star|sucesso/i, weight: 10, label: 'Métricas' },
-        { pattern: /risco|mitiga/i, weight: 10, label: 'Riscos' },
-        { pattern: /escopo|fora\s*do\s*escopo|out\s*of\s*scope/i, weight: 10, label: 'Escopo' },
-        { pattern: /cronograma|timeline|prazo/i, weight: 5, label: 'Timeline' },
-        { pattern: /requisito|requirement/i, weight: 5, label: 'Requisitos' },
+function getFieldsByBlock(mode: string): { block: string; title: string; fields: RequiredField[] }[] {
+    const allFields = getRequiredFields(mode);
+    const blocks = [
+        { block: 'problema', title: '🔍 O Problema — Conte sobre o problema que quer resolver e quem sofre com ele' },
+        { block: 'solucao', title: '💡 A Solução — O que o produto precisa fazer e como medir se está funcionando?' },
+        { block: 'planejamento', title: '📅 Planejamento — Riscos, prazos e como chegar aos primeiros usuários' },
     ];
 
-    for (const check of checks) {
-        if (check.pattern.test(prd)) {
-            score += check.weight;
+    return blocks
+        .map(b => ({
+            ...b,
+            fields: allFields.filter(f => f.block === b.block),
+        }))
+        .filter(b => b.fields.length > 0);
+}
+
+// === Sprint 6 (NP10): Validação Estruturada do PRD ===
+
+interface SectionCheck {
+    heading: RegExp;
+    minContentLength: number;
+    weight: number;
+    label: string;
+}
+
+interface SectionResult {
+    label: string;
+    found: boolean;
+    hasContent: boolean;
+    score: number;
+    maxScore: number;
+    contentLength: number;
+}
+
+const SECTION_CHECKS: SectionCheck[] = [
+    { heading: /##?\s*(sum[aá]rio|summary|executiv)/i, minContentLength: 100, weight: 10, label: 'Sumário Executivo' },
+    { heading: /##?\s*(problema|problem|oportunidade|dor)/i, minContentLength: 150, weight: 15, label: 'Problema e Oportunidade' },
+    { heading: /##?\s*(persona|jobs?\s*to\s*be|p[uú]blico|usu[aá]rio)/i, minContentLength: 100, weight: 15, label: 'Personas e Público-alvo' },
+    { heading: /##?\s*(mvp|funcionalidade|feature|solu[cç][aã]o)/i, minContentLength: 100, weight: 15, label: 'MVP e Funcionalidades' },
+    { heading: /##?\s*(m[eé]trica|kpi|north\s*star|sucesso|indicador)/i, minContentLength: 50, weight: 10, label: 'Métricas de Sucesso' },
+    { heading: /##?\s*(risco|mitiga[cç])/i, minContentLength: 80, weight: 10, label: 'Riscos e Mitigações' },
+    { heading: /##?\s*(timeline|cronograma|marco|prazo|roadmap)/i, minContentLength: 50, weight: 5, label: 'Timeline e Marcos' },
+    { heading: /##?\s*(vis[aã]o|estrat[eé]gia|go.to.market|escopo)/i, minContentLength: 50, weight: 5, label: 'Visão e Estratégia' },
+];
+
+/**
+ * Sprint 6: Divide PRD em seções por headings markdown
+ */
+function splitPrdBySections(prd: string): { heading: string; content: string }[] {
+    const lines = prd.split('\n');
+    const sections: { heading: string; content: string }[] = [];
+    let currentHeading = '';
+    let currentContent: string[] = [];
+
+    for (const line of lines) {
+        const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
+        if (headingMatch) {
+            if (currentHeading) {
+                sections.push({ heading: currentHeading, content: currentContent.join('\n').trim() });
+            }
+            currentHeading = headingMatch[2];
+            currentContent = [];
+        } else {
+            currentContent.push(line);
         }
     }
 
-    // Bonus por tamanho (PRDs muito curtos são incompletos)
-    const wordCount = prd.split(/\s+/).length;
-    if (wordCount > 500) score += 10;
-    if (wordCount > 1000) score += 5;
+    if (currentHeading) {
+        sections.push({ heading: currentHeading, content: currentContent.join('\n').trim() });
+    }
 
-    return Math.min(score, 100);
+    return sections;
 }
 
 /**
- * Identifica gaps no PRD
+ * Sprint 6 (NP10): Calcula score estruturado do PRD por seções com conteúdo mínimo.
+ * Substitui a versão antiga baseada em regex triviais.
+ */
+function calculatePrdScore(prd: string, mode: string): number {
+    const { score } = calculatePrdScoreDetailed(prd);
+    return score;
+}
+
+function calculatePrdScoreDetailed(prd: string): { score: number; details: SectionResult[] } {
+    const sections = splitPrdBySections(prd);
+    const results: SectionResult[] = [];
+
+    for (const check of SECTION_CHECKS) {
+        const section = sections.find(s => check.heading.test(s.heading));
+        const found = !!section;
+        const contentLength = section ? section.content.length : 0;
+        const hasContent = found && contentLength >= check.minContentLength;
+        const sectionScore = found && hasContent
+            ? check.weight
+            : found
+                ? Math.floor(check.weight * 0.5)
+                : 0;
+
+        results.push({
+            label: check.label,
+            found,
+            hasContent,
+            score: sectionScore,
+            maxScore: check.weight,
+            contentLength,
+        });
+    }
+
+    // Bonus por completude geral
+    const wordCount = prd.split(/\s+/).length;
+    let bonus = 0;
+    if (wordCount > 500) bonus += 10;
+    if (wordCount > 1000) bonus += 5;
+
+    const total = Math.min(results.reduce((acc, r) => acc + r.score, 0) + bonus, 100);
+    return { score: total, details: results };
+}
+
+/**
+ * Sprint 6 (NP10): Identifica gaps no PRD com detalhes por seção.
+ * Mostra seções ausentes, seções com conteúdo insuficiente, e pontos perdidos.
  */
 function identifyPrdGaps(prd: string, mode: string): string[] {
+    const { details } = calculatePrdScoreDetailed(prd);
     const gaps: string[] = [];
-    const checks = [
-        { pattern: /proble?ma|pain\s*point/i, label: 'Seção de Problema não encontrada' },
-        { pattern: /p[uú]blico|target|persona/i, label: 'Seção de Público-alvo não encontrada' },
-        { pattern: /funcionalidade|feature|mvp/i, label: 'Seção de Funcionalidades MVP não encontrada' },
-        { pattern: /m[eé]trica|kpi|north\s*star/i, label: 'Seção de Métricas de Sucesso não encontrada' },
-        { pattern: /risco|mitiga/i, label: 'Seção de Riscos não encontrada' },
-        { pattern: /escopo|fora\s*do\s*escopo/i, label: 'Definição de Escopo não encontrada' },
-    ];
 
-    for (const check of checks) {
-        if (!check.pattern.test(prd)) {
-            gaps.push(check.label);
+    for (const result of details) {
+        if (!result.found) {
+            gaps.push(`❌ **${result.label}**: Seção não encontrada (0/${result.maxScore} pontos)`);
+        } else if (!result.hasContent) {
+            gaps.push(`⚠️ **${result.label}**: Seção encontrada mas conteúdo insuficiente — ${result.contentLength} chars (${result.score}/${result.maxScore} pontos)`);
         }
     }
 
     const wordCount = prd.split(/\s+/).length;
     if (wordCount < 200) {
-        gaps.push(`PRD muito curto (${wordCount} palavras). Mínimo recomendado: 500 palavras.`);
+        gaps.push(`📏 PRD muito curto (${wordCount} palavras). Mínimo recomendado: 500 palavras.`);
+    }
+
+    // Mostrar seções completas como referência positiva
+    const complete = details.filter(r => r.found && r.hasContent);
+    if (complete.length > 0 && gaps.length > 0) {
+        gaps.push('');
+        gaps.push('**Seções completas:**');
+        for (const r of complete) {
+            gaps.push(`✅ **${r.label}**: Completo (${r.score}/${r.maxScore} pontos)`);
+        }
     }
 
     return gaps;

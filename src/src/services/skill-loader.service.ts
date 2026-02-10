@@ -337,6 +337,115 @@ export class SkillLoaderService {
     }
 
     /**
+     * v7.0 (Sprint 2 — NP6, NP8): Carrega pacote resumido para fase collecting.
+     * Inclui esqueleto do template (headings + primeiros campos) + checklist resumido.
+     * Budget: ~1500 tokens — suficiente para guiar perguntas inteligentes.
+     */
+    async loadCollectingPackage(
+        skillName: string
+    ): Promise<{ templateSkeleton: string; checklistSummary: string; skillGuide: string; tokenEstimate: number } | null> {
+        const cacheKey = `skill-collecting:${skillName}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            try {
+                return JSON.parse(cached);
+            } catch {
+                // Cache corrompido
+            }
+        }
+
+        const [rawSkill, rawTemplate, rawChecklist] = await Promise.all([
+            this.contentResolver.readSkillFile(skillName, "SKILL.md"),
+            this.contentResolver.readFirstTemplate(skillName),
+            this.contentResolver.readFirstChecklist(skillName),
+        ]);
+
+        // Esqueleto do template: headings + primeiras linhas de cada seção
+        const templateSkeleton = rawTemplate
+            ? this.extractTemplateSkeleton(rawTemplate)
+            : "PRD estruturado com: Sumário Executivo, Problema, Personas, MVP, Métricas, Riscos, Timeline";
+
+        // Checklist resumido: categorias + pesos
+        const checklistSummary = rawChecklist
+            ? this.extractChecklistSummary(rawChecklist)
+            : "";
+
+        // Guia da skill: seções de processo e quality gate
+        const skillGuide = rawSkill
+            ? this.extractSkillGuide(rawSkill)
+            : "";
+
+        const tokenEstimate =
+            this.estimateTokens(templateSkeleton) +
+            this.estimateTokens(checklistSummary) +
+            this.estimateTokens(skillGuide);
+
+        const result = { templateSkeleton, checklistSummary, skillGuide, tokenEstimate };
+        setCache(cacheKey, JSON.stringify(result));
+        return result;
+    }
+
+    /**
+     * Extrai esqueleto do template: headings + primeiras linhas de cada seção
+     */
+    private extractTemplateSkeleton(template: string): string {
+        const lines = template.split("\n");
+        const skeleton: string[] = [];
+        let inSection = false;
+        let sectionLines = 0;
+
+        for (const line of lines) {
+            const isHeading = /^#{1,4}\s+/.test(line);
+            if (isHeading) {
+                skeleton.push(line);
+                inSection = true;
+                sectionLines = 0;
+            } else if (inSection && sectionLines < 2 && line.trim()) {
+                skeleton.push(line);
+                sectionLines++;
+            } else if (line.trim() === '') {
+                if (inSection && sectionLines > 0) {
+                    inSection = false;
+                }
+            }
+        }
+
+        return skeleton.join("\n");
+    }
+
+    /**
+     * Extrai resumo do checklist: categorias + pesos
+     */
+    private extractChecklistSummary(checklist: string): string {
+        const lines = checklist.split("\n");
+        const summary: string[] = [];
+
+        for (const line of lines) {
+            if (/^#{1,4}\s+/.test(line) || /^\*\*/.test(line.trim()) || /^-\s+\[/.test(line.trim())) {
+                summary.push(line);
+            }
+        }
+
+        return summary.slice(0, 20).join("\n");
+    }
+
+    /**
+     * Extrai guia da skill: seções de processo otimizado e quality gate
+     */
+    private extractSkillGuide(skill: string): string {
+        const sections = this.parseMarkdownSections(skill);
+        const guideSections = sections.filter(s =>
+            this.isSectionMatch(s.heading, ["processo otimizado", "processo", "quality gate", "inputs obrigatorios", "inputs obrigatórios"])
+        );
+
+        if (guideSections.length === 0) return "";
+
+        return guideSections
+            .map(s => `${"#".repeat(s.level)} ${s.heading}\n${this.truncateToTokenBudget(s.content, 200)}`)
+            .join("\n\n");
+    }
+
+    /**
      * v6.0: Helper para ler primeiro recurso de um tipo (examples, reference)
      */
     private async safeReadResource(skillName: string, resourceType: "examples" | "templates" | "checklists" | "reference"): Promise<string | null> {
