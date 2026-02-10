@@ -1,14 +1,17 @@
 /**
- * Specialist Phase Handler (v6.0)
+ * Specialist Phase Handler (v6.1)
  * 
  * Handler central do novo fluxo de onboarding unificado.
  * Gerencia o ciclo: specialist_active → collecting → generating → validating → approved
  * 
- * Resolve:
- * - P5: Especialista nunca ativado de verdade
- * - P10: IA chama tool errada
- * - P11: next_action sem parâmetros necessários
- * - P14: Recovery paths claros em caso de erro
+ * v6.1 Fixes:
+ * - FIX: PRD validation score (was always 15/100 due to regex/escape bug)
+ * - FIX: prazo_mvp alias mapping
+ * - FIX: Infinite retry loop (max 3 attempts)
+ * - FIX: File-based PRD validation (eliminates JSON escape issues)
+ * - FIX: Reduced template repetition in context
+ * - FIX: Standardized output with AI instruction markers
+ * - FIX: Resource loading instructions in output
  */
 
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
@@ -18,6 +21,10 @@ import { serializarEstado } from "../state/storage.js";
 import { saveFile } from "../utils/persistence.js";
 import { ContentResolverService } from "../services/content-resolver.service.js";
 import { SkillLoaderService } from "../services/skill-loader.service.js";
+import { existsSync, readFileSync } from "fs";
+
+/** Maximum number of automatic PRD validation retries before requiring user approval */
+const MAX_PRD_VALIDATION_RETRIES = 3;
 
 interface SpecialistPhaseArgs {
     estado: EstadoProjeto;
@@ -34,7 +41,7 @@ const FIELD_ALIASES: Record<string, string[]> = {
     'funcionalidades_mvp': ['features', 'funcionalidades', 'mvp', 'features_mvp', 'funcionalidades_principais'],
     'north_star_metric': ['metrica', 'metric', 'kpi', 'north_star', 'metrica_sucesso', 'metrica_principal'],
     'riscos': ['riscos_principais', 'risks', 'riscos_mercado', 'riscos_tecnicos', 'riscos_negocio'],
-    'timeline': ['cronograma', 'prazo', 'timeline_desejado', 'quando', 'prazo_lancamento'],
+    'timeline': ['cronograma', 'prazo', 'timeline_desejado', 'quando', 'prazo_lancamento', 'prazo_mvp', 'prazo_mvp_desejado'],
     'personas': ['persona', 'persona_principal', 'personas_detalhadas', 'perfil_usuario'],
     'go_to_market': ['gtm', 'lancamento', 'estrategia_lancamento', 'go_to_market_strategy', 'estrategia_gtm'],
     'diferencial': ['diferencial_competitivo', 'vantagem', 'competitive_advantage', 'proposta_valor'],
@@ -264,13 +271,13 @@ Você DEVE gerar o PRD e enviá-lo como entregável IMEDIATAMENTE, sem esperar c
 
 ${collectedSummary}
 
-${templateContent ? `## Template do PRD (USE ESTE TEMPLATE)
+${templateContent ? `## 🔧 Recurso do Especialista
+> 💡 Para template completo: leia \`.agent/skills/specialist-gestao-produto/resources/templates/PRD.md\`
+> Ou execute: \`read_resource("maestro://especialista/gestao-produto")\`
 
-${templateContent}` : '## Template do PRD\n\nGere um PRD estruturado com: Visão, Problema, Público-alvo, Funcionalidades MVP, Métricas de Sucesso, Riscos.'}
+## Template do PRD (ESTRUTURA — use como guia)
 
-${checklistContent ? `## Checklist de Validação (VALIDE CONTRA ESTE CHECKLIST)
-
-${checklistContent}` : ''}
+${extractTemplateSkeleton(templateContent)}` : '## Template do PRD\\n\\nGere um PRD estruturado com: Visão, Problema, Público-alvo, Funcionalidades MVP, Métricas de Sucesso, Riscos.'}
 
 ---
 
@@ -331,24 +338,47 @@ executar({
 
 /**
  * Handler: validating — Recebe PRD draft e valida
+ * v6.1: File-based validation, retry limit, normalized PRD parsing
  */
 async function handleValidating(
     args: SpecialistPhaseArgs,
     onboarding: OnboardingState,
     sp: SpecialistPhaseState
 ): Promise<ToolResult> {
-    const { estado, diretorio, entregavel } = args;
+    const { estado, diretorio } = args;
+    let entregavel = args.entregavel;
+
+    // v6.1 (Problem #7): File-based validation fallback
+    if (!entregavel) {
+        // Try reading from saved draft file
+        const draftPath = `${diretorio}/.maestro/entregaveis/prd-draft.md`;
+        const docsPath = `${diretorio}/docs/01-produto/PRD.md`;
+
+        if (existsSync(docsPath)) {
+            try { entregavel = readFileSync(docsPath, 'utf-8'); } catch { /* ignore */ }
+        }
+        if (!entregavel && existsSync(draftPath)) {
+            try { entregavel = readFileSync(draftPath, 'utf-8'); } catch { /* ignore */ }
+        }
+    }
 
     if (!entregavel) {
-        // Se chamou sem entregável, voltar para generating
+        // Se chamou sem entregável e sem arquivo, voltar para generating
         sp.status = 'generating';
         await persistState(estado, onboarding, diretorio);
         return handleGenerating(args, onboarding, sp);
     }
 
+    // v6.1 (Bug #1): Normalize string — fix JSON-escaped newlines
+    entregavel = normalizePrdContent(entregavel);
+
     // Salvar PRD draft
     sp.prdDraft = entregavel;
     sp.status = 'validating';
+
+    // v6.1 (Bug #3): Track validation attempts
+    if (!sp.validationAttempts) sp.validationAttempts = 0;
+    sp.validationAttempts++;
 
     // Calcular score básico de validação
     const score = calculatePrdScore(entregavel, onboarding.mode);
@@ -361,6 +391,7 @@ async function handleValidating(
     // Salvar PRD como arquivo
     try {
         await saveFile(`${diretorio}/.maestro/entregaveis/prd-draft.md`, entregavel);
+        await saveFile(`${diretorio}/docs/01-produto/PRD.md`, entregavel);
     } catch (err) {
         console.warn('[specialist-phase] Falha ao salvar PRD:', err);
     }
@@ -377,35 +408,67 @@ async function handleValidating(
         return handleApproved(args, onboarding, sp);
     }
 
+    // v6.1 (Bug #3): Check retry limit
+    const retriesExhausted = sp.validationAttempts >= MAX_PRD_VALIDATION_RETRIES;
+
     // PRD precisa de melhorias
+    const { details } = calculatePrdScoreDetailed(entregavel);
     const gaps = identifyPrdGaps(entregavel, onboarding.mode);
 
+    // v6.1: Build detailed score breakdown for transparency
+    const scoreBreakdown = details
+        .map(d => `${d.found && d.hasContent ? '✅' : d.found ? '⚠️' : '❌'} **${d.label}**: ${d.score}/${d.maxScore} pts${d.found ? ` (${d.contentLength} chars)` : ''}`)
+        .join('\n');
+
+    if (retriesExhausted) {
+        // v6.1 (Bug #3): Max retries reached — ask user for decision
+        return {
+            content: formatResponse({
+                titulo: "📊 Validação do PRD — Decisão Necessária",
+                resumo: `PRD validado com score ${score}/100 após ${sp.validationAttempts} tentativas. Requer decisão do usuário.`,
+                dados: {
+                    "Score": `${score}/100`,
+                    "Tentativas": `${sp.validationAttempts}/${MAX_PRD_VALIDATION_RETRIES}`,
+                    "Status": "⚠️ Limite de tentativas atingido",
+                    "Mínimo": "70/100",
+                },
+                instrucoes: `## 📊 Detalhamento do Score\n\n${scoreBreakdown}\n\n${gaps.length > 0 ? `## Gaps Restantes\n\n${gaps.map(g => `- ${g}`).join('\n')}\n\n` : ''}## ⚠️ Limite de Tentativas Atingido\n\nO PRD já foi reenviado ${sp.validationAttempts} vezes sem atingir o score mínimo de 70/100.\n\n**Pergunte ao usuário:**\n1. Aprovar o PRD com score atual (${score}/100) e prosseguir\n2. Solicitar melhorias específicas antes de reenviar\n3. Cancelar e recomeçar a coleta de dados\n\n⚠️ **NÃO reenvie automaticamente.** Aguarde a decisão do usuário.`,
+                proximo_passo: {
+                    tool: "executar",
+                    descricao: "Aguardando decisão do usuário sobre o PRD",
+                    args: `{ "diretorio": "${diretorio}", "acao": "avancar", "entregavel": "<PRD final>" }`,
+                    requer_input_usuario: true,
+                    prompt_usuario: `PRD com score ${score}/100 após ${sp.validationAttempts} tentativas. Aprovar, melhorar ou recomeçar?`,
+                },
+            }),
+            next_action: {
+                tool: "executar",
+                description: "Aguardar decisão do usuário",
+                args_template: { diretorio, acao: "avancar" },
+                requires_user_input: true,
+                user_prompt: `PRD com score ${score}/100. Aprovar, melhorar ou recomeçar?`,
+            },
+            progress: {
+                current_phase: "specialist_validating",
+                total_phases: 5,
+                completed_phases: 3,
+                percentage: 65,
+            },
+        };
+    }
+
+    // Normal retry flow (within limits)
     return {
         content: formatResponse({
             titulo: "📊 Validação do PRD",
-            resumo: `PRD recebido. Score: ${score}/100. ${score >= 70 ? 'Aprovado!' : 'Precisa de melhorias.'}`,
+            resumo: `PRD recebido. Score: ${score}/100. Tentativa ${sp.validationAttempts}/${MAX_PRD_VALIDATION_RETRIES}.`,
             dados: {
                 "Score": `${score}/100`,
-                "Status": score >= 70 ? "✅ Aprovado" : "⚠️ Precisa de melhorias",
+                "Tentativa": `${sp.validationAttempts}/${MAX_PRD_VALIDATION_RETRIES}`,
+                "Status": "⚠️ Precisa de melhorias",
                 "Mínimo": "70/100",
             },
-            instrucoes: `${gaps.length > 0 ? `## Gaps Identificados\n\n${gaps.map(g => `- ❌ ${g}`).join('\n')}\n\n` : ''}🤖 **AÇÃO AUTOMÁTICA REQUERIDA:**
-Você DEVE melhorar o PRD nos pontos acima e reenviá-lo IMEDIATAMENTE, sem esperar comando do usuário.
-
-\`\`\`json
-executar({
-    "diretorio": "${diretorio}",
-    "acao": "avancar",
-    "entregavel": "<PRD melhorado>"
-})
-\`\`\`
-
-🤖 **NÃO ESPERE** o usuário dizer "pode seguir". Corrija os gaps e execute a tool AGORA.
-
-## 📍 Onde Estamos
-✅ Setup → ✅ Coleta → ✅ Geração PRD → 🔄 Validação → ⏳ Aprovação
-
-⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar", entregavel: "..."})\``,
+            instrucoes: `## 📊 Detalhamento do Score\n\n${scoreBreakdown}\n\n${gaps.length > 0 ? `## Gaps Identificados\n\n${gaps.map(g => `- ${g}`).join('\n')}\n\n` : ''}🤖 **AÇÃO REQUERIDA (tentativa ${sp.validationAttempts + 1}/${MAX_PRD_VALIDATION_RETRIES}):**\nMelhore o PRD nos pontos acima e reenvie.\n\n\`\`\`json\nexecutar({\n    "diretorio": "${diretorio}",\n    "acao": "avancar",\n    "entregavel": "<PRD melhorado>"\n})\n\`\`\`\n\n## 📍 Onde Estamos\n✅ Setup → ✅ Coleta → ✅ Geração PRD → 🔄 Validação → ⏳ Aprovação`,
             proximo_passo: {
                 tool: "executar",
                 descricao: "Reenviar PRD melhorado",
@@ -512,6 +575,33 @@ executar({
 }
 
 // === HELPERS ===
+
+/**
+ * v6.1 (Problem #4): Extracts only the heading structure (skeleton) from a full template.
+ * Reduces token usage by ~80% compared to injecting the full template content.
+ */
+function extractTemplateSkeleton(templateContent: string): string {
+    const lines = templateContent.split('\n');
+    const skeleton: string[] = [];
+
+    for (const line of lines) {
+        // Keep headings
+        if (line.match(/^#{1,6}\s+/)) {
+            skeleton.push(line);
+        }
+        // Keep checkbox items (just the label, not description)
+        else if (line.match(/^\s*-?\s*\[\s*\]/)) {
+            const match = line.match(/^\s*-?\s*\[\s*\]\s*\*?\*?(.+?)[\*:].*/);
+            if (match) {
+                skeleton.push(`- [ ] ${match[1].trim()}`);
+            } else {
+                skeleton.push(line.substring(0, 80));
+            }
+        }
+    }
+
+    return skeleton.join('\n');
+}
 
 /**
  * Sprint 3 (NP1, NP5, NP9): Formata campos faltantes organizados por blocos temáticos com exemplos.
@@ -753,33 +843,45 @@ interface SectionResult {
     contentLength: number;
 }
 
+/**
+ * v6.1 (Bug #1 fix): Regex patterns match against CLEANED heading text
+ * (splitPrdBySections already strips '#' prefixes via headingMatch[2]).
+ * Removed leading regex prefix that was causing all sections to appear "not found".
+ * Also made patterns more permissive with optional numbering prefixes like "1." or "1.1".
+ */
 const SECTION_CHECKS: SectionCheck[] = [
-    { heading: /##?\s*(sum[aá]rio|summary|executiv)/i, minContentLength: 100, weight: 10, label: 'Sumário Executivo' },
-    { heading: /##?\s*(problema|problem|oportunidade|dor)/i, minContentLength: 150, weight: 15, label: 'Problema e Oportunidade' },
-    { heading: /##?\s*(persona|jobs?\s*to\s*be|p[uú]blico|usu[aá]rio)/i, minContentLength: 100, weight: 15, label: 'Personas e Público-alvo' },
-    { heading: /##?\s*(mvp|funcionalidade|feature|solu[cç][aã]o)/i, minContentLength: 100, weight: 15, label: 'MVP e Funcionalidades' },
-    { heading: /##?\s*(m[eé]trica|kpi|north\s*star|sucesso|indicador)/i, minContentLength: 50, weight: 10, label: 'Métricas de Sucesso' },
-    { heading: /##?\s*(risco|mitiga[cç])/i, minContentLength: 80, weight: 10, label: 'Riscos e Mitigações' },
-    { heading: /##?\s*(timeline|cronograma|marco|prazo|roadmap)/i, minContentLength: 50, weight: 5, label: 'Timeline e Marcos' },
-    { heading: /##?\s*(vis[aã]o|estrat[eé]gia|go.to.market|escopo)/i, minContentLength: 50, weight: 5, label: 'Visão e Estratégia' },
+    { heading: /^\d*\.?\d*\s*(sum[aá]rio|summary|executiv)/i, minContentLength: 100, weight: 10, label: 'Sumário Executivo' },
+    { heading: /^\d*\.?\d*\s*(problema|problem|oportunidade|dor)/i, minContentLength: 150, weight: 15, label: 'Problema e Oportunidade' },
+    { heading: /^\d*\.?\d*\s*(persona|jobs?\s*to\s*be|p[uú]blico|usu[aá]rio)/i, minContentLength: 100, weight: 15, label: 'Personas e Público-alvo' },
+    { heading: /^\d*\.?\d*\s*(mvp|funcionalidade|feature|solu[cç][aã]o)/i, minContentLength: 100, weight: 15, label: 'MVP e Funcionalidades' },
+    { heading: /^\d*\.?\d*\s*(m[eé]trica|kpi|north\s*star|sucesso|indicador)/i, minContentLength: 50, weight: 10, label: 'Métricas de Sucesso' },
+    { heading: /^\d*\.?\d*\s*(risco|mitiga[cç])/i, minContentLength: 80, weight: 10, label: 'Riscos e Mitigações' },
+    { heading: /^\d*\.?\d*\s*(timeline|cronograma|marco|prazo|roadmap)/i, minContentLength: 50, weight: 5, label: 'Timeline e Marcos' },
+    { heading: /^\d*\.?\d*\s*(vis[aã]o|estrat[eé]gia|go.to.market|escopo)/i, minContentLength: 50, weight: 5, label: 'Visão e Estratégia' },
 ];
 
 /**
  * Sprint 6: Divide PRD em seções por headings markdown
  */
+/**
+ * v6.1 (Bug #1 fix): Added normalizePrdContent() call before splitting.
+ * Also matches up to h6 headers (#{1,6}) instead of only h4.
+ */
 function splitPrdBySections(prd: string): { heading: string; content: string }[] {
-    const lines = prd.split('\n');
+    // Normalize is done before calling this function, but safe to re-normalize
+    const normalizedPrd = normalizePrdContent(prd);
+    const lines = normalizedPrd.split('\n');
     const sections: { heading: string; content: string }[] = [];
     let currentHeading = '';
     let currentContent: string[] = [];
 
     for (const line of lines) {
-        const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
+        const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
         if (headingMatch) {
             if (currentHeading) {
                 sections.push({ heading: currentHeading, content: currentContent.join('\n').trim() });
             }
-            currentHeading = headingMatch[2];
+            currentHeading = headingMatch[2].trim();
             currentContent = [];
         } else {
             currentContent.push(line);
@@ -791,6 +893,36 @@ function splitPrdBySections(prd: string): { heading: string; content: string }[]
     }
 
     return sections;
+}
+
+/**
+ * v6.1 (Bug #1): Normalizes PRD content to fix JSON escape issues.
+ * When PRD is sent as JSON string argument, \n may arrive as literal "\n" instead of newlines.
+ * Also handles \r\n and other escape artifacts.
+ */
+function normalizePrdContent(content: string): string {
+    let normalized = content;
+
+    // Fix literal \n that are not actual newlines
+    // Only replace if the string doesn't seem to have real newlines already
+    const realNewlineCount = (normalized.match(/\n/g) || []).length;
+    const literalNewlineCount = (normalized.match(/\\n/g) || []).length;
+
+    if (literalNewlineCount > realNewlineCount * 2) {
+        // Likely has escaped newlines — replace them
+        normalized = normalized.replace(/\\n/g, '\n');
+    }
+
+    // Normalize CRLF to LF
+    normalized = normalized.replace(/\r\n/g, '\n');
+
+    // Fix escaped quotes from JSON serialization if present
+    normalized = normalized.replace(/\\"/g, '"');
+
+    // Fix double-escaped newlines (\\n → \n)
+    normalized = normalized.replace(/\\\\n/g, '\n');
+
+    return normalized.trim();
 }
 
 /**

@@ -51,7 +51,7 @@ export interface BrainstormSection {
 }
 
 /**
- * Estado da fase do especialista (v6.0 — novo fluxo unificado)
+ * Estado da fase do especialista (v6.1 — novo fluxo unificado)
  */
 export interface SpecialistPhaseState {
   skillName: string;
@@ -59,6 +59,8 @@ export interface SpecialistPhaseState {
   collectedData: Record<string, any>;
   prdDraft?: string;
   validationScore?: number;
+  /** v6.1: Counter for validation retry attempts (max 3 before requiring user decision) */
+  validationAttempts?: number;
   interactionCount: number;
   activatedAt?: string;
   completedAt?: string;
@@ -70,23 +72,23 @@ export interface SpecialistPhaseState {
 export interface OnboardingState {
   projectId: string;
   phase: OnboardingPhase;
-  
+
   // v6.0: Fase do especialista (novo fluxo unificado)
   specialistPhase?: SpecialistPhaseState;
-  
+
   // Discovery (legacy — mantido para backward compat)
   discoveryStatus: 'pending' | 'in_progress' | 'completed';
   discoveryBlocks: DiscoveryBlock[];
   discoveryResponses: Record<string, any>;
   discoveryStartedAt?: string;
   discoveryCompletedAt?: string;
-  
+
   // Brainstorm (legacy — mantido para backward compat)
   brainstormStatus: BrainstormStatus;
   brainstormSections: BrainstormSection[];
   brainstormStartedAt?: string;
   brainstormCompletedAt?: string;
-  
+
   // PRD
   prdStatus: 'pending' | 'draft' | 'validated' | 'approved';
   prdScore: number;
@@ -96,7 +98,7 @@ export interface OnboardingState {
     gaps: string[];
     suggestions: string[];
   };
-  
+
   // Metadata
   mode: 'economy' | 'balanced' | 'quality';
   completedAt?: string;

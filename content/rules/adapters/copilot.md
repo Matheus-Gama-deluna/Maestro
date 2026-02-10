@@ -8,3 +8,8 @@ target_path: .github/copilot-instructions.md
 Este adaptador formata as regras para o GitHub Copilot.
 
 O conteúdo de `RULES.md` será inserido automaticamente pelo CLI.
+
+**Paths IDE-specific:**
+- Skills: `.agent/skills/`
+- Workflows: `.agent/workflows/`
+- Rules: `.github/copilot-instructions.md`

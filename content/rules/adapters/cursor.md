@@ -8,3 +8,8 @@ target_path: .cursorrules
 Este adaptador formata as regras para o Cursor IDE.
 
 O conteúdo de `RULES.md` será inserido automaticamente pelo CLI.
+
+**Paths IDE-specific:**
+- Skills: `.cursor/skills/`
+- Workflows: `.cursor/commands/`
+- Rules: `.cursorrules`

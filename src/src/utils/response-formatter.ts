@@ -95,10 +95,11 @@ export function formatResponse(opts: ToolResponseOptions): ResponseBlock[] {
     }
 
     // Bloco 3: Instruções para a IA (se houver) — v5.2: marcado como assistant-only
+    // v6.1 (Opportunity #3): Wrapped with AI instruction markers for standardized parsing
     if (opts.instrucoes) {
         blocks.push(forAssistantOnly({
             type: "text",
-            text: `## 🤖 Instruções\n\n${opts.instrucoes}`,
+            text: `<!-- AI_INSTRUCTIONS_START -->\n## 🤖 Instruções\n\n${opts.instrucoes}\n<!-- AI_INSTRUCTIONS_END -->`,
         }));
     }
 
@@ -143,10 +144,10 @@ export function formatResponse(opts: ToolResponseOptions): ResponseBlock[] {
     // Bloco final: Próximo passo (sempre no final, se houver)
     // v5.3: Valida que tool é pública, remapeia se necessário
     if (opts.proximo_passo) {
-        const toolName = isPublicTool(opts.proximo_passo.tool) 
-            ? opts.proximo_passo.tool 
+        const toolName = isPublicTool(opts.proximo_passo.tool)
+            ? opts.proximo_passo.tool
             : remapToPublicTool(opts.proximo_passo.tool);
-        
+
         if (!isPublicTool(opts.proximo_passo.tool)) {
             console.error(`[response-formatter] proximo_passo referencia tool interna: ${opts.proximo_passo.tool} → remapeado para: ${toolName}`);
         }
@@ -175,9 +176,8 @@ export function embedNextAction(
 ): ResponseBlock[] {
     if (!nextAction) return content;
 
-    const metaBlock = `\n---\n\n**Próxima ação:** \`${nextAction.tool}\` — ${nextAction.description}${
-        nextAction.requires_user_input ? `\n> 👤 ${nextAction.user_prompt || "Aguardando input."}` : ""
-    }`;
+    const metaBlock = `\n---\n\n**Próxima ação:** \`${nextAction.tool}\` — ${nextAction.description}${nextAction.requires_user_input ? `\n> 👤 ${nextAction.user_prompt || "Aguardando input."}` : ""
+        }`;
 
     return [...content, { type: "text", text: metaBlock }];
 }

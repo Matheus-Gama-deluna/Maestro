@@ -21,7 +21,7 @@ export const IDE_CONFIGS = {
         rulesPath: '.gemini/GEMINI.md',
         workflowsDir: '.agent/workflows',
         skillsDir: '.agent/skills',
-        header: '---\ntrigger: always_on\nsystem: maestro\nversion: 1.0.0\n---\n\n'
+        header: '---\ntrigger: always_on\nsystem: maestro\nversion: 3.0.0\n---\n\n'
     }
 } as const;
 
@@ -81,23 +81,23 @@ export function getSkillMCPPath(skillName: string, ide: IDEType): string {
  */
 export function detectIDE(projectDir: string): IDEType | null {
     // Verifica Windsurf
-    if (existsSync(join(projectDir, '.windsurfrules')) || 
+    if (existsSync(join(projectDir, '.windsurfrules')) ||
         existsSync(join(projectDir, '.windsurf'))) {
         return 'windsurf';
     }
-    
+
     // Verifica Cursor
-    if (existsSync(join(projectDir, '.cursorrules')) || 
+    if (existsSync(join(projectDir, '.cursorrules')) ||
         existsSync(join(projectDir, '.cursor'))) {
         return 'cursor';
     }
-    
+
     // Verifica Antigravity
-    if (existsSync(join(projectDir, '.gemini')) || 
+    if (existsSync(join(projectDir, '.gemini')) ||
         existsSync(join(projectDir, '.agent'))) {
         return 'antigravity';
     }
-    
+
     return null;
 }
 

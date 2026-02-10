@@ -16,14 +16,14 @@ function getDefaultSourceDir(): string {
         join(process.cwd(), "content"),                  // working dir
         join(__dirname, "..", "content"),                // dist/content (quando instalado)
     ];
-    
+
     for (const path of possiblePaths) {
         if (existsSync(path)) {
             console.error(`[DEBUG] Conteúdo encontrado em: ${path}`);
             return path;
         }
     }
-    
+
     console.error(`[DEBUG] Conteúdo não encontrado. Tentados: ${possiblePaths.join(", ")}`);
     throw new Error("Conteúdo embutido não encontrado");
 }
@@ -117,7 +117,7 @@ const IDE_CONFIGS = {
     },
     antigravity: {
         path: '.gemini/GEMINI.md',
-        header: '---\ntrigger: always_on\nsystem: maestro\nversion: 1.0.0\n---\n\n',
+        header: '---\ntrigger: always_on\nsystem: maestro\nversion: 3.0.0\n---\n\n',
         workflowsDir: '.agent/workflows',
         skillsDir: '.agent/skills'
     }
@@ -126,39 +126,39 @@ const IDE_CONFIGS = {
 export async function injectContentForIDE(diretorio: string, ide: 'windsurf' | 'cursor' | 'antigravity'): Promise<InjectContentResult> {
     const sourceDir = getDefaultSourceDir();
     const config = IDE_CONFIGS[ide];
-    
+
     // 1. Injetar Rules
     const rulesSource = join(sourceDir, 'rules', 'RULES.md');
     let rulesContent = '';
-    
+
     if (existsSync(rulesSource)) {
         rulesContent = await readFile(rulesSource, 'utf-8');
     } else {
         rulesContent = generateDefaultRules();
     }
-    
+
     const rulesTarget = join(diretorio, config.path);
     const rulesDir = dirname(rulesTarget);
-    
+
     if (!existsSync(rulesDir)) {
         await mkdir(rulesDir, { recursive: true });
     }
-    
+
     await writeFile(rulesTarget, config.header + rulesContent);
-    
+
     // 2. Injetar Skills (Adaptadas)
     const skillsSource = join(sourceDir, 'skills');
     const skillsTarget = join(diretorio, config.skillsDir);
-    
+
     if (existsSync(skillsSource)) {
         const adapter = new SkillAdapter();
         await adapter.adaptSkills(skillsSource, skillsTarget, ide, true);
     }
-    
+
     // 3. Injetar Workflows
     const workflowsSource = join(sourceDir, 'workflows');
     const workflowsTarget = join(diretorio, config.workflowsDir);
-    
+
     if (existsSync(workflowsSource)) {
         await mkdir(workflowsTarget, { recursive: true });
         // Simples cópia para workflows (assumindo compatibilidade ou sem adapter específico por enquanto)
