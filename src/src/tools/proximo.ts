@@ -22,6 +22,7 @@ import { ContentResolverService } from "../services/content-resolver.service.js"
 import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { saveFile, saveMultipleFiles, formatSavedFilesConfirmation } from "../utils/persistence.js";
 import { classificacaoProgressiva } from "../services/classificacao-progressiva.service.js"; // v6.0
+import { getSpecialistQuestions } from "../handlers/specialist-phase-handler.js"; // v7.0
 
 interface ProximoArgs {
     entregavel: string;
@@ -548,8 +549,27 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
     );
     estado.classificacao_progressiva.sinais = sinaisAtualizados;
 
-    // Recalcular classificação com todos os sinais acumulados
-    const { nivel: nivelCalculado, confianca, criterios } = classificacaoProgressiva.recalcular(sinaisAtualizados);
+    // Sprint 4 (v7.0): Capturar sinais das respostas dos especialistas
+    // Fase 2 (Requisitos) e Fase 4 (Arquitetura) fazem perguntas técnicas
+    if (estado.fase_atual === 2 || estado.fase_atual === 4) {
+        const sinaisEspecialista = classificacaoProgressiva.extrairSinaisEspecialista(
+            estado.fase_atual,
+            args.entregavel
+        );
+
+        if (sinaisEspecialista.length > 0) {
+            // Adicionar sinais do especialista aos sinais existentes
+            estado.classificacao_progressiva.sinais = [
+                ...estado.classificacao_progressiva.sinais,
+                ...sinaisEspecialista
+            ];
+        }
+    }
+
+    // Recalcular classificação com todos os sinais acumulados (incluindo sinais do especialista)
+    const { nivel: nivelCalculado, confianca, criterios } = classificacaoProgressiva.recalcular(
+        estado.classificacao_progressiva.sinais
+    );
 
     // Verificar se precisa expandir o fluxo
     const expansao = classificacaoProgressiva.verificarExpansao(
@@ -587,7 +607,7 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
 ### 📊 Sinais que levaram à expansão:
 ${criterios.map(c => `- ${c}`).join("\n")}
 
-> ⚡ O sistema detectou complexidade adicional e expandiu o fluxo automaticamente.
+> ⚡ O sistema detectou complexidade adicional baseado nas suas respostas e expandiu o fluxo automaticamente.
 > As fases já concluídas permanecem intactas.
 `;
     } else if (estado.fase_atual === 1) {
@@ -760,6 +780,8 @@ ${classificacaoInfo}
 |-------|-------|
 | **Especialista** | ${proximaFase?.especialista || "-"} |
 | **Entregável** | ${proximaFase?.entregavel_esperado || "-"} |
+
+${getSpecialistQuestions(estado.fase_atual)}
 
 ## Gate de Saída
 ${proximaFase?.gate_checklist.map(item => `- [ ] ${item}`).join("\n") || "Nenhum"}

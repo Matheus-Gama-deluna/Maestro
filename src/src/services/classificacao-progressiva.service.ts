@@ -562,6 +562,246 @@ export class ClassificacaoProgressivaService {
             atual.confianca > melhor.confianca ? atual : melhor
         );
     }
+
+    /**
+     * Sprint 3 (v7.0): Extrai sinais das respostas dos especialistas
+     * Captura dados técnicos fornecidos pelos especialistas de Requisitos e Arquitetura
+     */
+    extrairSinaisEspecialista(fase: number, respostas: string): SinalClassificacao[] {
+        const sinais: SinalClassificacao[] = [];
+        const timestamp = new Date().toISOString();
+        const lower = respostas.toLowerCase();
+
+        if (fase === 2) {
+            // Especialista de Requisitos
+
+            // Volume/Escala
+            const volumePatterns = [
+                { pattern: /(\d+k?)\s*(usuário|user|concurrent)/i, tipo: "usuários" },
+                { pattern: /(\d+k?)\s*(transaç|operaç|pedido)/i, tipo: "transações" }
+            ];
+
+            for (const { pattern, tipo } of volumePatterns) {
+                const match = respostas.match(pattern);
+                if (match) {
+                    const numero = parseInt(match[1].replace('k', '000'));
+                    let categoria = "Baixo";
+                    if (numero >= 100000) categoria = "Alto (>100k)";
+                    else if (numero >= 10000) categoria = "Médio (10k-100k)";
+
+                    sinais.push({
+                        fase,
+                        fonte: "especialista-requisitos",
+                        categoria: "volume",
+                        valor: `${categoria} ${tipo}`,
+                        confianca: 0.9,
+                        timestamp
+                    });
+                    break;
+                }
+            }
+
+            // Integrações
+            const integracoes = this.detectarIntegracoes(respostas);
+            integracoes.forEach(int => {
+                sinais.push({
+                    fase,
+                    fonte: "especialista-requisitos",
+                    categoria: "integracao",
+                    valor: int,
+                    confianca: 0.95,
+                    timestamp
+                });
+            });
+
+            // Compliance/Segurança
+            if (lower.includes('lgpd') || lower.includes('gdpr')) {
+                sinais.push({
+                    fase,
+                    fonte: "especialista-requisitos",
+                    categoria: "seguranca",
+                    valor: "LGPD/GDPR",
+                    confianca: 0.95,
+                    timestamp
+                });
+            }
+
+            if (lower.includes('pci')) {
+                sinais.push({
+                    fase,
+                    fonte: "especialista-requisitos",
+                    categoria: "seguranca",
+                    valor: "PCI-DSS",
+                    confianca: 0.95,
+                    timestamp
+                });
+            }
+
+            if (lower.includes('hipaa')) {
+                sinais.push({
+                    fase,
+                    fonte: "especialista-requisitos",
+                    categoria: "seguranca",
+                    valor: "HIPAA",
+                    confianca: 0.95,
+                    timestamp
+                });
+            }
+
+            // Performance
+            if (/sla|uptime|disponibilidade.*99/i.test(respostas)) {
+                sinais.push({
+                    fase,
+                    fonte: "especialista-requisitos",
+                    categoria: "nfr",
+                    valor: "Alta disponibilidade (SLA)",
+                    confianca: 0.9,
+                    timestamp
+                });
+            }
+        }
+
+        if (fase === 4) {
+            // Especialista de Arquitetura
+
+            // Stack - Frontend
+            const frontendPatterns = [
+                { pattern: /react|next\.?js/i, nome: "React/Next.js" },
+                { pattern: /vue|nuxt\.?js/i, nome: "Vue/Nuxt.js" },
+                { pattern: /angular/i, nome: "Angular" },
+                { pattern: /flutter|react native/i, nome: "Mobile (Flutter/RN)" }
+            ];
+
+            for (const { pattern, nome } of frontendPatterns) {
+                if (pattern.test(respostas)) {
+                    sinais.push({
+                        fase,
+                        fonte: "especialista-arquitetura",
+                        categoria: "stack",
+                        valor: `Frontend: ${nome}`,
+                        confianca: 0.95,
+                        timestamp
+                    });
+                    break;
+                }
+            }
+
+            // Stack - Backend
+            const backendPatterns = [
+                { pattern: /node\.?js|express|nestjs/i, nome: "Node.js" },
+                { pattern: /python|django|fastapi|flask/i, nome: "Python" },
+                { pattern: /java|spring/i, nome: "Java/Spring" },
+                { pattern: /go|golang/i, nome: "Go" },
+                { pattern: /\.net|csharp|c#/i, nome: ".NET/C#" }
+            ];
+
+            for (const { pattern, nome } of backendPatterns) {
+                if (pattern.test(respostas)) {
+                    sinais.push({
+                        fase,
+                        fonte: "especialista-arquitetura",
+                        categoria: "stack",
+                        valor: `Backend: ${nome}`,
+                        confianca: 0.95,
+                        timestamp
+                    });
+                    break;
+                }
+            }
+
+            // Stack - Database
+            const dbPatterns = [
+                { pattern: /postgresql|postgres/i, nome: "PostgreSQL" },
+                { pattern: /mongodb|mongo/i, nome: "MongoDB" },
+                { pattern: /mysql/i, nome: "MySQL" },
+                { pattern: /firebase/i, nome: "Firebase" },
+                { pattern: /supabase/i, nome: "Supabase" }
+            ];
+
+            for (const { pattern, nome } of dbPatterns) {
+                if (pattern.test(respostas)) {
+                    sinais.push({
+                        fase,
+                        fonte: "especialista-arquitetura",
+                        categoria: "stack",
+                        valor: `Database: ${nome}`,
+                        confianca: 0.95,
+                        timestamp
+                    });
+                    break;
+                }
+            }
+
+            // Padrões arquiteturais
+            if (/microservi/i.test(respostas)) {
+                sinais.push({
+                    fase,
+                    fonte: "especialista-arquitetura",
+                    categoria: "arquitetura",
+                    valor: "Microserviços",
+                    confianca: 0.9,
+                    timestamp
+                });
+            }
+
+            if (/multi-tenant/i.test(respostas)) {
+                sinais.push({
+                    fase,
+                    fonte: "especialista-arquitetura",
+                    categoria: "arquitetura",
+                    valor: "Multi-tenant",
+                    confianca: 0.9,
+                    timestamp
+                });
+            }
+
+            // Senioridade do time
+            if (/júnior|junior/i.test(respostas)) {
+                sinais.push({
+                    fase,
+                    fonte: "especialista-arquitetura",
+                    categoria: "equipe",
+                    valor: "Time júnior",
+                    confianca: 0.85,
+                    timestamp
+                });
+            } else if (/sênior|senior|pleno/i.test(respostas)) {
+                sinais.push({
+                    fase,
+                    fonte: "especialista-arquitetura",
+                    categoria: "equipe",
+                    valor: "Time experiente",
+                    confianca: 0.85,
+                    timestamp
+                });
+            }
+        }
+
+        return sinais;
+    }
+
+    /**
+     * Detecta integrações mencionadas no texto
+     */
+    private detectarIntegracoes(texto: string): string[] {
+        const integracoes: string[] = [];
+        const patterns = [
+            { pattern: /stripe|mercadopago|paypal|pagseguro/i, nome: "Gateway de pagamento" },
+            { pattern: /auth0|firebase auth|oauth|google.*login|facebook.*login/i, nome: "Autenticação social" },
+            { pattern: /sendgrid|mailchimp|email|smtp/i, nome: "Email/SMTP" },
+            { pattern: /twilio|sms|whatsapp/i, nome: "SMS/WhatsApp" },
+            { pattern: /s3|cloudinary|storage|cdn/i, nome: "Armazenamento/CDN" },
+            { pattern: /google maps|mapbox/i, nome: "Maps" }
+        ];
+
+        for (const { pattern, nome } of patterns) {
+            if (pattern.test(texto) && !integracoes.includes(nome)) {
+                integracoes.push(nome);
+            }
+        }
+
+        return integracoes;
+    }
 }
 
 // Singleton export

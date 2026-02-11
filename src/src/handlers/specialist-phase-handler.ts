@@ -671,53 +671,29 @@ async function handleApproved(
         // Manter compatibilidade com classificacao_sugerida
         estado.classificacao_sugerida = {
             nivel,
-            pontuacao: Math.round(confianca), // Usar confiança como pontuação
+            pontuacao: Math.round(confianca),
             criterios,
         };
-        // Inferência contextual para perguntas agrupadas
-        estado.inferencia_contextual = inferirContextoBalanceado(`${estado.nome} ${prdContent}`);
 
-        const perguntas = estado.inferencia_contextual?.perguntas_prioritarias || [];
-        const perguntasMarkdown = perguntas.length
-            ? perguntas.map((p: any) => `- (${p.prioridade}) ${p.pergunta}${p.valor_inferido ? `\n  - Inferido: ${p.valor_inferido} (confiança ${((p.confianca_inferencia ?? 0) * 100).toFixed(0)}%)` : ""}`).join("\n")
-            : "- Informe domínio, stack preferida e integrações em um único prompt.";
-
+        // Mensagem simplificada - sem bloqueio de classificação
         classificacaoInfo = `
 
-## 🔍 Classificação Inicial (PROVISÓRIA)
+✅ **PRD Aprovado e Salvo!**
 
-| Campo | Valor |
-|-------|-------|
-| **Nível sugerido** | **${nivel.toUpperCase()}** |
-| **Confiança** | ${confianca}% |
-| **Critérios** | ${criterios.slice(0, 3).join(', ')} |
+📁 Arquivo: \`docs/01-produto/PRD.md\`
 
-> 💡 Esta classificação é **provisória** e será refinada automaticamente
-> conforme você avança nas fases de Requisitos e Arquitetura.
+🎯 **Próximo Passo:** Vamos detalhar os requisitos técnicos com o Especialista de Requisitos.
 
-## Ação obrigatória (responder em UM ÚNICO PROMPT)
-Confirme ou ajuste a classificação usando:
+> 💡 A classificação do projeto será refinada automaticamente conforme avançamos nas fases.
 
-\`\`\`json
-executar({
-  "diretorio": "${diretorio}",
-  "acao": "avancar",
-  "respostas": {
-    "nivel": "${nivel}"
-  }
-})
-\`\`\`
-
-Responda também às perguntas abaixo no MESMO prompt:
-${perguntasMarkdown}
-
-> ⚠️ Não prossiga para outras fases antes de confirmar a classificação.`;
+Use: \`executar({acao: "avancar"})\`
+`;
     }
 
     // Avançar estado do projeto para fase 1 de desenvolvimento
     estado.fase_atual = 1;
-    estado.aguardando_classificacao = true;
-    estado.classificacao_pos_prd_confirmada = false;
+    // Classificação em background - sem bloqueio
+    // estado.aguardando_classificacao removido - classificação é silenciosa
     estado.status = 'ativo';
 
     await persistState(estado, onboarding, diretorio);
@@ -1016,6 +992,72 @@ function getFieldsByBlock(mode: string): { block: string; title: string; fields:
         .filter(b => b.fields.length > 0);
 }
 
+/**
+ * Sprint 2 (v7.0): Retorna perguntas técnicas que o especialista deve fazer
+ * Distribui perguntas técnicas aos especialistas de cada fase
+ */
+function getSpecialistQuestions(fase: number): string {
+    if (fase === 2) {
+        // Especialista de Requisitos
+        return `
+## 📋 Coleta de Requisitos Técnicos
+
+Como Especialista de Requisitos, preciso entender alguns aspectos técnicos para criar um documento completo:
+
+### 1. Volume e Escala
+- Quantos usuários simultâneos você espera?
+- Quantas transações/operações por dia?
+- Crescimento esperado nos próximos 6 meses?
+
+### 2. Integrações Externas
+- Precisa integrar com quais sistemas/APIs?
+- Exemplos: pagamento (Stripe, PagSeguro), email (SendGrid), SMS, etc.
+- Autenticação social? (Google, Facebook, etc.)
+
+### 3. Segurança e Compliance
+- Precisa seguir LGPD? (dados de brasileiros)
+- Dados sensíveis? (cartão, saúde, financeiro)
+- Outros requisitos? (PCI-DSS, HIPAA, SOC2)
+
+### 4. Performance
+- Tempo de resposta esperado? (ex: < 200ms)
+- Disponibilidade necessária? (ex: 99.9%)
+- Horários de pico de uso?
+
+> 💡 Responda de forma natural, não precisa seguir a ordem exata. Após suas respostas, vou criar o documento de requisitos.
+`;
+    }
+
+    if (fase === 4) {
+        // Especialista de Arquitetura
+        return `
+## 🏗️ Decisões de Arquitetura
+
+Como Especialista de Arquitetura, preciso entender suas preferências e restrições:
+
+### 1. Stack Tecnológica
+- **Frontend:** Tem preferência? (React, Vue, Angular, Next.js)
+- **Backend:** Qual linguagem/framework? (Node.js, Python, PHP, Java)
+- **Database:** Qual banco de dados? (PostgreSQL, MySQL, MongoDB)
+- Alguma restrição ou tecnologia que o time já domina?
+
+### 2. Time e Infraestrutura
+- Quem vai desenvolver? (senioridade: júnior, pleno, sênior)
+- Onde vai hospedar? (AWS, Azure, Vercel, Heroku, VPS)
+- Orçamento mensal de infraestrutura?
+
+### 3. Padrões Arquiteturais
+- Monolito ou microserviços?
+- Multi-tenant necessário?
+- Precisa de cache? CDN?
+
+> 💡 Se não tiver preferência, posso sugerir a melhor stack baseado nos requisitos já definidos.
+`;
+    }
+
+    return '';
+}
+
 // === Sprint 6 (NP10): Validação Estruturada do PRD ===
 
 interface SectionCheck {
@@ -1249,3 +1291,6 @@ async function persistState(
         console.error('[specialist-phase] Erro ao salvar estado:', err);
     }
 }
+
+// Exportar função para uso em outros módulos
+export { getSpecialistQuestions };
