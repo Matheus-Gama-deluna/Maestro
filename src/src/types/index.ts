@@ -54,6 +54,9 @@ export interface EstadoProjeto {
     // Inferência contextual (balanceada para evitar excesso de suposições)
     inferencia_contextual?: InferenciaContextual;
 
+    // v6.0: Classificação progressiva (acumula sinais ao longo das fases)
+    classificacao_progressiva?: ClassificacaoProgressiva;
+
     // v2.0: Configuração de modo e otimizações
     config?: {
         mode: 'economy' | 'balanced' | 'quality';
@@ -127,6 +130,25 @@ export interface InferenciaContextual {
     dominio?: { nome: string; confianca: number };
     stack?: { frontend?: string; backend?: string; database?: string; confianca: number };
     perguntas_prioritarias?: PerguntaPriorizada[];
+}
+
+// v6.0: Classificação Progressiva
+export interface SinalClassificacao {
+    fase: number;
+    fonte: string;          // "prd" | "requisitos" | "ux" | "arquitetura" | "usuario"
+    categoria: string;      // "dominio" | "stack" | "integracao" | "seguranca" | "volume" | "equipe"
+    valor: string;
+    confianca: number;      // 0-1
+    timestamp: string;
+}
+
+export interface ClassificacaoProgressiva {
+    nivel_atual: NivelComplexidade;
+    nivel_provisorio: boolean;      // true até confirmação definitiva na fase de arquitetura
+    confianca_geral: number;        // 0-100
+    sinais: SinalClassificacao[];
+    historico_niveis: Array<{ fase: number; nivel: NivelComplexidade; motivo: string }>;
+    fases_refinamento: number[];    // fases que refinam: [1, 2, 4] (simples) ou [1, 2, 5] (medio)
 }
 
 

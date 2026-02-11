@@ -27,6 +27,7 @@ import { resolveProjectPath } from "../../utils/files.js";
 import { getFluxoComStitch, getFaseComStitch } from "../../flows/types.js";
 import { determinarTierGate, descreverTier } from "../../gates/tiers.js";
 import { getSpecialistPersona } from "../../services/specialist.service.js";
+import { existsSync, readFileSync } from "fs";
 import { saveFile } from "../../utils/persistence.js";
 
 interface AvancarArgs {
@@ -77,7 +78,7 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
     if (args.estado_json) {
         estado = parsearEstado(args.estado_json);
     }
-    
+
     // v6.0: Auto-carregar estado do filesystem se não fornecido
     if (!estado) {
         try {
@@ -189,29 +190,73 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
     }
 
     // Desenvolvimento: delegar para proximo
-    if (!args.entregavel) {
+    // v8.0 Sprint 3: File-first — sempre ler entregável do disco, não do JSON
+    const estadoJson = args.estado_json || serializarEstado(estado).content;
+
+    // v6.0: Path dinâmico para qualquer fase (não apenas PRD)
+    const faseInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
+
+    // Construir path dinâmico baseado na fase atual
+    let entregavelPath: string | null = null;
+    if (faseInfo) {
+        const faseDirName = `fase-${estado.fase_atual.toString().padStart(2, '0')}-${faseInfo.nome.toLowerCase().replace(/\s/g, '-')}`;
+        entregavelPath = `${diretorio}/docs/${faseDirName}/${faseInfo.entregavel_esperado}`;
+    }
+
+    // Fallback: verificar path convencional (01-produto, 02-requisitos, etc.)
+    const pathConvencional = estado.entregaveis?.[`fase_${estado.fase_atual}`];
+
+    // Tentar ler do disco (prioridade: path dinâmico, depois convencional)
+    const pathsParaTentar = [entregavelPath, pathConvencional].filter(Boolean) as string[];
+    let entregavelDoDisco: string | undefined;
+
+    for (const path of pathsParaTentar) {
+        if (existsSync(path)) {
+            try {
+                entregavelDoDisco = readFileSync(path, 'utf-8');
+                break;
+            } catch {
+                // Continuar tentando próximo path
+            }
+        }
+    }
+
+    if (!entregavelDoDisco && !args.entregavel) {
         return {
             content: formatResponse({
                 titulo: "⚠️ Entregável Necessário",
-                resumo: "Para avançar na fase de desenvolvimento, forneça o entregável.",
+                resumo: "Para avançar na fase de desenvolvimento, salve o entregável no disco.",
+                instrucoes: `🤖 **AÇÃO REQUERIDA:**
+
+1. Salve o entregável no arquivo correspondente à fase atual
+2. Após salvar, avance:
+
+\`\`\`json
+executar({
+    "diretorio": "${diretorio}",
+    "acao": "avancar"
+})
+\`\`\`
+
+⚠️ **NÃO passe o conteúdo via entregavel.** O sistema lê direto do arquivo.`,
                 proximo_passo: {
                     tool: "executar",
-                    descricao: "Avançar fase com entregável",
-                    args: `{ "diretorio": "${args.diretorio}", "acao": "avancar", "entregavel": "conteúdo do entregável..." }`,
-                    requer_input_usuario: true,
-                    prompt_usuario: "Forneça o conteúdo do entregável da fase atual.",
+                    descricao: "Avançar fase (entregável do disco)",
+                    args: `{ "diretorio": "${diretorio}", "acao": "avancar" }`,
+                    requer_input_usuario: false,
+                    auto_execute: true,
                 },
             }),
         };
     }
 
-    // v8.0 FIX (Bug D): Passar estado serializado para proximo.ts quando auto-carregado
-    const estadoJson = args.estado_json || serializarEstado(estado).content;
+    // Usar entregável do disco (prioridade) ou do parâmetro (fallback)
+    const entregavelFinal = entregavelDoDisco || args.entregavel || "";
 
     return proximo({
         diretorio: args.diretorio,
         estado_json: estadoJson,
-        entregavel: args.entregavel,
+        entregavel: entregavelFinal || "",
         resumo_json: args.resumo_json,
         nome_arquivo: args.nome_arquivo,
         auto_flow: args.auto_flow,

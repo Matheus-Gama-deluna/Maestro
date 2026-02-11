@@ -1,7 +1,20 @@
+/**
+ * Classificador de Complexidade de Projetos
+ * 
+ * @deprecated v6.0 - Este módulo foi substituído por ClassificacaoProgressivaService
+ * que acumula sinais ao longo de múltiplas fases em vez de classificar apenas no PRD.
+ * 
+ * Mantido para compatibilidade e referência, mas não é mais usado no fluxo principal.
+ * 
+ * Analisa o PRD e determina o nível de complexidade do projeto.
+ * Baseado em critérios objetivos e contagem de features.
+ */
+
 import type { NivelComplexidade, ClassificacaoResultado } from "../types/index.js";
 
 /**
  * Classifica a complexidade do projeto baseado no PRD
+ * @deprecated v6.0 - usar ClassificacaoProgressivaService
  */
 export function classificarPRD(prd: string): ClassificacaoResultado {
     let pontos = 0;

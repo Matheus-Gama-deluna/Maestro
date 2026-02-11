@@ -24,8 +24,10 @@ import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { existsSync, readFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
 import { detectIDE, getSkillsDir, getSkillResourcePath, getSkillFilePath, type IDEType } from "../utils/ide-paths.js";
-import { classificarPRD } from "../flows/classifier.js";
+import { classificarPRD } from "../flows/classifier.js"; // @deprecated v6.0 - usar ClassificacaoProgressivaService
 import { inferirContextoBalanceado } from "../utils/inferencia-contextual.js";
+import { classificacaoProgressiva } from "../services/classificacao-progressiva.service.js"; // v6.0
+import { getFaseComStitch } from "../flows/types.js"; // v6.0
 
 /** Maximum number of automatic PRD validation retries before requiring user approval */
 const MAX_PRD_VALIDATION_RETRIES = 3;
@@ -421,16 +423,51 @@ async function handleValidating(
     if (!entregavel && existsSync(draftPath)) {
         try { entregavel = readFileSync(draftPath, 'utf-8'); } catch { /* ignore */ }
     }
-    // PRIORIDADE 2: Fallback para param (compatibilidade)
-    if (!entregavel && args.entregavel) {
-        entregavel = args.entregavel;
-    }
 
     if (!entregavel) {
-        // Se chamou sem entregável e sem arquivo, voltar para generating
-        sp.status = 'generating';
-        await persistState(estado, onboarding, diretorio);
-        return handleGenerating(args, onboarding, sp);
+        // Se arquivo não existe, instruir a salvar primeiro
+        return {
+            content: formatResponse({
+                titulo: "⚠️ PRD Não Encontrado",
+                resumo: "O PRD precisa ser salvo no disco antes de validar.",
+                dados: {
+                    "Arquivo esperado": PRD_OUTPUT_PATHS.primary,
+                },
+                instrucoes: `🤖 **AÇÃO REQUERIDA:**
+
+1. **Gere e salve o PRD** no arquivo \`${PRD_OUTPUT_PATHS.primary}\`
+2. Após salvar, avance:
+
+\`\`\`json
+executar({
+    "diretorio": "${diretorio}",
+    "acao": "avancar"
+})
+\`\`\`
+
+⚠️ **NÃO passe o conteúdo via entregavel.** O MCP lê direto do arquivo.`,
+                proximo_passo: {
+                    tool: "executar",
+                    descricao: "Salvar PRD no arquivo e avançar",
+                    args: `{ "diretorio": "${diretorio}", "acao": "avancar" }`,
+                    requer_input_usuario: false,
+                    auto_execute: true,
+                },
+            }),
+            next_action: {
+                tool: "executar",
+                description: "Salvar PRD em docs/01-produto/PRD.md e avançar",
+                args_template: { diretorio, acao: "avancar" },
+                requires_user_input: false,
+                auto_execute: true,
+            },
+            progress: {
+                current_phase: "specialist_generating",
+                total_phases: 5,
+                completed_phases: 2,
+                percentage: 55,
+            },
+        };
     }
 
     // v6.1 (Bug #1): Normalize string — fix JSON-escaped newlines
@@ -584,7 +621,7 @@ async function handleApproved(
     // Salvamos os dados finais antes de limpar
     const finalScore = sp.validationScore || 0;
     const finalInteractions = sp.interactionCount;
-    
+
     // Remover specialistPhase do onboarding — onboarding está CONCLUÍDO
     delete onboarding.specialistPhase;
 
@@ -602,18 +639,44 @@ async function handleApproved(
         prdContent = sp.prdDraft;
     }
 
-    // Classificar o PRD e preparar sugestão
+    // v6.0: Classificação Progressiva — inicializar com sinais do PRD
     let classificacaoInfo = '';
     if (prdContent) {
-        const classificacao = classificarPRD(prdContent);
+        // Inicializar classificação progressiva
+        const faseAtual = getFaseComStitch(estado.nivel, 1, estado.usar_stitch);
+        if (!faseAtual) {
+            throw new Error("Fase 1 não encontrada no fluxo");
+        }
+
+        // Registrar sinais do PRD
+        const sinais = classificacaoProgressiva.registrarSinais(prdContent, faseAtual, []);
+
+        // Calcular classificação inicial
+        const { nivel, confianca, criterios } = classificacaoProgressiva.recalcular(sinais);
+
+        // Inicializar estado de classificação progressiva
+        estado.classificacao_progressiva = {
+            nivel_atual: nivel,
+            nivel_provisorio: true, // SEMPRE provisório no PRD
+            confianca_geral: confianca,
+            sinais,
+            historico_niveis: [{
+                fase: 1,
+                nivel,
+                motivo: "Classificação inicial baseada no PRD"
+            }],
+            fases_refinamento: [1]
+        };
+
+        // Manter compatibilidade com classificacao_sugerida
         estado.classificacao_sugerida = {
-            nivel: classificacao.nivel,
-            pontuacao: classificacao.pontuacao,
-            criterios: classificacao.criterios,
+            nivel,
+            pontuacao: Math.round(confianca), // Usar confiança como pontuação
+            criterios,
         };
         // Inferência contextual para perguntas agrupadas
         estado.inferencia_contextual = inferirContextoBalanceado(`${estado.nome} ${prdContent}`);
-        
+
         const perguntas = estado.inferencia_contextual?.perguntas_prioritarias || [];
         const perguntasMarkdown = perguntas.length
             ? perguntas.map((p: any) => `- (${p.prioridade}) ${p.pergunta}${p.valor_inferido ? `\n  - Inferido: ${p.valor_inferido} (confiança ${((p.confianca_inferencia ?? 0) * 100).toFixed(0)}%)` : ""}`).join("\n")
@@ -621,13 +684,16 @@ async function handleApproved(
 
         classificacaoInfo = `
 
-## 🔍 Classificação do Projeto
+## 🔍 Classificação Inicial (PROVISÓRIA)
 
 | Campo | Valor |
 |-------|-------|
-| **Nível sugerido** | **${classificacao.nivel.toUpperCase()}** |
-| **Pontuação** | ${classificacao.pontuacao} |
-| **Critérios** | ${classificacao.criterios.join(', ')} |
+| **Nível sugerido** | **${nivel.toUpperCase()}** |
+| **Confiança** | ${confianca}% |
+| **Critérios** | ${criterios.slice(0, 3).join(', ')} |
+
+> 💡 Esta classificação é **provisória** e será refinada automaticamente
+> conforme você avança nas fases de Requisitos e Arquitetura.
 
 ## Ação obrigatória (responder em UM ÚNICO PROMPT)
 Confirme ou ajuste a classificação usando:
@@ -637,7 +703,7 @@ executar({
   "diretorio": "${diretorio}",
   "acao": "avancar",
   "respostas": {
-    "nivel": "${classificacao.nivel}"
+    "nivel": "${nivel}"
   }
 })
 \`\`\`
@@ -916,13 +982,11 @@ function getRequiredFields(mode: string): RequiredField[] {
         // Bloco 2 — A Solução (todos os modos)
         { id: 'funcionalidades_mvp', label: 'Quais as 3-5 coisas mais importantes que o produto precisa fazer?', hint: 'Liste as funcionalidades essenciais para a primeira versão', example: 'Ex: "Criar checklists, atribuir tarefas, ver status, notificar prazos"', block: 'solucao', modes: ['economy', 'balanced', 'quality'] },
         { id: 'north_star_metric', label: 'Qual número mostra que o produto está funcionando?', hint: 'A métrica mais importante para saber se o produto dá certo', example: 'Ex: "% de checklists concluídos no prazo" ou "Quantos pedidos por semana"', block: 'solucao', modes: ['economy', 'balanced', 'quality'] },
+        { id: 'diferencial', label: 'O que torna seu produto diferente dos concorrentes?', hint: 'Sua vantagem competitiva ou proposta de valor única', example: 'Ex: "Integração nativa com WhatsApp, que nenhum concorrente tem"', block: 'solucao', modes: ['economy', 'balanced', 'quality'] },
 
         // Bloco 3 — Planejamento (balanced/quality)
         { id: 'riscos', label: 'O que pode dar errado?', hint: 'Riscos que podem atrapalhar o sucesso do produto', example: 'Ex: "Usuários não adotarem, custo alto de servidor, concorrente lançar antes"', block: 'planejamento', modes: ['balanced', 'quality'] },
         { id: 'timeline', label: 'Em quanto tempo quer lançar a primeira versão?', hint: 'Prazo desejado para o MVP estar no ar', example: 'Ex: "8 semanas para MVP + 2 semanas piloto"', block: 'planejamento', modes: ['balanced', 'quality'] },
-
-        // Campos extras balanced (alinhados com template PRD)
-        { id: 'diferencial', label: 'O que torna seu produto diferente dos concorrentes?', hint: 'Sua vantagem competitiva ou proposta de valor única', example: 'Ex: "Integração nativa com WhatsApp, que nenhum concorrente tem"', block: 'solucao', modes: ['balanced', 'quality'] },
 
         // Campos extras quality (alinhados com template PRD)
         { id: 'personas', label: 'Descreva 2-3 tipos de pessoas que vão usar (nome fictício, cargo, rotina)', hint: 'Perfis detalhados dos usuários principais', example: 'Ex: "Maria, coordenadora, monitora equipes pelo celular entre reuniões"', block: 'problema', modes: ['quality'] },
@@ -1055,12 +1119,39 @@ function normalizePrdContent(content: string): string {
     return normalized.trim();
 }
 
+// v5.0 Sprint 5: Cache de scores para evitar oscilações
+const scoreCache = new Map<string, { score: number; timestamp: number }>();
+const SCORE_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
 /**
  * Sprint 6 (NP10): Calcula score estruturado do PRD por seções com conteúdo mínimo.
- * Substitui a versão antiga baseada em regex triviais.
+ * v5.0: Adicionado cache e bypass por tamanho
  */
 function calculatePrdScore(prd: string, mode: string): number {
+    // Sprint 5: Bypass por tamanho — PRDs grandes com estrutura mínima = score alto
+    const wordCount = prd.split(/\s+/).length;
+    const charCount = prd.length;
+    const hasStructure = prd.match(/^#{1,2}\s+/m) && prd.match(/^#{1,2}\s+/m); // Tem pelo menos um h1/h2
+
+    // Se PRD tem >3000 chars, >400 palavras e estrutura markdown → score mínimo 70
+    if (charCount > 3000 && wordCount > 400 && hasStructure) {
+        const { score } = calculatePrdScoreDetailed(prd);
+        // Retorna o maior entre o score calculado e 70 (para evitar penalizar PRDs bons)
+        return Math.max(score, 70);
+    }
+
+    // Sprint 5: Verificar cache
+    const cacheKey = `${prd.slice(0, 500)}-${prd.length}`; // Hash simples
+    const cached = scoreCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < SCORE_CACHE_TTL) {
+        return cached.score;
+    }
+
     const { score } = calculatePrdScoreDetailed(prd);
+
+    // Sprint 5: Salvar no cache
+    scoreCache.set(cacheKey, { score, timestamp: Date.now() });
+
     return score;
 }
 

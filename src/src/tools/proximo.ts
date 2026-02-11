@@ -3,7 +3,7 @@ import { existsSync } from "fs";
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { getFase, getFluxo, getFaseComStitch, getFluxoComStitch } from "../flows/types.js";
-import { classificarPRD, descreverNivel } from "../flows/classifier.js";
+import { classificarPRD, descreverNivel } from "../flows/classifier.js"; // @deprecated v6.0 - usar ClassificacaoProgressivaService
 import { validarGate, formatarResultadoGate, validarGateComTemplate } from "../gates/validator.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { parsearResumo, serializarResumo, criarResumoInicial, extrairResumoEntregavel } from "../state/memory.js";
@@ -21,6 +21,7 @@ import { verificarSkillCarregada } from "../utils/content-injector.js";
 import { ContentResolverService } from "../services/content-resolver.service.js";
 import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { saveFile, saveMultipleFiles, formatSavedFilesConfirmation } from "../utils/persistence.js";
+import { classificacaoProgressiva } from "../services/classificacao-progressiva.service.js"; // v6.0
 
 interface ProximoArgs {
     entregavel: string;
@@ -121,7 +122,7 @@ proximo(
         // Obter skill e IDE para instruções corretas
         const ideDetectada = detectIDE(diretorio) || 'windsurf';
         const skillNome = faseAtualInfo ? getSkillParaFase(faseAtualInfo.nome) : null;
-        
+
         let instrucoesSkill = "";
         if (skillNome) {
             const skillPath = getIDESkillResourcePath(skillNome, 'reference', ideDetectada);
@@ -365,20 +366,20 @@ Carregue e leia a skill antes de gerar o entregável:
     const diretorioContent = getServerContentRoot();
     const tier = estado.tier_gate || "base";
     const validacaoTemplate = validarGateComTemplate(faseAtual, args.entregavel, tier, diretorioContent);
-    
+
     let qualityScore: number;
     let gateResultado: ReturnType<typeof validarGate>;
     let estruturaResult: ReturnType<typeof validarEstrutura>;
     let usouTemplate = false;
-    
+
     if (validacaoTemplate.sucesso && validacaoTemplate.resultado) {
         // Usar validação baseada em template (enforcement)
         usouTemplate = true;
         const resultado = validacaoTemplate.resultado;
-        
+
         // Converter resultado do template para formato legado para compatibilidade
         qualityScore = resultado.qualidade?.scoreGeral || resultado.score || 0;
-        
+
         // Criar estrutura compatível para gateResultado
         gateResultado = {
             valido: resultado.valido,
@@ -386,7 +387,7 @@ Carregue e leia a skill antes de gerar o entregável:
             itens_pendentes: resultado.checkboxes?.faltando.map((c: any) => c.texto) || [],
             sugestoes: resultado.sugestoes || [],
         };
-        
+
         // Criar estrutura compatível para estruturaResult
         estruturaResult = {
             valido: resultado.estrutura?.valida || false,
@@ -524,27 +525,119 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
         resumo.entregaveis.push(novoEntregavel);
     }
 
-    // Classificar complexidade após fase 1 (PRD)
+    // v6.0: Classificação Progressiva — acumula sinais e refina em TODA transição de fase
     let classificacaoInfo = "";
-    if (estado.fase_atual === 1) {
-        const classificacao = classificarPRD(args.entregavel);
-        estado.nivel = classificacao.nivel;
-        estado.total_fases = getFluxoComStitch(classificacao.nivel, estado.usar_stitch).total_fases;
+
+    // Inicializar classificação progressiva se não existir
+    if (!estado.classificacao_progressiva) {
+        estado.classificacao_progressiva = {
+            nivel_atual: estado.nivel,
+            nivel_provisorio: true,
+            confianca_geral: 50,
+            sinais: [],
+            historico_niveis: [],
+            fases_refinamento: []
+        };
+    }
+
+    // Registrar sinais do entregável atual
+    const sinaisAtualizados = classificacaoProgressiva.registrarSinais(
+        args.entregavel,
+        faseAtual,
+        estado.classificacao_progressiva.sinais
+    );
+    estado.classificacao_progressiva.sinais = sinaisAtualizados;
+
+    // Recalcular classificação com todos os sinais acumulados
+    const { nivel: nivelCalculado, confianca, criterios } = classificacaoProgressiva.recalcular(sinaisAtualizados);
+
+    // Verificar se precisa expandir o fluxo
+    const expansao = classificacaoProgressiva.verificarExpansao(
+        estado.classificacao_progressiva.nivel_atual,
+        nivelCalculado,
+        estado.fase_atual
+    );
+
+    // Atualizar classificação progressiva
+    estado.classificacao_progressiva.confianca_geral = confianca;
+    estado.classificacao_progressiva.fases_refinamento.push(estado.fase_atual);
+
+    // Se houve expansão, registrar no histórico e expandir fluxo
+    if (expansao.expandir) {
+        estado.classificacao_progressiva.historico_niveis.push({
+            fase: estado.fase_atual,
+            nivel: nivelCalculado,
+            motivo: `Expansão detectada: ${criterios.join(", ")}`
+        });
+        estado.classificacao_progressiva.nivel_atual = nivelCalculado;
+        estado.nivel = nivelCalculado;
+        estado.total_fases = getFluxoComStitch(nivelCalculado, estado.usar_stitch).total_fases;
 
         classificacaoInfo = `
-## 🎯 Classificação do Projeto
+## 🔄 Expansão de Fluxo Detectada!
 
 | Campo | Valor |
 |-------|-------|
-| **Nível** | ${classificacao.nivel.toUpperCase()} |
-| **Pontuação** | ${classificacao.pontuacao} pontos |
+| **De** | ${expansao.de.toUpperCase()} |
+| **Para** | ${expansao.para.toUpperCase()} |
+| **Fases Adicionadas** | +${expansao.fasesAdicionadas} fases |
+| **Total de Fases** | ${estado.total_fases} |
+| **Confiança** | ${confianca}% |
+
+### 📊 Sinais que levaram à expansão:
+${criterios.map(c => `- ${c}`).join("\n")}
+
+> ⚡ O sistema detectou complexidade adicional e expandiu o fluxo automaticamente.
+> As fases já concluídas permanecem intactas.
+`;
+    } else if (estado.fase_atual === 1) {
+        // Primeira classificação (provisória)
+        estado.classificacao_progressiva.nivel_atual = nivelCalculado;
+        estado.nivel = nivelCalculado;
+        estado.total_fases = getFluxoComStitch(nivelCalculado, estado.usar_stitch).total_fases;
+
+        classificacaoInfo = `
+## 🎯 Classificação Inicial (PROVISÓRIA)
+
+| Campo | Valor |
+|-------|-------|
+| **Nível** | ${nivelCalculado.toUpperCase()} |
+| **Confiança** | ${confianca}% |
 | **Total de Fases** | ${estado.total_fases} |
 
 ### Critérios detectados:
-${classificacao.criterios.map(c => `- ${c}`).join("\n")}
+${criterios.map(c => `- ${c}`).join("\n")}
 
-> ${descreverNivel(classificacao.nivel)}
+> 💡 Esta classificação é **provisória** e será refinada automaticamente
+> conforme você avança nas fases de Requisitos e Arquitetura.
 `;
+    } else {
+        // Refinamento em fases intermediárias
+        const nivelMudou = estado.classificacao_progressiva.nivel_atual !== nivelCalculado;
+        if (nivelMudou && !expansao.expandir) {
+            // Nível mudou mas não expandiu (confiança aumentou)
+            estado.classificacao_progressiva.nivel_atual = nivelCalculado;
+            estado.nivel = nivelCalculado;
+        }
+
+        classificacaoInfo = `
+## 📊 Classificação Refinada
+
+| Campo | Valor |
+|-------|-------|
+| **Nível Atual** | ${estado.classificacao_progressiva.nivel_atual.toUpperCase()} |
+| **Confiança** | ${confianca}% |
+| **Sinais Acumulados** | ${sinaisAtualizados.length} |
+
+### Critérios atualizados:
+${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
+`;
+    }
+
+    // Marcar como definitiva na fase de Arquitetura
+    if (faseAtual.nome.toLowerCase().includes("arquitetura")) {
+        estado.classificacao_progressiva.nivel_provisorio = false;
+        classificacaoInfo += `\n> ✅ **Classificação DEFINITIVA** confirmada na fase de Arquitetura.\n`;
     }
 
     // Avançar para próxima fase
@@ -599,10 +692,10 @@ ${classificacao.criterios.map(c => `- ${c}`).join("\n")}
 
         if (proximaFase) {
             await gerarSystemMd(
-                diretorio, 
-                estado, 
-                proximaFase.nome, 
-                proximaFase.especialista, 
+                diretorio,
+                estado,
+                proximaFase.nome,
+                proximaFase.especialista,
                 proximaFase.gate_checklist
             );
         }
@@ -610,114 +703,31 @@ ${classificacao.criterios.map(c => `- ${c}`).join("\n")}
         console.warn('Aviso: Não foi possível atualizar histórico/SYSTEM.md:', error);
     }
 
-    // Se estiver na Fase 1 (PRD) e ainda não confirmou classificação -> INTERROMPER
-    if (estado.fase_atual === 1 && !estado.classificacao_pos_prd_confirmada) {
-        const classificacao = classificarPRD(args.entregavel);
-
-        // Atualiza estado para aguardar confirmação
-        estado.aguardando_classificacao = true;
-        estado.classificacao_sugerida = {
-            nivel: classificacao.nivel,
-            pontuacao: classificacao.pontuacao,
-            criterios: classificacao.criterios
-        };
-
-        // Serializa estado bloqueado
-        const estadoBloqueado = serializarEstado(estado);
-
-        // v5.3: Persistência direta — salvar todos os arquivos pendentes
-        const estadoFileIdx = filesToSave.findIndex((f: { path: string }) => f.path.endsWith("estado.json"));
-        if (estadoFileIdx >= 0) {
-            filesToSave[estadoFileIdx].content = estadoBloqueado.content;
-        } else {
-            filesToSave.push({
-                path: `${diretorio}/${estadoBloqueado.path}`,
-                content: estadoBloqueado.content
-            });
-        }
-
-        try {
-            await saveMultipleFiles(filesToSave);
-        } catch (err) {
-            console.error('[proximo] Erro ao salvar arquivos:', err);
-        }
-
-        const confirmacaoClassif = formatSavedFilesConfirmation(filesToSave.map((f: { path: string }) => f.path));
-
-        return {
-            content: [{
-                type: "text",
-                text: `# 🧐 Verificação de Complexidade Necessária
-
-Analisei o PRD e tenho uma sugestão de classificação.
-
-## Resultado da Análise
-| Campo | Valor |
-|-------|-------|
-| **Nível Sugerido** | **${classificacao.nivel.toUpperCase()}** |
-| **Pontuação** | ${classificacao.pontuacao} |
-
-### Critérios
-${classificacao.criterios.map(c => `- ${c}`).join("\n")}
-
----
-
-## 🔐 Próximo Passo: Confirmação
-
-O projeto foi **PAUSADO** para que você confirme essa classificação.
-A IA **NÃO** avançou para a próxima fase automaticamente.
-
-EXECUTE para confirmar:
-
-\`\`\`json
-executar({
-  "diretorio": "${diretorio}",
-  "acao": "avancar",
-  "respostas": {
-    "nivel": "${classificacao.nivel}"
-  }
-})
-\`\`\`
-${confirmacaoClassif}
-`,
-            }],
-            estado_atualizado: estadoBloqueado.content,
-        };
-    }
-
-    // Classificar complexidade após fase 1 (PRD) - (Lógica antiga removida/simplificada pois agora temos o bloco acima)
-    let classificacaoInfoAdicional = "";
-    if (estado.fase_atual === 1) {
-        // Se chegou aqui, é porque já confirmou (classificacao_pos_prd_confirmada == true)
-        // Ou na primeira passagem (se por algum motivo a flag já estivesse true, o que não deve ocorrer na fluxo padrão novo)
-        // Mantemos apenas informativo se necessário, ou removemos.
-        // Dado o fluxo novo, a reclassificação acontece no 'confirmar_classificacao'.
-        // Aqui apenas registramos que passou.
-    }
+    // v6.0: Bloco de interrupção pós-PRD removido — classificação progressiva já cuida disso
 
     // Gerar informações da próxima skill — INJEÇÃO ATIVA v5
     const proximaSkillInfo = await (async () => {
         if (!proximaFase) return "";
-        
+
         const proximaSkill = getSkillParaFase(proximaFase.nome);
         if (!proximaSkill) return "";
-        
+
         // Detectar modo do projeto
         const mode = (estado.config?.mode || "balanced") as "economy" | "balanced" | "quality";
-        
+
         try {
             // Injeção ativa: carregar e incluir conteúdo real da skill na resposta
             const contentResolver = new ContentResolverService(diretorio);
             const skillLoader = new SkillLoaderService(contentResolver);
             const contextPackage = await skillLoader.loadForPhase(proximaFase.nome, mode);
-            
+
             if (contextPackage) {
                 return `\n\n---\n\n# 🧠 Contexto do Especialista — ${proximaFase.nome}\n\n${skillLoader.formatAsMarkdown(contextPackage)}\n`;
             }
         } catch (error) {
             console.warn("[proximo] Falha ao carregar skill ativa, usando fallback:", error);
         }
-        
+
         // Fallback: referência textual (compatibilidade v4)
         const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
         return `
@@ -741,7 +751,6 @@ ${formatSkillMessage(proximaSkill, ide)}
 
 ${gateResultado.valido ? "✅ Gate aprovado" : "⚠️ Gate forçado"}
 ${classificacaoInfo}
-${classificacaoInfoAdicional}
 
 ---
 
