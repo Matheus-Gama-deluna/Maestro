@@ -36,10 +36,10 @@ export const ESTRUTURAS_FASES: EstruturaFase[] = [
         tamanho_minimo_por_tier: { essencial: 100, base: 300, avancado: 500 },
         peso_estrutura: 0.3,
         secoes: [
-            { header: "^#{1,2}\\s*(problema|problem)", descricao: "Seção de Problema" },
-            { header: "^#{1,2}\\s*(usuário|usuario|user|persona)", descricao: "Seção de Usuários/Personas", obrigatorio_tier: "base" },
-            { header: "^#{1,2}\\s*(funcionalidade|feature|mvp|escopo)", descricao: "Seção de Funcionalidades/MVP" },
-            { header: "^#{1,2}\\s*(métrica|metrica|sucesso|kpi)", descricao: "Seção de Métricas de Sucesso", obrigatorio_tier: "base" },
+            { header: "^#{1,3}\\s*\\d*\\.?\\s*(problema|problem|oportunidade|dor|pain)", descricao: "Seção de Problema" },
+            { header: "^#{1,3}\\s*\\d*\\.?\\s*(usu[áa]rios?|usuario|user|persona|p[uú]blico)", descricao: "Seção de Usuários/Personas", obrigatorio_tier: "base" },
+            { header: "^#{1,3}\\s*\\d*\\.?\\s*(funcionalidade|feature|mvp|escopo|solu[cç][aã]o)", descricao: "Seção de Funcionalidades/MVP" },
+            { header: "^#{1,3}\\s*\\d*\\.?\\s*(m[eé]trica|sucesso|kpi|north.?star|indicador)", descricao: "Seção de Métricas de Sucesso", obrigatorio_tier: "base" },
         ],
     },
     {

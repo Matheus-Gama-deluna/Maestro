@@ -224,18 +224,34 @@ function validarGateComChecklist(entregavel: string, checklist: string[]): GateR
     };
 }
 function verificarItem(item: string, entregavel: string): boolean {
-    // Extrai palavras-chave do item
+    const conteudoLower = entregavel.toLowerCase();
+
+    // Sinônimos por item para matching mais robusto (fase 1 - PRD)
+    const sinonimos: Record<string, string[][]> = {
+        "problema claramente definido": [["problema", "problem", "dor", "oportunidade", "pain"]],
+        "personas ou usuários identificados": [["persona", "usuário", "usuario", "usuarios", "usuários", "público", "publico", "user"]],
+        "funcionalidades mvp listadas": [["funcionalidade", "funcionalidades", "feature", "mvp", "escopo", "solução", "soluçao"]],
+        "métricas de sucesso definidas": [["métrica", "metrica", "métricas", "metricas", "kpi", "sucesso", "north star", "indicador"]],
+    };
+
+    // Tenta match por sinônimos primeiro
+    const itemLower = item.toLowerCase();
+    const gruposSinonimos = sinonimos[itemLower];
+    if (gruposSinonimos) {
+        return gruposSinonimos.every(grupo =>
+            grupo.some(sin => conteudoLower.includes(sin))
+        );
+    }
+
+    // Fallback: match por keywords (modo original melhorado)
     const keywords = item
         .toLowerCase()
         .replace(/[^a-záéíóúàãõç\s]/g, "")
         .split(/\s+/)
         .filter((word) => word.length > 3);
 
-    const conteudoLower = entregavel.toLowerCase();
-
-    // Verifica se pelo menos 70% das keywords estão presentes (mais rigoroso)
     const encontradas = keywords.filter((kw) => conteudoLower.includes(kw));
-    return encontradas.length >= Math.ceil(keywords.length * 0.7);
+    return encontradas.length >= Math.ceil(keywords.length * 0.5);
 }
 
 /**

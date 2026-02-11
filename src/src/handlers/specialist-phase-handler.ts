@@ -1084,9 +1084,9 @@ interface SectionResult {
  */
 const SECTION_CHECKS: SectionCheck[] = [
     { heading: /^[\d.\s]*(sum[aá]rio|summary|executiv)/i, minContentLength: 100, weight: 10, label: 'Sumário Executivo' },
-    { heading: /^[\d.\s]*(problema|problem|oportunidade|dor)/i, minContentLength: 150, weight: 15, label: 'Problema e Oportunidade' },
-    { heading: /^[\d.\s]*(persona|jobs?\s*to\s*be|p[uú]blico|usu[aá]rio)/i, minContentLength: 100, weight: 15, label: 'Personas e Público-alvo' },
-    { heading: /^[\d.\s]*(mvp|funcionalidade|feature|solu[cç][aã]o)/i, minContentLength: 100, weight: 15, label: 'MVP e Funcionalidades' },
+    { heading: /^[\d.\s]*(problema|problem|oportunidade|dor|pain)/i, minContentLength: 150, weight: 15, label: 'Problema e Oportunidade' },
+    { heading: /^[\d.\s]*(persona|jobs?\s*to\s*be|p[uú]blico|usu[aá]rios?|user)/i, minContentLength: 100, weight: 15, label: 'Personas e Público-alvo' },
+    { heading: /^[\d.\s]*(mvp|funcionalidade|feature|solu[cç][aã]o|escopo)/i, minContentLength: 100, weight: 15, label: 'MVP e Funcionalidades' },
     { heading: /^[\d.\s]*(m[eé]trica|kpi|north\s*star|sucesso|indicador)/i, minContentLength: 50, weight: 10, label: 'Métricas de Sucesso' },
     { heading: /^[\d.\s]*(risco|mitiga[cç])/i, minContentLength: 80, weight: 10, label: 'Riscos e Mitigações' },
     { heading: /^[\d.\s]*(timeline|cronograma|marco|prazo|roadmap)/i, minContentLength: 50, weight: 5, label: 'Timeline e Marcos' },
