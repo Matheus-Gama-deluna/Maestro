@@ -23,9 +23,11 @@ import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { saveFile, saveMultipleFiles, formatSavedFilesConfirmation } from "../utils/persistence.js";
 import { classificacaoProgressiva } from "../services/classificacao-progressiva.service.js"; // v6.0
 import { getSpecialistQuestions } from "../handlers/specialist-phase-handler.js"; // v7.0
+import { resolverPathEntregavel, listarPathsEsperados } from "../utils/entregavel-path.js"; // v5.5.0
+import { readFile } from "fs/promises";
 
 interface ProximoArgs {
-    entregavel: string;
+    entregavel?: string;  // v5.5.0: Opcional - sistema lê do disco automaticamente
     estado_json: string;         // Estado atual do projeto (obrigatório)
     resumo_json?: string;        // Resumo atual (opcional, cria novo se não informado)
     nome_arquivo?: string;
@@ -117,9 +119,39 @@ proximo(
     // Obter fase atual para mensagens de erro
     const faseAtualInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
 
-    // Validar tamanho mínimo do entregável
+    // v5.5.0: Leitura automática do disco
+    let entregavel = args.entregavel;
+    let entregavelLidoDoDisco = false;
+    let caminhoResolvido: string | null = null;
+
+    // Heurística: se entregável está vazio OU muito curto (< 100 chars), provavelmente é uma descrição
+    // Tentamos ler do disco como fallback
+    const TAMANHO_MINIMO_CONTEUDO_REAL = 100;
+
+    if (!entregavel || entregavel.trim().length < TAMANHO_MINIMO_CONTEUDO_REAL) {
+        if (faseAtualInfo) {
+            // Tentar resolver path do entregável
+            caminhoResolvido = resolverPathEntregavel(
+                diretorio,
+                estado.fase_atual,
+                faseAtualInfo,
+                estado
+            );
+
+            if (caminhoResolvido) {
+                try {
+                    entregavel = await readFile(caminhoResolvido, 'utf-8');
+                    entregavelLidoDoDisco = true;
+                } catch (err) {
+                    // Erro ao ler arquivo, continua com validação abaixo
+                }
+            }
+        }
+    }
+
+    // Se ainda não tem entregável válido, retornar erro
     const TAMANHO_MINIMO_ENTREGAVEL = 200;
-    if (!args.entregavel || args.entregavel.trim().length < TAMANHO_MINIMO_ENTREGAVEL) {
+    if (!entregavel || entregavel.trim().length < TAMANHO_MINIMO_ENTREGAVEL) {
         // Obter skill e IDE para instruções corretas
         const ideDetectada = detectIDE(diretorio) || 'windsurf';
         const skillNome = faseAtualInfo ? getSkillParaFase(faseAtualInfo.nome) : null;
@@ -144,17 +176,34 @@ Abra os seguintes arquivos no seu IDE:
 `;
         }
 
+        // Listar paths esperados para ajudar o usuário
+        const pathsEsperados = faseAtualInfo
+            ? listarPathsEsperados(diretorio, estado.fase_atual, faseAtualInfo)
+            : [];
+
         return {
             content: [{
                 type: "text",
-                text: `# ❌ Entregável Inválido
+                text: `# ❌ Entregável Não Encontrado
 
-O entregável está vazio ou muito curto.
+O sistema não encontrou o entregável da fase atual.
 
 | Métrica | Valor |
 |---------|-------|
+| **Fase** | ${estado.fase_atual} - ${faseAtualInfo?.nome || 'N/A'} |
+| **Entregável esperado** | ${faseAtualInfo?.entregavel_esperado || 'N/A'} |
 | **Tamanho recebido** | ${args.entregavel?.trim().length || 0} caracteres |
 | **Tamanho mínimo** | ${TAMANHO_MINIMO_ENTREGAVEL} caracteres |
+
+---
+
+## 📁 Paths Verificados
+
+O sistema tentou ler o entregável dos seguintes locais:
+
+${pathsEsperados.map((p, i) => `${i + 1}. \`${p}\``).join('\n')}
+
+> ⚠️ **Nenhum arquivo encontrado** em nenhum dos paths acima.
 
 ---
 
@@ -169,9 +218,10 @@ ${instrucoesSkill}
 2. Consulte os **Templates** → Use como base estrutural
 3. Faça perguntas ao usuário → Conforme indicado na SKILL
 4. Gere o entregável → Seguindo TODAS as seções do template
-5. Valide com o **Checklist** → Antes de avançar
-6. Apresente ao usuário → Para aprovação
-7. Só então chame \`proximo()\`
+5. **Salve o arquivo** → Em um dos paths listados acima
+6. Valide com o **Checklist** → Antes de avançar
+7. Apresente ao usuário → Para aprovação
+8. Só então chame \`proximo()\` → Sistema lerá automaticamente do disco
 
 > ⛔ **NÃO TENTE AVANÇAR** com entregáveis vazios ou incompletos!
 `,
@@ -179,6 +229,10 @@ ${instrucoesSkill}
             isError: true,
         };
     }
+
+    // v5.5.0: Após validação, entregavel é garantidamente string não-vazia
+    // TypeScript assertion para evitar erros de tipo
+    const entregavelValidado: string = entregavel!;
 
     // Verificar se há bloqueio de aprovação pendente (Gate)
     if (estado.aguardando_aprovacao) {
@@ -209,7 +263,7 @@ O **usuário humano** deve decidir:
 
     // Fluxo PRD-first: se ainda aguardando PRD, analisar e AUTO-CONFIRMAR se auto_flow
     if (estado.status === "aguardando_prd" && estado.fase_atual === 1) {
-        const analise = classificarPRD(args.entregavel);
+        const analise = classificarPRD(entregavelValidado);
         estado.classificacao_sugerida = analise;
         estado.status = "ativo";
 
@@ -225,7 +279,7 @@ O **usuário humano** deve decidir:
             estado.classificacao_pos_prd_confirmada = false;
 
             // Inferência balanceada (não assume críticos) + perguntas agrupadas
-            estado.inferencia_contextual = inferirContextoBalanceado(`${estado.nome} ${args.entregavel}`);
+            estado.inferencia_contextual = inferirContextoBalanceado(`${estado.nome} ${entregavelValidado}`);
 
             const estadoFile = serializarEstado(estado);
 
@@ -366,7 +420,7 @@ Carregue e leia a skill antes de gerar o entregável:
     // Tentar validação com template (novo sistema inteligente)
     const diretorioContent = getServerContentRoot();
     const tier = estado.tier_gate || "base";
-    const validacaoTemplate = validarGateComTemplate(faseAtual, args.entregavel, tier, diretorioContent);
+    const validacaoTemplate = validarGateComTemplate(faseAtual, entregavelValidado, tier, diretorioContent);
 
     let qualityScore: number;
     let gateResultado: ReturnType<typeof validarGate>;
@@ -401,8 +455,8 @@ Carregue e leia a skill antes de gerar o entregável:
     } else {
         // Fallback para sistema legado
         usouTemplate = false;
-        estruturaResult = validarEstrutura(estado.fase_atual, args.entregavel);
-        gateResultado = validarGate(faseAtual, args.entregavel);
+        estruturaResult = validarEstrutura(estado.fase_atual, entregavelValidado);
+        gateResultado = validarGate(faseAtual, entregavelValidado);
         qualityScore = calcularQualityScore(estruturaResult, gateResultado);
     }
 
@@ -491,7 +545,7 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
 
     filesToSave.push({
         path: caminhoArquivo,
-        content: args.entregavel
+        content: entregavelValidado
     });
 
     // Atualizar estado com entregável registrado
@@ -506,7 +560,7 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
     }
 
     // Extrair resumo do entregável
-    const extractedInfo = extrairResumoEntregavel(args.entregavel, estado.fase_atual, faseAtual.nome, faseAtual.entregavel_esperado, caminhoArquivo);
+    const extractedInfo = extrairResumoEntregavel(entregavelValidado, estado.fase_atual, faseAtual.nome, faseAtual.entregavel_esperado, caminhoArquivo);
 
     const novoEntregavel: EntregavelResumo = {
         fase: estado.fase_atual,
@@ -543,7 +597,7 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
 
     // Registrar sinais do entregável atual
     const sinaisAtualizados = classificacaoProgressiva.registrarSinais(
-        args.entregavel,
+        entregavelValidado,
         faseAtual,
         estado.classificacao_progressiva.sinais
     );
@@ -554,7 +608,7 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
     if (estado.fase_atual === 2 || estado.fase_atual === 4) {
         const sinaisEspecialista = classificacaoProgressiva.extrairSinaisEspecialista(
             estado.fase_atual,
-            args.entregavel
+            entregavelValidado
         );
 
         if (sinaisEspecialista.length > 0) {
@@ -725,6 +779,14 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
 
     // v6.0: Bloco de interrupção pós-PRD removido — classificação progressiva já cuida disso
 
+    // v5.5.0: Feedback visual quando entregável foi lido do disco
+    const feedbackLeitura = entregavelLidoDoDisco && caminhoResolvido
+        ? `
+> 📄 **Entregável lido automaticamente de:** \`${caminhoResolvido}\`
+
+`
+        : "";
+
     // Gerar informações da próxima skill — INJEÇÃO ATIVA v5
     const proximaSkillInfo = await (async () => {
         if (!proximaFase) return "";
@@ -804,7 +866,7 @@ ${proximaSkillInfo}
     // v5: next_action e progress são calculados automaticamente pelo middleware flow-engine.middleware.ts
     // Mantemos apenas specialist_persona e estado_atualizado para o middleware processar
     return {
-        content: [{ type: "text", text: resposta + confirmacao }],
+        content: [{ type: "text", text: feedbackLeitura + resposta + confirmacao }],
         estado_atualizado: estadoFile.content,
         specialist_persona: specialist || undefined,
         // next_action e progress serão adicionados pelo middleware withFlowEngine
@@ -842,5 +904,5 @@ export const proximoSchema = {
             description: "Modo fluxo automático: auto-confirma classificação, pula verificações redundantes e avança automaticamente se score >= 70 (padrão: false)",
         },
     },
-    required: ["entregavel", "estado_json", "diretorio"],
+    required: ["estado_json", "diretorio"],  // v5.5.0: entregavel agora é opcional
 };
