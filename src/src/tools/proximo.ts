@@ -7,7 +7,7 @@ import { classificarPRD, descreverNivel } from "../flows/classifier.js"; // @dep
 import { validarGate, formatarResultadoGate, validarGateComTemplate } from "../gates/validator.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { parsearResumo, serializarResumo, criarResumoInicial, extrairResumoEntregavel } from "../state/memory.js";
-import { gerarInstrucaoProximaFase } from "../utils/instructions.js";
+import { gerarInstrucaoProximaFase, gerarInstrucaoCorrecao } from "../utils/instructions.js";
 import type { EntregavelResumo, ProjectSummary } from "../types/memory.js";
 import { logEvent, EventTypes } from "../utils/history.js";
 import { getSpecialistPersona } from "../services/specialist.service.js";
@@ -236,6 +236,20 @@ ${instrucoesSkill}
 
     // Verificar se há bloqueio de aprovação pendente (Gate)
     if (estado.aguardando_aprovacao) {
+        // v5.5.0: Incluir instruções de correção no bloqueio
+        const ideParaInstrucao = detectIDE(diretorio) || 'windsurf';
+        const instrucaoCorrecao = faseAtualInfo
+            ? gerarInstrucaoCorrecao(
+                faseAtualInfo.nome,
+                estado.score_bloqueado || 0,
+                [], // Itens aprovados não estão salvos no estado
+                [], // Itens pendentes não estão salvos no estado
+                [],
+                [],
+                ideParaInstrucao
+            )
+            : "";
+
         return {
             content: [{
                 type: "text",
@@ -248,12 +262,14 @@ O projeto está bloqueado aguardando aprovação do usuário.
 | **Motivo** | ${estado.motivo_bloqueio || "Score abaixo do ideal"} |
 | **Score** | ${estado.score_bloqueado}/100 |
 
+${instrucaoCorrecao}
+
 ## 🔐 Ação Necessária
 
 O **usuário humano** deve decidir:
 
-- **Aprovar**: \`aprovar_gate(acao: "aprovar", ...)\`
-- **Rejeitar**: \`aprovar_gate(acao: "rejeitar", ...)\`
+- **Para aprovar e avançar**: Diga "aprovar o gate"
+- **Para corrigir primeiro**: Siga as instruções acima e re-submeta
 
 > ⚠️ A IA NÃO pode aprovar automaticamente. Aguarde a decisão do usuário.
 `,
@@ -460,32 +476,45 @@ Carregue e leia a skill antes de gerar o entregável:
         qualityScore = calcularQualityScore(estruturaResult, gateResultado);
     }
 
-    // Score < 50: BLOQUEAR
+    // Score < 50: BLOQUEAR com instruções detalhadas de correção
     if (qualityScore < 50) {
+        const ideParaBloqueio = detectIDE(diretorio) || 'windsurf';
+        const feedbackBloqueio = gerarInstrucaoCorrecao(
+            faseAtual.nome,
+            qualityScore,
+            gateResultado.itens_validados || [],
+            gateResultado.itens_pendentes || [],
+            gateResultado.sugestoes || [],
+            estruturaResult.secoes_faltando || [],
+            ideParaBloqueio
+        );
+
+        // Feedback de leitura do disco
+        const feedbackLeituraBloqueio = entregavelLidoDoDisco && caminhoResolvido
+            ? `> 📄 **Entregável lido de:** \`${caminhoResolvido}\`\n\n`
+            : !caminhoResolvido && faseAtualInfo
+                ? `> ⚠️ **Arquivo não encontrado no disco.** O conteúdo foi recebido via argumento.\n\n`
+                : "";
+
         return {
             content: [{
                 type: "text",
                 text: `# ❌ Entregável Bloqueado
 
-## Score: ${qualityScore}/100 - Abaixo do mínimo (50)
+${feedbackLeituraBloqueio}## Score: ${qualityScore}/100 - Abaixo do mínimo (50)
 
 O entregável não atende aos requisitos mínimos de qualidade.
 
-### Problemas Encontrados
-
-${estruturaResult.feedback.join("\n")}
-
-### Checklist Pendente
-${gateResultado.itens_pendentes.map((item, i) => `- ${item}\n  💡 ${gateResultado.sugestoes[i]}`).join("\n")}
+${feedbackBloqueio}
 
 ---
 
-**Não é possível avançar.** Corrija os itens acima e tente novamente.`,
+**Não é possível avançar.** Corrija os itens acima, salve o arquivo e tente novamente com \`executar({ acao: "avancar" })\`.`,
             }],
         };
     }
 
-    // Score 50-69: Bloquear e aguardar aprovação do usuário
+    // Score 50-69: Bloquear e aguardar aprovação do usuário (com instruções detalhadas)
     if (qualityScore < 70) {
         // Setar flag de bloqueio no estado
         estado.aguardando_aprovacao = true;
@@ -502,19 +531,35 @@ ${gateResultado.itens_pendentes.map((item, i) => `- ${item}\n  💡 ${gateResult
             console.error('[proximo] Erro ao salvar estado bloqueado:', err);
         }
 
+        // v5.5.0: Feedback instrutor com templates e checklists
+        const ideParaAprovacao = detectIDE(diretorio) || 'windsurf';
+        const feedbackAprovacao = gerarInstrucaoCorrecao(
+            faseAtual.nome,
+            qualityScore,
+            gateResultado.itens_validados || [],
+            gateResultado.itens_pendentes || [],
+            gateResultado.sugestoes || [],
+            estruturaResult.secoes_faltando || [],
+            ideParaAprovacao
+        );
+
+        // Feedback de leitura do disco
+        const feedbackLeituraAprovacao = entregavelLidoDoDisco && caminhoResolvido
+            ? `> 📄 **Entregável lido de:** \`${caminhoResolvido}\`\n\n`
+            : !caminhoResolvido && faseAtualInfo
+                ? `> ⚠️ **Arquivo não encontrado no disco.** O conteúdo foi recebido via argumento.\n\n`
+                : "";
+
         return {
             content: [{
                 type: "text",
                 text: `# ⚠️ Aprovação do Usuário Necessária
 
-## Score: ${qualityScore}/100 - Abaixo do mínimo recomendado (70)
+${feedbackLeituraAprovacao}## Score: ${qualityScore}/100 - Abaixo do mínimo recomendado (70)
 
-O entregável tem qualidade abaixo do ideal.
+O entregável tem qualidade abaixo do ideal mas pode ser melhorado.
 
-### Itens Pendentes
-
-${estruturaResult.secoes_faltando.length > 0 ? `**Seções faltando:**\n${estruturaResult.secoes_faltando.map((s: string) => `- ${s}`).join("\n")}\n` : ""}
-${gateResultado.itens_pendentes.length > 0 ? `**Checklist pendente:**\n${gateResultado.itens_pendentes.map((item: string) => `- ${item}`).join("\n")}` : ""}
+${feedbackAprovacao}
 
 ---
 
@@ -522,8 +567,8 @@ ${gateResultado.itens_pendentes.length > 0 ? `**Checklist pendente:**\n${gateRes
 
 O projeto foi **bloqueado** aguardando decisão do usuário:
 
-- **Para aprovar**: O usuário deve pedir para aprovar o gate
-- **Para corrigir**: O usuário deve pedir para rejeitar e corrigir o entregável
+- **Para corrigir** (recomendado): Siga as instruções acima, edite o arquivo e re-submeta com \`executar({ acao: "avancar" })\`
+- **Para aprovar mesmo assim**: Diga "aprovar o gate"
 
 > ⚠️ **CRÍTICO**: A IA NÃO pode aprovar automaticamente.
 > Aguarde a decisão explícita do usuário humano.

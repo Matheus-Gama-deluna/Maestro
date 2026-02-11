@@ -16,7 +16,7 @@ export function gerarInstrucaoRecursos(
     ide?: IDEType
 ): string {
     const skillNome = getSkillParaFase(faseNome);
-    
+
     if (!skillNome) {
         return `
 ---
@@ -26,7 +26,7 @@ export function gerarInstrucaoRecursos(
 Fase **${faseNome}** não possui skill associada.
 `;
     }
-    
+
     const ideUsada = ide || 'windsurf';
     const skillPath = getSkillResourcePath(skillNome, 'reference', ideUsada);
     const templatesPath = getSkillResourcePath(skillNome, 'templates', ideUsada);
@@ -71,7 +71,7 @@ export function gerarInstrucaoRecursosCompacta(
     ide?: IDEType
 ): string {
     const skillNome = getSkillParaFase(faseNome);
-    
+
     if (!skillNome) {
         return `
 ---
@@ -81,7 +81,7 @@ export function gerarInstrucaoRecursosCompacta(
 Fase **${faseNome}** não possui skill associada.
 `;
     }
-    
+
     const ideUsada = ide || 'windsurf';
     const skillPath = getSkillResourcePath(skillNome, 'reference', ideUsada);
     const templatesPath = getSkillResourcePath(skillNome, 'templates', ideUsada);
@@ -109,7 +109,7 @@ export function gerarInstrucaoProximaFase(
     ide?: IDEType
 ): string {
     const skillNome = getSkillParaFase(faseNome);
-    
+
     if (!skillNome) {
         return `
 ---
@@ -119,7 +119,7 @@ export function gerarInstrucaoProximaFase(
 Fase não possui skill associada.
 `;
     }
-    
+
     const ideUsada = ide || 'windsurf';
     const skillPath = getSkillResourcePath(skillNome, 'reference', ideUsada);
     const templatesPath = getSkillResourcePath(skillNome, 'templates', ideUsada);
@@ -137,3 +137,88 @@ Antes de começar, você **DEVE** ler os recursos:
 > ⛔ **NÃO PULE** a leitura dos recursos!
 `;
 }
+
+/**
+ * Gera instrução detalhada de correção quando validação falha
+ * Inclui paths de templates, checklists e instruções de como melhorar
+ */
+export function gerarInstrucaoCorrecao(
+    faseNome: string,
+    qualityScore: number,
+    itensAprovados: string[],
+    itensPendentes: string[],
+    sugestoes: string[],
+    secoesFaltando: string[],
+    ide?: IDEType
+): string {
+    const skillNome = getSkillParaFase(faseNome);
+    const ideUsada = ide || 'windsurf';
+
+    // Seção de itens aprovados
+    const aprovadosSection = itensAprovados.length > 0
+        ? `### ✅ Itens Aprovados (${itensAprovados.length})\n${itensAprovados.map(i => `- ✅ ${i}`).join("\n")}\n`
+        : "";
+
+    // Seção de itens pendentes com sugestões
+    const pendentesSection = itensPendentes.length > 0
+        ? `### ❌ Itens Pendentes (${itensPendentes.length})\n${itensPendentes.map((item, i) => `- ❌ **${item}**\n  💡 ${sugestoes[i] || `Adicione: ${item}`}`).join("\n")}\n`
+        : "";
+
+    // Seção de seções faltando
+    const secoesSection = secoesFaltando.length > 0
+        ? `### 📝 Seções Faltando no Documento\n${secoesFaltando.map(s => `- 📝 **${s}** — Adicione esta seção ao entregável`).join("\n")}\n`
+        : "";
+
+    // Seção de recursos da skill (templates/checklists)
+    let recursosSection = "";
+    if (skillNome) {
+        const skillPath = getSkillResourcePath(skillNome, 'reference', ideUsada);
+        const templatesPath = getSkillResourcePath(skillNome, 'templates', ideUsada);
+        const checklistPath = getSkillResourcePath(skillNome, 'checklists', ideUsada);
+
+        recursosSection = `
+---
+
+## 📚 Recursos Para Correção
+
+**Consulte esses arquivos para saber EXATAMENTE o que incluir:**
+
+1. **Template do entregável** (estrutura completa):
+   \`${templatesPath}\`
+   → Use como referência para as seções obrigatórias
+
+2. **Checklist de validação** (critérios de aprovação):
+   \`${checklistPath}\`
+   → Cada item precisa estar presente no entregável
+
+3. **SKILL.md** (instruções do especialista):
+   \`${skillPath}SKILL.md\`
+   → Siga os princípios e perguntas do especialista
+`;
+    }
+
+    // Instrução de como corrigir
+    const instrucaoCorrecao = `
+---
+
+## 🔄 Como Corrigir
+
+1. **Leia o template** → Veja quais seções estão faltando
+2. **Leia o checklist** → Veja quais critérios não foram atendidos
+3. **Edite o entregável** → Adicione as seções e conteúdos faltantes
+4. **Salve o arquivo** → No mesmo local no disco
+5. **Re-submeta** → Chame \`executar({ acao: "avancar" })\` novamente
+
+> 💡 **Dica:** Foque nos itens ❌ pendentes listados acima. Cada item precisa estar presente no conteúdo do entregável.
+`;
+
+    return `
+## 📊 Resultado da Validação: ${qualityScore}/100
+
+${aprovadosSection}
+${pendentesSection}
+${secoesSection}
+${recursosSection}
+${instrucaoCorrecao}`;
+}
+
