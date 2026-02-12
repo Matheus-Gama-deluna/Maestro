@@ -1,5 +1,5 @@
 import { join, resolve } from "path";
-import { existsSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
 import { getFase, getFluxo, getFaseComStitch, getFluxoComStitch } from "../flows/types.js";
@@ -25,6 +25,7 @@ import { classificacaoProgressiva } from "../services/classificacao-progressiva.
 import { getSpecialistQuestions } from "../handlers/specialist-phase-handler.js"; // v7.0
 import { resolverPathEntregavel, listarPathsEsperados } from "../utils/entregavel-path.js"; // v5.5.0
 import { readFile } from "fs/promises";
+import { isPrototypePhase } from "../handlers/prototype-phase-handler.js"; // v9.0
 
 interface ProximoArgs {
     entregavel?: string;  // v5.5.0: Opcional - sistema lê do disco automaticamente
@@ -119,6 +120,9 @@ proximo(
     // Obter fase atual para mensagens de erro
     const faseAtualInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
 
+    // v9.0: Fase de prototipagem — entregável é prototipos.md + verificação de HTML na pasta
+    const isProtoPhase = isPrototypePhase(faseAtualInfo?.nome, estado.usar_stitch);
+
     // v5.5.0: Leitura automática do disco
     let entregavel = args.entregavel;
     let entregavelLidoDoDisco = false;
@@ -130,22 +134,84 @@ proximo(
 
     if (!entregavel || entregavel.trim().length < TAMANHO_MINIMO_CONTEUDO_REAL) {
         if (faseAtualInfo) {
-            // Tentar resolver path do entregável
-            caminhoResolvido = resolverPathEntregavel(
-                diretorio,
-                estado.fase_atual,
-                faseAtualInfo,
-                estado
-            );
-
-            if (caminhoResolvido) {
-                try {
-                    entregavel = await readFile(caminhoResolvido, 'utf-8');
-                    entregavelLidoDoDisco = true;
-                } catch (err) {
-                    // Erro ao ler arquivo, continua com validação abaixo
+            // v9.0: Para fase de prototipagem, tentar ler prototipos/prototipos.md
+            if (isProtoPhase) {
+                const protoSummaryPath = join(diretorio, 'prototipos', 'prototipos.md');
+                if (existsSync(protoSummaryPath)) {
+                    try {
+                        entregavel = await readFile(protoSummaryPath, 'utf-8');
+                        entregavelLidoDoDisco = true;
+                        caminhoResolvido = protoSummaryPath;
+                    } catch { /* ignore */ }
                 }
             }
+
+            if (!entregavel || entregavel.trim().length < TAMANHO_MINIMO_CONTEUDO_REAL) {
+                // Tentar resolver path do entregável
+                caminhoResolvido = resolverPathEntregavel(
+                    diretorio,
+                    estado.fase_atual,
+                    faseAtualInfo,
+                    estado
+                );
+
+                if (caminhoResolvido) {
+                    try {
+                        entregavel = await readFile(caminhoResolvido, 'utf-8');
+                        entregavelLidoDoDisco = true;
+                    } catch (err) {
+                        // Erro ao ler arquivo, continua com validação abaixo
+                    }
+                }
+            }
+        }
+    }
+
+    // v9.0: Para fase de prototipagem, verificar se há HTML na pasta prototipos/
+    if (isProtoPhase) {
+        const protoDir = join(diretorio, 'prototipos');
+        let htmlFiles: string[] = [];
+        if (existsSync(protoDir)) {
+            try {
+                const allFiles = readdirSync(protoDir, { recursive: true }) as string[];
+                htmlFiles = allFiles.filter(f => {
+                    const ext = String(f).toLowerCase();
+                    return ext.endsWith('.html') || ext.endsWith('.htm');
+                }).map(String);
+            } catch { /* ignore */ }
+        }
+
+        if (htmlFiles.length === 0) {
+            return {
+                content: [{
+                    type: "text",
+                    text: `# ❌ Protótipos HTML Não Encontrados
+
+A fase de Prototipagem requer que os arquivos HTML exportados do Google Stitch estejam na pasta \`prototipos/\`.
+
+## 📁 Pasta verificada
+\`${protoDir}\`
+
+## ⚡ AÇÃO OBRIGATÓRIA
+
+1. Acesse **stitch.withgoogle.com**
+2. Use os prompts de \`prototipos/stitch-prompts.md\`
+3. Exporte os protótipos como HTML
+4. Coloque os arquivos \`.html\` na pasta \`prototipos/\`
+5. Depois execute: \`executar({acao: "avancar"})\`
+
+> ⛔ A fase **só será concluída** quando os arquivos HTML estiverem na pasta.
+`,
+                }],
+                isError: true,
+            };
+        }
+
+        // Se tem HTML mas não tem entregável markdown, gerar um resumo automático
+        if (!entregavel || entregavel.trim().length < TAMANHO_MINIMO_CONTEUDO_REAL) {
+            entregavel = `# Protótipos — Fase de Prototipagem\n\n## Arquivos HTML\n\n${htmlFiles.map(f => `- \`${f}\``).join('\n')}\n\n## Total: ${htmlFiles.length} protótipo(s)\n`;
+            entregavelLidoDoDisco = false;
+            caminhoResolvido = null;
         }
     }
 

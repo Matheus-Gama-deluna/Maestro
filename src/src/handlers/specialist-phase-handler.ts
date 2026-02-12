@@ -1066,45 +1066,45 @@ Como Especialista de Arquitetura, preciso entender suas preferências e restriç
 
 Como Especialista de Prototipagem, vou transformar o Design Doc aprovado em protótipos interativos usando Google Stitch.
 
-### 📋 Processo de 4 Etapas
+### 📋 Processo de 5 Etapas
 
-**Etapa 1 — Análise (15 min)**
-Vou revisar o Design Doc para identificar:
-- Componentes de UI necessários (navigation, data display, inputs, feedback, layout)
+**Etapa 1 — Análise** *(automática)*
+O sistema analisa o Design Doc e mapeia:
+- Componentes de UI necessários
 - Fluxos de interação principais
-- Design System definido (cores, tipografia, espaçamento)
-- Prioridades de prototipagem
+- Design System definido
 
-**Etapa 2 — Geração de Prompts (20 min)**
-Vou criar prompts otimizados para o Google Stitch incluindo:
-- Contexto completo do projeto
-- Referência ao Design System
-- Especificações de responsividade
-- Interações e estados dos componentes
+**Etapa 2 — Geração de Prompts** *(automática)*
+O sistema gera prompts otimizados e salva em:
+📁 \`prototipos/stitch-prompts.md\`
 
-**Etapa 3 — Prototipagem no Stitch (30 min)**
-Você vai usar os prompts gerados no stitch.withgoogle.com:
-- Inserir cada prompt no Stitch
-- Iterar até obter componentes funcionais
-- Exportar código HTML/CSS ou React
+**Etapa 3 — Prototipagem no Stitch** *(usuário)*
+Você usa os prompts no stitch.withgoogle.com:
+1. Copie cada prompt do arquivo gerado
+2. Cole no Google Stitch
+3. Itere até obter o resultado desejado
+4. **Exporte o código HTML**
+5. **Salve os arquivos .html na pasta \`prototipos/\`**
 
-**Etapa 4 — Validação (20 min)**
-Vamos validar o protótipo contra o checklist:
-- Componentes presentes e funcionais
-- Aderência ao Design System
-- Fluxos de navegação corretos
-- Código exportado e organizado
+**Etapa 4 — Validação HTML** *(automática)*
+O sistema valida os arquivos HTML na pasta:
+- Estrutura HTML válida
+- Conteúdo mínimo
+- Score >= 50 para aprovação
+
+**Etapa 5 — Aprovação**
+Protótipos validados → próxima fase
 
 ### ⚠️ IMPORTANTE
-- **NÃO** vou pedir decisões de stack tecnológica — isso é da fase de Arquitetura
-- **NÃO** vou pedir decisões de infraestrutura — isso é da fase de Arquitetura
-- Meu foco é **100% visual**: transformar o Design Doc em protótipos funcionais
+- **NÃO** peça decisões de stack tecnológica — isso é da fase de Arquitetura
+- **NÃO** peça decisões de infraestrutura — isso é da fase de Arquitetura
+- Foco é **100% visual**: transformar o Design Doc em protótipos funcionais
+- A fase **só será concluída** quando os arquivos HTML estiverem na pasta \`prototipos/\`
 
 ### 🎯 Para começar, preciso saber:
-1. O Design Doc da fase anterior foi aprovado? (necessário como base)
-2. Qual Design System foi definido? (Material, Ant Design, Chakra UI, Custom)
-3. Quais são as 3-5 telas mais importantes para prototipar primeiro?
-4. Tem preferência de tema? (light/dark)
+1. Qual Design System usar? (Material, Ant Design, Chakra UI, Custom)
+2. Quais são as 3-5 telas mais importantes para prototipar primeiro?
+3. Tem preferência de tema? (light/dark)
 
 > 💡 Acesse stitch.withgoogle.com para usar os prompts que vou gerar. O Stitch é gratuito e gera interfaces com código exportável.
 `;

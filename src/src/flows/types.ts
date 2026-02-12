@@ -444,11 +444,11 @@ const FASE_STITCH: Fase = {
     template: "prototipo-stitch",
     skill: "specialist-prototipagem-stitch",
     gate_checklist: [
-        "Design Doc aprovado como base para prototipagem",
-        "Prompts para Stitch gerados com base no estilo definido",
-        "Protótipos testados no stitch.withgoogle.com",
-        "Código HTML/CSS exportado e salvo em docs/03-ux/stitch-output/",
-        "Assets (imagens/ícones) salvos em docs/03-ux/stitch-output/assets/",
+        "Design Doc da fase anterior analisado e componentes mapeados",
+        "Prompts otimizados para Google Stitch gerados e salvos em prototipos/stitch-prompts.md",
+        "Protótipos criados no stitch.withgoogle.com usando os prompts gerados",
+        "Arquivos HTML exportados do Stitch e salvos na pasta prototipos/",
+        "Protótipos HTML validados pelo sistema (score >= 50)",
     ],
     entregavel_esperado: "prototipos.md",
 };

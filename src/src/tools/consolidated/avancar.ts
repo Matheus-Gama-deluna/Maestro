@@ -29,6 +29,7 @@ import { determinarTierGate, descreverTier } from "../../gates/tiers.js";
 import { getSpecialistPersona } from "../../services/specialist.service.js";
 import { existsSync, readFileSync } from "fs";
 import { saveFile } from "../../utils/persistence.js";
+import { isPrototypePhase } from "../../handlers/prototype-phase-handler.js";
 
 interface AvancarArgs {
     diretorio: string;
@@ -144,6 +145,29 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
                 const estadoFile = serializarEstado(estado);
                 try { await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content); } catch { /* ignore */ }
                 return handleClassificacao(args, estado, diretorio);
+            }
+
+            // v9.0: Detectar fase de prototipagem (Stitch) e delegar para handler dedicado
+            const faseAtualInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
+            if (isPrototypePhase(faseAtualInfo?.nome, estado.usar_stitch)) {
+                try {
+                    const { handlePrototypePhase } = await import("../../handlers/prototype-phase-handler.js");
+                    return handlePrototypePhase({
+                        estado,
+                        diretorio,
+                        respostas: args.respostas,
+                        entregavel: args.entregavel,
+                    });
+                } catch (err) {
+                    return {
+                        content: formatError(
+                            "avancar",
+                            `Erro ao processar fase de prototipagem: ${err instanceof Error ? err.message : String(err)}`,
+                            `Tente novamente com: executar({diretorio: "${diretorio}", acao: "avancar", respostas: {design_system: "...", telas_prioritarias: ["..."]}})`
+                        ),
+                        isError: true,
+                    };
+                }
             }
 
             try {
