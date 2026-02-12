@@ -64,6 +64,18 @@ export const ESTRUTURAS_FASES: EstruturaFase[] = [
     },
     {
         fase: 4,
+        nome: "Prototipagem",
+        tamanho_minimo_por_tier: { essencial: 50, base: 100, avancado: 200 },
+        peso_estrutura: 0.2,
+        secoes: [
+            { header: "^#{1,3}\\s*\\d*\\.?\\s*(prot[oó]tipo|prototype|componente|component|tela|screen)", descricao: "Componentes/Telas Prototipadas" },
+            { header: "^#{1,3}\\s*\\d*\\.?\\s*(fluxo|flow|navega[cç][aã]o|jornada)", descricao: "Fluxos de Navegação", obrigatorio_tier: "base" },
+            { header: "^#{1,3}\\s*\\d*\\.?\\s*(design|estilo|cor|tipografia|visual)", descricao: "Design System/Estilo Visual", obrigatorio_tier: "base" },
+            { header: "^#{1,3}\\s*\\d*\\.?\\s*(html|export|c[oó]digo|stitch|arquivo)", descricao: "Código HTML Exportado" },
+        ],
+    },
+    {
+        fase: 4,
         nome: "Domínio",
         tamanho_minimo_por_tier: { essencial: 50, base: 200, avancado: 300 },
         peso_estrutura: 0.3,
@@ -143,10 +155,18 @@ export const ESTRUTURAS_FASES: EstruturaFase[] = [
 ];
 
 /**
- * Get estrutura for a specific phase
+ * Get estrutura for a specific phase by number
  */
 export function getEstruturaFase(fase: number): EstruturaFase | undefined {
     return ESTRUTURAS_FASES.find(e => e.fase === fase);
+}
+
+/**
+ * Get estrutura for a specific phase by name (necessário para fases dinâmicas como Prototipagem)
+ */
+export function getEstruturaFaseByName(nome: string): EstruturaFase | undefined {
+    const nomeLower = nome.toLowerCase();
+    return ESTRUTURAS_FASES.find(e => e.nome.toLowerCase() === nomeLower);
 }
 
 /**
@@ -160,11 +180,16 @@ function isSecaoObrigatoria(secao: SecaoObrigatoria, tier: TierGate): boolean {
 
 /**
  * Validate estrutura of an entregavel com suporte a tier
+ * @param fase - Número da fase
+ * @param entregavel - Conteúdo do entregável
+ * @param tier - Tier de validação
+ * @param faseNome - Nome da fase (opcional, para fases dinâmicas como Prototipagem)
  */
 export function validarEstrutura(
     fase: number,
     entregavel: string,
-    tier: TierGate = "base"  // Tier para determinar exigências
+    tier: TierGate = "base",
+    faseNome?: string
 ): {
     valido: boolean;
     score: number;
@@ -173,7 +198,8 @@ export function validarEstrutura(
     tamanho_ok: boolean;
     feedback: string[];
 } {
-    const estrutura = getEstruturaFase(fase);
+    // Priorizar busca por nome (para fases dinâmicas como Prototipagem)
+    const estrutura = faseNome ? (getEstruturaFaseByName(faseNome) || getEstruturaFase(fase)) : getEstruturaFase(fase);
 
     if (!estrutura) {
         // Fase sem estrutura definida - aceita qualquer coisa

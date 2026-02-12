@@ -537,7 +537,7 @@ Carregue e leia a skill antes de gerar o entregável:
     } else {
         // Fallback para sistema legado
         usouTemplate = false;
-        estruturaResult = validarEstrutura(estado.fase_atual, entregavelValidado);
+        estruturaResult = validarEstrutura(estado.fase_atual, entregavelValidado, "base", faseAtual.nome);
         gateResultado = validarGate(faseAtual, entregavelValidado);
         qualityScore = calcularQualityScore(estruturaResult, gateResultado);
     }

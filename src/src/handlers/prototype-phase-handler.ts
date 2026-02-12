@@ -111,47 +111,412 @@ function findHtmlFiles(diretorio: string): string[] {
     }
 }
 
-/**
- * Valida os arquivos HTML encontrados
- */
-function validateHtmlFiles(diretorio: string, htmlFiles: string[]): {
-    score: number;
-    details: Array<{ file: string; size: number; hasContent: boolean; hasStructure: boolean }>;
-    summary: string;
-} {
-    const dir = getPrototypeDir(diretorio);
-    const details: Array<{ file: string; size: number; hasContent: boolean; hasStructure: boolean }> = [];
-    let totalScore = 0;
+/** Resultado detalhado de validação por categoria (alinhado ao checklist de 100 pontos) */
+interface ValidationCategoryResult {
+    name: string;
+    maxPoints: number;
+    earnedPoints: number;
+    items: Array<{ name: string; maxPoints: number; earnedPoints: number; status: '✅' | '⚠️' | '❌' }>;
+}
 
+interface DetailedValidationResult {
+    score: number;
+    categories: ValidationCategoryResult[];
+    fileDetails: Array<{ file: string; size: number; hasContent: boolean; hasStructure: boolean; hasCss: boolean }>;
+    summary: string;
+    gaps: string[];
+    strengths: string[];
+}
+
+/**
+ * Analisa um arquivo HTML e retorna métricas detalhadas
+ */
+function analyzeHtmlFile(content: string): {
+    componentCount: number;
+    uniqueClasses: number;
+    hasMediaQueries: boolean;
+    mediaQueryCount: number;
+    hasForms: boolean;
+    formCount: number;
+    hasHoverStates: boolean;
+    hasLoadingStates: boolean;
+    hasErrorStates: boolean;
+    hasDisabledStates: boolean;
+    hasNavigation: boolean;
+    hasButtons: boolean;
+    buttonCount: number;
+    hasInputs: boolean;
+    inputCount: number;
+    hasModals: boolean;
+    hasTables: boolean;
+    hasCards: boolean;
+    hasIcons: boolean;
+    hasAlerts: boolean;
+    hasBadges: boolean;
+    hasTooltips: boolean;
+    hasColorVariables: boolean;
+    hasFontFamily: boolean;
+    hasFontSizes: boolean;
+    hasFlexOrGrid: boolean;
+    hasTransitions: boolean;
+    hasAnimations: boolean;
+    hasAriaAttributes: boolean;
+    linkCount: number;
+    imageCount: number;
+    sectionCount: number;
+    cssSize: number;
+    totalSize: number;
+} {
+    const lower = content.toLowerCase();
+
+    // Componentes
+    const divCount = (content.match(/<div/gi) || []).length;
+    const sectionTags = (content.match(/<(section|article|aside|header|footer|main|nav)/gi) || []).length;
+    const componentCount = divCount + sectionTags;
+
+    // CSS classes
+    const classMatches = content.match(/class="([^"]*)"/gi) || [];
+    const allClasses = classMatches.flatMap(m => (m.match(/class="([^"]*)"/i)?.[1] || '').split(/\s+/));
+    const uniqueClasses = new Set(allClasses.filter(c => c.length > 0)).size;
+
+    // Media queries (responsividade)
+    const mediaQueryMatches = content.match(/@media/gi) || [];
+    const hasMediaQueries = mediaQueryMatches.length > 0;
+    const mediaQueryCount = mediaQueryMatches.length;
+
+    // Forms
+    const formMatches = content.match(/<form/gi) || [];
+    const hasForms = formMatches.length > 0;
+    const formCount = formMatches.length;
+
+    // Estados
+    const hasHoverStates = /:hover/i.test(content);
+    const hasLoadingStates = /loading|spinner|skeleton|shimmer|pulse/i.test(content);
+    const hasErrorStates = /error|invalid|danger|alert-danger|text-red|text-danger/i.test(content);
+    const hasDisabledStates = /disabled|:disabled|opacity.*0\.[3-5]|cursor.*not-allowed/i.test(content);
+
+    // Navegação
+    const hasNavigation = /<nav/i.test(content) || /navbar|sidebar|menu|breadcrumb/i.test(content);
+
+    // Botões
+    const buttonMatches = content.match(/<button/gi) || [];
+    const btnClassMatches = content.match(/class="[^"]*btn[^"]*"/gi) || [];
+    const hasButtons = buttonMatches.length > 0 || btnClassMatches.length > 0;
+    const buttonCount = Math.max(buttonMatches.length, btnClassMatches.length);
+
+    // Inputs
+    const inputMatches = content.match(/<input/gi) || [];
+    const selectMatches = content.match(/<select/gi) || [];
+    const textareaMatches = content.match(/<textarea/gi) || [];
+    const hasInputs = inputMatches.length + selectMatches.length + textareaMatches.length > 0;
+    const inputCount = inputMatches.length + selectMatches.length + textareaMatches.length;
+
+    // Componentes UI
+    const hasModals = /modal|dialog|overlay|backdrop/i.test(content);
+    const hasTables = /<table/i.test(content);
+    const hasCards = /card|panel/i.test(content);
+    const hasIcons = /icon|svg|fa-|material-icons|lucide/i.test(content);
+    const hasAlerts = /alert|notification|toast|snackbar/i.test(content);
+    const hasBadges = /badge|chip|tag|label/i.test(content);
+    const hasTooltips = /tooltip|popover/i.test(content);
+
+    // Design System
+    const hasColorVariables = /--[a-z]+-color|--primary|--secondary|--accent|var\(--/i.test(content);
+    const hasFontFamily = /font-family/i.test(content);
+    const hasFontSizes = /font-size/i.test(content);
+    const hasFlexOrGrid = /display\s*:\s*(flex|grid)/i.test(content);
+    const hasTransitions = /transition/i.test(content);
+    const hasAnimations = /animation|@keyframes/i.test(content);
+
+    // Acessibilidade
+    const hasAriaAttributes = /aria-|role="/i.test(content);
+
+    // Contagens
+    const linkCount = (content.match(/<a\s/gi) || []).length;
+    const imageCount = (content.match(/<img/gi) || []).length;
+    const sectionCount = sectionTags;
+
+    // CSS size
+    const styleBlocks = content.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || [];
+    const cssSize = styleBlocks.reduce((acc, block) => acc + block.length, 0);
+
+    return {
+        componentCount, uniqueClasses, hasMediaQueries, mediaQueryCount,
+        hasForms, formCount, hasHoverStates, hasLoadingStates, hasErrorStates,
+        hasDisabledStates, hasNavigation, hasButtons, buttonCount, hasInputs,
+        inputCount, hasModals, hasTables, hasCards, hasIcons, hasAlerts,
+        hasBadges, hasTooltips, hasColorVariables, hasFontFamily, hasFontSizes,
+        hasFlexOrGrid, hasTransitions, hasAnimations, hasAriaAttributes,
+        linkCount, imageCount, sectionCount, cssSize, totalSize: content.length,
+    };
+}
+
+/**
+ * Valida os arquivos HTML com scoring granular alinhado ao checklist (100 pontos)
+ * 
+ * Categorias:
+ * - Componentes: 40 pts (principais 20, design system 10, estados 5, reutilização 5)
+ * - Fluxos: 30 pts (principais 15, navegação 5, feedback visual 5, erros 5)
+ * - Design: 20 pts (cores 5, tipografia 5, espaçamento 5, responsividade 5)
+ * - Qualidade: 10 pts (código exportado 5, feedback stakeholders 3, documentação 2)
+ */
+function validateHtmlFiles(diretorio: string, htmlFiles: string[]): DetailedValidationResult {
+    const dir = getPrototypeDir(diretorio);
+    const fileDetails: DetailedValidationResult['fileDetails'] = [];
+    const allAnalyses: ReturnType<typeof analyzeHtmlFile>[] = [];
+
+    // Analisar cada arquivo
     for (const file of htmlFiles) {
         const fullPath = join(dir, file);
         try {
-            const stat = statSync(fullPath);
             const content = readFileSync(fullPath, 'utf-8');
-            const size = stat.size;
-            const hasContent = content.trim().length > 100;
-            const hasStructure = /<html/i.test(content) || /<div/i.test(content) || /<body/i.test(content);
-
-            let fileScore = 0;
-            if (hasContent) fileScore += 50;
-            if (hasStructure) fileScore += 30;
-            if (size > 500) fileScore += 10;
-            if (/<style/i.test(content) || /class="/i.test(content)) fileScore += 10;
-
-            totalScore += fileScore;
-            details.push({ file, size, hasContent, hasStructure });
+            const stat = statSync(fullPath);
+            const analysis = analyzeHtmlFile(content);
+            allAnalyses.push(analysis);
+            fileDetails.push({
+                file,
+                size: stat.size,
+                hasContent: content.trim().length > 100,
+                hasStructure: /<html/i.test(content) || /<div/i.test(content) || /<body/i.test(content),
+                hasCss: /<style/i.test(content) || /class="/i.test(content),
+            });
         } catch {
-            details.push({ file, size: 0, hasContent: false, hasStructure: false });
+            fileDetails.push({ file, size: 0, hasContent: false, hasStructure: false, hasCss: false });
         }
     }
 
-    const avgScore = htmlFiles.length > 0 ? Math.round(totalScore / htmlFiles.length) : 0;
+    if (allAnalyses.length === 0) {
+        return {
+            score: 0,
+            categories: [],
+            fileDetails,
+            summary: '❌ Nenhum arquivo HTML válido encontrado',
+            gaps: ['Nenhum arquivo HTML válido na pasta prototipos/'],
+            strengths: [],
+        };
+    }
 
-    const summary = details.map(d =>
-        `${d.hasContent && d.hasStructure ? '✅' : d.hasContent ? '⚠️' : '❌'} **${d.file}** — ${formatSize(d.size)}${d.hasStructure ? '' : ' (sem estrutura HTML válida)'}`
+    // Agregar métricas de todos os arquivos
+    const totalComponents = allAnalyses.reduce((s, a) => s + a.componentCount, 0);
+    const totalUniqueClasses = allAnalyses.reduce((s, a) => s + a.uniqueClasses, 0);
+    const totalButtons = allAnalyses.reduce((s, a) => s + a.buttonCount, 0);
+    const totalInputs = allAnalyses.reduce((s, a) => s + a.inputCount, 0);
+    const totalLinks = allAnalyses.reduce((s, a) => s + a.linkCount, 0);
+    const totalCssSize = allAnalyses.reduce((s, a) => s + a.cssSize, 0);
+    const anyHasNav = allAnalyses.some(a => a.hasNavigation);
+    const anyHasForms = allAnalyses.some(a => a.hasForms);
+    const anyHasModals = allAnalyses.some(a => a.hasModals);
+    const anyHasTables = allAnalyses.some(a => a.hasTables);
+    const anyHasCards = allAnalyses.some(a => a.hasCards);
+    const anyHasIcons = allAnalyses.some(a => a.hasIcons);
+    const anyHasAlerts = allAnalyses.some(a => a.hasAlerts);
+    const anyHasBadges = allAnalyses.some(a => a.hasBadges);
+    const anyHasTooltips = allAnalyses.some(a => a.hasTooltips);
+    const anyHasHover = allAnalyses.some(a => a.hasHoverStates);
+    const anyHasLoading = allAnalyses.some(a => a.hasLoadingStates);
+    const anyHasError = allAnalyses.some(a => a.hasErrorStates);
+    const anyHasDisabled = allAnalyses.some(a => a.hasDisabledStates);
+    const anyHasMediaQueries = allAnalyses.some(a => a.hasMediaQueries);
+    const totalMediaQueries = allAnalyses.reduce((s, a) => s + a.mediaQueryCount, 0);
+    const anyHasColorVars = allAnalyses.some(a => a.hasColorVariables);
+    const anyHasFontFamily = allAnalyses.some(a => a.hasFontFamily);
+    const anyHasFontSizes = allAnalyses.some(a => a.hasFontSizes);
+    const anyHasFlexGrid = allAnalyses.some(a => a.hasFlexOrGrid);
+    const anyHasTransitions = allAnalyses.some(a => a.hasTransitions);
+    const anyHasAnimations = allAnalyses.some(a => a.hasAnimations);
+    const anyHasAria = allAnalyses.some(a => a.hasAriaAttributes);
+
+    // Contar tipos de componentes UI presentes
+    const uiComponentTypes = [anyHasNav, anyHasForms, anyHasModals, anyHasTables, anyHasCards,
+        anyHasIcons, anyHasAlerts, anyHasBadges, anyHasTooltips,
+        totalButtons > 0, totalInputs > 0].filter(Boolean).length;
+
+    // === CATEGORIA 1: COMPONENTES (40 pontos) ===
+    // 1.1 Componentes principais presentes (20 pts)
+    let componentScore = 0;
+    if (totalComponents >= 30 && uiComponentTypes >= 6) componentScore = 20;
+    else if (totalComponents >= 20 && uiComponentTypes >= 4) componentScore = 15;
+    else if (totalComponents >= 10 && uiComponentTypes >= 3) componentScore = 10;
+    else if (totalComponents >= 5) componentScore = 5;
+
+    // 1.2 Design System aderência (10 pts)
+    let dsScore = 0;
+    if (anyHasColorVars) dsScore += 3;
+    if (anyHasFontFamily) dsScore += 2;
+    if (anyHasFontSizes) dsScore += 2;
+    if (totalUniqueClasses >= 20) dsScore += 3;
+    else if (totalUniqueClasses >= 10) dsScore += 2;
+    else if (totalUniqueClasses >= 5) dsScore += 1;
+    dsScore = Math.min(dsScore, 10);
+
+    // 1.3 Estados implementados (5 pts)
+    let statesScore = 0;
+    const stateCount = [anyHasHover, anyHasLoading, anyHasError, anyHasDisabled].filter(Boolean).length;
+    if (stateCount >= 4) statesScore = 5;
+    else if (stateCount >= 2) statesScore = 3;
+    else if (stateCount >= 1) statesScore = 1;
+
+    // 1.4 Reutilização (5 pts)
+    let reuseScore = 0;
+    if (totalUniqueClasses >= 30 && allAnalyses.length >= 3) reuseScore = 5;
+    else if (totalUniqueClasses >= 15 && allAnalyses.length >= 2) reuseScore = 3;
+    else if (totalUniqueClasses >= 5) reuseScore = 1;
+
+    const componentsCategory: ValidationCategoryResult = {
+        name: 'Componentes',
+        maxPoints: 40,
+        earnedPoints: componentScore + dsScore + statesScore + reuseScore,
+        items: [
+            { name: 'Componentes principais presentes', maxPoints: 20, earnedPoints: componentScore, status: componentScore >= 15 ? '✅' : componentScore >= 10 ? '⚠️' : '❌' },
+            { name: 'Design System aderência', maxPoints: 10, earnedPoints: dsScore, status: dsScore >= 7 ? '✅' : dsScore >= 5 ? '⚠️' : '❌' },
+            { name: 'Estados implementados', maxPoints: 5, earnedPoints: statesScore, status: statesScore >= 3 ? '✅' : statesScore >= 1 ? '⚠️' : '❌' },
+            { name: 'Reutilização', maxPoints: 5, earnedPoints: reuseScore, status: reuseScore >= 3 ? '✅' : reuseScore >= 1 ? '⚠️' : '❌' },
+        ],
+    };
+
+    // === CATEGORIA 2: FLUXOS (30 pontos) ===
+    // 2.1 Fluxos principais (15 pts)
+    let flowScore = 0;
+    const hasMultiplePages = allAnalyses.length >= 3;
+    const hasInteractivity = totalButtons > 0 && totalLinks > 0;
+    if (hasMultiplePages && hasInteractivity && anyHasForms) flowScore = 15;
+    else if (hasMultiplePages && hasInteractivity) flowScore = 10;
+    else if (allAnalyses.length >= 2 && (totalButtons > 0 || totalLinks > 0)) flowScore = 7;
+    else if (allAnalyses.length >= 1) flowScore = 3;
+
+    // 2.2 Navegação (5 pts)
+    let navScore = 0;
+    if (anyHasNav && totalLinks >= 5) navScore = 5;
+    else if (anyHasNav || totalLinks >= 3) navScore = 3;
+    else if (totalLinks >= 1) navScore = 1;
+
+    // 2.3 Feedback visual (5 pts)
+    let feedbackScore = 0;
+    const feedbackElements = [anyHasLoading, anyHasAlerts, anyHasTransitions, anyHasAnimations].filter(Boolean).length;
+    if (feedbackElements >= 3) feedbackScore = 5;
+    else if (feedbackElements >= 2) feedbackScore = 3;
+    else if (feedbackElements >= 1) feedbackScore = 1;
+
+    // 2.4 Tratamento de erros (5 pts)
+    let errorScore = 0;
+    if (anyHasError && anyHasForms && anyHasAlerts) errorScore = 5;
+    else if (anyHasError && (anyHasForms || anyHasAlerts)) errorScore = 3;
+    else if (anyHasError) errorScore = 1;
+
+    const flowsCategory: ValidationCategoryResult = {
+        name: 'Fluxos',
+        maxPoints: 30,
+        earnedPoints: flowScore + navScore + feedbackScore + errorScore,
+        items: [
+            { name: 'Fluxos principais funcionam', maxPoints: 15, earnedPoints: flowScore, status: flowScore >= 10 ? '✅' : flowScore >= 7 ? '⚠️' : '❌' },
+            { name: 'Navegação intuitiva', maxPoints: 5, earnedPoints: navScore, status: navScore >= 3 ? '✅' : navScore >= 1 ? '⚠️' : '❌' },
+            { name: 'Feedback visual', maxPoints: 5, earnedPoints: feedbackScore, status: feedbackScore >= 3 ? '✅' : feedbackScore >= 1 ? '⚠️' : '❌' },
+            { name: 'Tratamento de erros', maxPoints: 5, earnedPoints: errorScore, status: errorScore >= 3 ? '✅' : errorScore >= 1 ? '⚠️' : '❌' },
+        ],
+    };
+
+    // === CATEGORIA 3: DESIGN (20 pontos) ===
+    // 3.1 Cores (5 pts)
+    let colorScore = 0;
+    if (anyHasColorVars && totalCssSize > 500) colorScore = 5;
+    else if (totalCssSize > 300) colorScore = 3;
+    else if (totalCssSize > 100) colorScore = 1;
+
+    // 3.2 Tipografia (5 pts)
+    let typoScore = 0;
+    if (anyHasFontFamily && anyHasFontSizes) typoScore = 5;
+    else if (anyHasFontFamily || anyHasFontSizes) typoScore = 3;
+    else if (totalCssSize > 200) typoScore = 1;
+
+    // 3.3 Espaçamento (5 pts)
+    let spacingScore = 0;
+    if (anyHasFlexGrid && totalUniqueClasses >= 15) spacingScore = 5;
+    else if (anyHasFlexGrid || totalUniqueClasses >= 10) spacingScore = 3;
+    else if (totalCssSize > 100) spacingScore = 1;
+
+    // 3.4 Responsividade (5 pts)
+    let responsiveScore = 0;
+    if (totalMediaQueries >= 3) responsiveScore = 5;
+    else if (totalMediaQueries >= 2) responsiveScore = 3;
+    else if (anyHasMediaQueries) responsiveScore = 1;
+
+    const designCategory: ValidationCategoryResult = {
+        name: 'Design',
+        maxPoints: 20,
+        earnedPoints: colorScore + typoScore + spacingScore + responsiveScore,
+        items: [
+            { name: 'Cores do Design System', maxPoints: 5, earnedPoints: colorScore, status: colorScore >= 3 ? '✅' : colorScore >= 1 ? '⚠️' : '❌' },
+            { name: 'Tipografia consistente', maxPoints: 5, earnedPoints: typoScore, status: typoScore >= 3 ? '✅' : typoScore >= 1 ? '⚠️' : '❌' },
+            { name: 'Espaçamento uniforme', maxPoints: 5, earnedPoints: spacingScore, status: spacingScore >= 3 ? '✅' : spacingScore >= 1 ? '⚠️' : '❌' },
+            { name: 'Responsividade', maxPoints: 5, earnedPoints: responsiveScore, status: responsiveScore >= 3 ? '✅' : responsiveScore >= 1 ? '⚠️' : '❌' },
+        ],
+    };
+
+    // === CATEGORIA 4: QUALIDADE (10 pontos) ===
+    // 4.1 Código exportado (5 pts)
+    let codeScore = 0;
+    const allHaveContent = fileDetails.every(f => f.hasContent && f.hasStructure);
+    const allHaveCss = fileDetails.every(f => f.hasCss);
+    if (allHaveContent && allHaveCss && allAnalyses.length >= 3) codeScore = 5;
+    else if (allHaveContent && allHaveCss) codeScore = 3;
+    else if (allHaveContent) codeScore = 1;
+
+    // 4.2 Feedback stakeholders (3 pts) — verificar se existe documento de feedback
+    let feedbackStakeholderScore = 0;
+    const feedbackDocPath = join(diretorio, 'prototipos', 'feedback-stakeholders.md');
+    const validationDocPath = getValidationFilePath(diretorio);
+    if (existsSync(feedbackDocPath)) feedbackStakeholderScore = 3;
+    else if (existsSync(validationDocPath)) feedbackStakeholderScore = 1;
+
+    // 4.3 Documentação (2 pts) — verificar se existe prototipos.md
+    let docScore = 0;
+    const protoDocPath = join(diretorio, 'prototipos', 'prototipos.md');
+    const promptsPath = getPromptsFilePath(diretorio);
+    if (existsSync(protoDocPath) && existsSync(promptsPath)) docScore = 2;
+    else if (existsSync(protoDocPath) || existsSync(promptsPath)) docScore = 1;
+
+    const qualityCategory: ValidationCategoryResult = {
+        name: 'Qualidade',
+        maxPoints: 10,
+        earnedPoints: codeScore + feedbackStakeholderScore + docScore,
+        items: [
+            { name: 'Código exportado disponível', maxPoints: 5, earnedPoints: codeScore, status: codeScore >= 3 ? '✅' : codeScore >= 1 ? '⚠️' : '❌' },
+            { name: 'Feedback stakeholders', maxPoints: 3, earnedPoints: feedbackStakeholderScore, status: feedbackStakeholderScore >= 2 ? '✅' : feedbackStakeholderScore >= 1 ? '⚠️' : '❌' },
+            { name: 'Documentação completa', maxPoints: 2, earnedPoints: docScore, status: docScore >= 1 ? '✅' : '❌' },
+        ],
+    };
+
+    // === SCORE TOTAL ===
+    const categories = [componentsCategory, flowsCategory, designCategory, qualityCategory];
+    const totalScore = categories.reduce((s, c) => s + c.earnedPoints, 0);
+
+    // Identificar gaps e strengths
+    const gaps: string[] = [];
+    const strengths: string[] = [];
+    for (const cat of categories) {
+        for (const item of cat.items) {
+            if (item.status === '❌') gaps.push(`${item.name} (${item.earnedPoints}/${item.maxPoints})`);            else if (item.status === '⚠️') gaps.push(`${item.name} — pode melhorar (${item.earnedPoints}/${item.maxPoints})`);
+            else strengths.push(`${item.name} (${item.earnedPoints}/${item.maxPoints})`);
+        }
+    }
+
+    // Gerar summary
+    const fileSummary = fileDetails.map(d =>
+        `${d.hasContent && d.hasStructure ? '✅' : d.hasContent ? '⚠️' : '❌'} **${d.file}** — ${formatSize(d.size)}${d.hasCss ? '' : ' (sem CSS)'}${d.hasStructure ? '' : ' (sem estrutura HTML)'}`
     ).join('\n');
 
-    return { score: avgScore, details, summary };
+    const categorySummary = categories.map(c =>
+        `### ${c.name} (${c.earnedPoints}/${c.maxPoints})\n${c.items.map(i => `${i.status} ${i.name}: ${i.earnedPoints}/${i.maxPoints}`).join('\n')}`
+    ).join('\n\n');
+
+    return {
+        score: totalScore,
+        categories,
+        fileDetails,
+        summary: `## 📄 Arquivos\n\n${fileSummary}\n\n## 📊 Detalhamento por Categoria\n\n${categorySummary}`,
+        gaps,
+        strengths,
+    };
 }
 
 function formatSize(bytes: number): string {
@@ -723,9 +1088,74 @@ ${htmlFiles.length > 0 ? `\n### 📄 Arquivos HTML já encontrados:\n${htmlFiles
     };
 }
 
+/** Thresholds alinhados ao checklist stitch-validation.md */
+const SCORE_AUTO_APPROVE = 75;   // >= 75: aprovação automática (Bom/Excelente)
+const SCORE_MANUAL_APPROVE = 60; // 60-74: aprovação manual necessária (Aceitável)
+// < 60: bloqueado (Insuficiente)
+
+/**
+ * Gera instruções de correção específicas baseadas nos gaps identificados
+ */
+function generateCorrectionInstructions(validation: DetailedValidationResult, diretorio: string): string {
+    const ide = 'windsurf'; // fallback
+    const skillDir = `.windsurf/skills/specialist-prototipagem-stitch`;
+
+    const gapInstructions: string[] = [];
+
+    for (const cat of validation.categories) {
+        const lowItems = cat.items.filter(i => i.status === '❌' || i.status === '⚠️');
+        if (lowItems.length === 0) continue;
+
+        gapInstructions.push(`### ${cat.name} (${cat.earnedPoints}/${cat.maxPoints})`);
+        for (const item of lowItems) {
+            const missing = item.maxPoints - item.earnedPoints;
+            gapInstructions.push(`${item.status} **${item.name}**: ${item.earnedPoints}/${item.maxPoints} — faltam **${missing} pontos**`);
+
+            // Instruções específicas por item
+            if (item.name.includes('Componentes principais')) {
+                gapInstructions.push('  → Adicione mais componentes HTML: `<nav>`, `<form>`, `<table>`, cards, modais, ícones');
+            } else if (item.name.includes('Design System')) {
+                gapInstructions.push('  → Use CSS variables (`--primary`, `--secondary`), `font-family`, `font-size`, classes consistentes');
+            } else if (item.name.includes('Estados')) {
+                gapInstructions.push('  → Adicione `:hover`, loading states, error states, `disabled` em botões/inputs');
+            } else if (item.name.includes('Reutilização')) {
+                gapInstructions.push('  → Use classes CSS reutilizáveis em múltiplos arquivos HTML');
+            } else if (item.name.includes('Fluxos principais')) {
+                gapInstructions.push('  → Crie 3+ páginas HTML com botões, links e formulários interconectados');
+            } else if (item.name.includes('Navegação')) {
+                gapInstructions.push('  → Adicione `<nav>` com links entre as páginas do protótipo');
+            } else if (item.name.includes('Feedback visual')) {
+                gapInstructions.push('  → Adicione loading indicators, alertas, transitions CSS, animações');
+            } else if (item.name.includes('Tratamento de erros')) {
+                gapInstructions.push('  → Adicione validação de formulários, mensagens de erro, alertas de erro');
+            } else if (item.name.includes('Cores')) {
+                gapInstructions.push('  → Use CSS variables para cores e aumente o CSS inline (`<style>`)');
+            } else if (item.name.includes('Tipografia')) {
+                gapInstructions.push('  → Defina `font-family` e `font-size` consistentes no CSS');
+            } else if (item.name.includes('Espaçamento')) {
+                gapInstructions.push('  → Use `display: flex` ou `display: grid` para layout estruturado');
+            } else if (item.name.includes('Responsividade')) {
+                gapInstructions.push('  → Adicione `@media` queries para mobile, tablet e desktop (3+ breakpoints)');
+            } else if (item.name.includes('Feedback stakeholders')) {
+                gapInstructions.push(`  → Crie \`prototipos/feedback-stakeholders.md\` com feedback documentado`);
+            } else if (item.name.includes('Documentação')) {
+                gapInstructions.push(`  → Crie \`prototipos/prototipos.md\` com resumo dos protótipos`);
+            }
+        }
+        gapInstructions.push('');
+    }
+
+    return gapInstructions.join('\n');
+}
+
 /**
  * Etapa 4: VALIDATING_HTML
  * Valida os arquivos HTML encontrados na pasta prototipos/
+ * 
+ * Thresholds (alinhados ao checklist stitch-validation.md):
+ * - >= 75: Aprovação automática (Bom/Excelente)
+ * - 60-74: Aprovação manual necessária (Aceitável)
+ * - < 60: Bloqueado (Insuficiente)
  */
 async function handleValidatingHtml(
     args: PrototypePhaseArgs,
@@ -744,7 +1174,7 @@ async function handleValidatingHtml(
         return handleAwaitingHtml(args, sp, data);
     }
 
-    // Validar arquivos
+    // Validar arquivos com scoring granular
     const validation = validateHtmlFiles(diretorio, htmlFiles);
     data.htmlFiles = htmlFiles;
     data.validationScore = validation.score;
@@ -754,8 +1184,11 @@ async function handleValidatingHtml(
     sp.status = 'validating';
     sp.validationScore = validation.score;
 
-    if (validation.score >= 50) {
-        // Aprovado — gerar documento de validação
+    const ide = resolveIDE(estado, diretorio);
+    const skillDir = `${getSkillsDir(ide)}/specialist-prototipagem-stitch`;
+
+    // === SCORE >= 75: APROVAÇÃO AUTOMÁTICA ===
+    if (validation.score >= SCORE_AUTO_APPROVE) {
         data.prototypeStatus = 'approved';
         sp.status = 'approved';
         sp.completedAt = new Date().toISOString();
@@ -773,59 +1206,126 @@ async function handleValidatingHtml(
         return handleApproved(args, sp, data);
     }
 
-    // Score baixo — pedir melhorias
+    // === SCORE 60-74: APROVAÇÃO MANUAL NECESSÁRIA ===
+    if (validation.score >= SCORE_MANUAL_APPROVE) {
+        savePrototypeData(sp.collectedData, data);
+        await persistState(estado, diretorio);
+
+        const correctionInstructions = generateCorrectionInstructions(validation, diretorio);
+        const classification = validation.score >= 70 ? 'Aceitável ⚠️' : 'Aceitável (baixo) ⚠️';
+
+        return {
+            content: formatResponse({
+                titulo: "⚠️ Validação dos Protótipos — Aprovação Manual Necessária",
+                resumo: `Score: ${validation.score}/100 (${classification}). ${htmlFiles.length} arquivo(s). Iteração ${data.iterationCount}. Mínimo para auto-aprovação: ${SCORE_AUTO_APPROVE}.`,
+                dados: {
+                    "Arquivos HTML": String(htmlFiles.length),
+                    "Score": `${validation.score}/100`,
+                    "Classificação": classification,
+                    "Auto-aprovação": `>= ${SCORE_AUTO_APPROVE}`,
+                    "Iteração": String(data.iterationCount),
+                },
+                instrucoes: `${validation.summary}
+
+## � Gaps Identificados
+
+${correctionInstructions}
+
+## ✅ Pontos Fortes
+${validation.strengths.length > 0 ? validation.strengths.map(s => `- ✅ ${s}`).join('\n') : '- Nenhum item com pontuação máxima'}
+
+## 📚 Recursos Para Correção
+- **Template:** \`${skillDir}/resources/templates/prototipo-stitch.md\`
+- **Checklist:** \`${skillDir}/resources/checklists/stitch-validation.md\`
+- **Guia:** \`${skillDir}/SKILL.md\`
+
+## 🔄 Como Corrigir
+1. Leia o checklist → Veja quais critérios não foram atendidos
+2. Edite os arquivos HTML → Adicione os elementos faltantes
+3. Re-submeta → \`executar({acao: "avancar"})\`
+
+## 🔐 Ação do Usuário Necessária
+- **Para corrigir** (recomendado): Siga as instruções acima e re-submeta
+- **Para aprovar mesmo assim**: Diga "aprovar o gate" ou "aprovar protótipos"
+
+> ⚠️ A IA **NÃO** pode aprovar automaticamente. Aguarde a decisão do usuário.
+
+## 📍 Onde Estamos
+✅ Análise → ✅ Geração de Prompts → ✅ Prototipagem no Stitch → 🔄 Validação HTML → ⏳ Aprovação`,
+                proximo_passo: {
+                    tool: "executar",
+                    descricao: "Re-validar após melhorias ou aguardar aprovação manual",
+                    args: `{ "diretorio": "${diretorio}", "acao": "avancar" }`,
+                    requer_input_usuario: true,
+                    prompt_usuario: "Corrija os gaps ou diga 'aprovar o gate' para avançar.",
+                },
+            }),
+            next_action: {
+                tool: "executar",
+                description: "Re-validar após correções ou aguardar aprovação manual",
+                args_template: { diretorio, acao: "avancar" },
+                requires_user_input: true,
+                user_prompt: "Corrija os gaps ou diga 'aprovar o gate' para avançar.",
+            },
+            progress: {
+                current_phase: "prototipagem_validating",
+                total_phases: 5,
+                completed_phases: 3,
+                percentage: 70,
+            },
+        };
+    }
+
+    // === SCORE < 60: BLOQUEADO ===
     savePrototypeData(sp.collectedData, data);
     await persistState(estado, diretorio);
 
+    const correctionInstructions = generateCorrectionInstructions(validation, diretorio);
+
     return {
         content: formatResponse({
-            titulo: "📊 Validação dos Protótipos — Melhorias Necessárias",
-            resumo: `${htmlFiles.length} arquivo(s) HTML encontrado(s). Score: ${validation.score}/100. Iteração ${data.iterationCount}.`,
+            titulo: "❌ Validação dos Protótipos — Bloqueado",
+            resumo: `Score: ${validation.score}/100 (Insuficiente). Mínimo: ${SCORE_MANUAL_APPROVE}. ${htmlFiles.length} arquivo(s). Iteração ${data.iterationCount}.`,
             dados: {
                 "Arquivos HTML": String(htmlFiles.length),
                 "Score": `${validation.score}/100`,
-                "Mínimo": "50/100",
+                "Classificação": "Insuficiente ❌",
+                "Mínimo para aprovação manual": String(SCORE_MANUAL_APPROVE),
+                "Mínimo para auto-aprovação": String(SCORE_AUTO_APPROVE),
                 "Iteração": String(data.iterationCount),
             },
-            instrucoes: `## 📄 Arquivos Encontrados
+            instrucoes: `${validation.summary}
 
-${validation.summary}
+## ❌ Gaps Críticos — Correção Obrigatória
 
-## ⚠️ Melhorias Necessárias
+${correctionInstructions}
 
-Os arquivos HTML precisam de mais conteúdo/estrutura para serem aprovados.
+## 📚 Recursos Para Correção
+- **Template:** \`${skillDir}/resources/templates/prototipo-stitch.md\`
+- **Checklist:** \`${skillDir}/resources/checklists/stitch-validation.md\`
+- **Guia:** \`${skillDir}/SKILL.md\`
 
-### Sugestões:
-- Verifique se os arquivos foram exportados corretamente do Stitch
-- Cada arquivo deve conter HTML válido com tags \`<html>\`, \`<body>\`, \`<div>\`, etc.
-- Inclua CSS inline ou em \`<style>\` para estilização
-- Arquivos muito pequenos (< 500 bytes) indicam export incompleto
+## 🔄 Como Corrigir
+1. **Leia o checklist** → Veja EXATAMENTE quais critérios não foram atendidos
+2. **Edite os arquivos HTML** na pasta \`${PROTOTYPE_OUTPUT_DIR}/\`
+3. **Adicione os elementos faltantes** listados acima
+4. **Re-submeta**: \`executar({acao: "avancar"})\`
 
-### Para corrigir:
-1. Re-exporte os protótipos do Google Stitch
-2. Substitua os arquivos na pasta \`${PROTOTYPE_OUTPUT_DIR}/\`
-3. Execute novamente:
-
-\`\`\`json
-executar({
-    "diretorio": "${diretorio}",
-    "acao": "avancar"
-})
-\`\`\`
+> ⛔ **NÃO é possível aprovar manualmente** com score < ${SCORE_MANUAL_APPROVE}. Corrija os itens acima primeiro.
 
 ## 📍 Onde Estamos
 ✅ Análise → ✅ Geração de Prompts → ✅ Prototipagem no Stitch → 🔄 Validação HTML → ⏳ Aprovação`,
             proximo_passo: {
                 tool: "executar",
-                descricao: "Re-validar após melhorias nos arquivos HTML",
+                descricao: "Re-validar após correções nos arquivos HTML",
                 args: `{ "diretorio": "${diretorio}", "acao": "avancar" }`,
                 requer_input_usuario: true,
-                prompt_usuario: "Corrija os arquivos HTML e avise quando estiverem prontos.",
+                prompt_usuario: "Corrija os arquivos HTML conforme instruções e avise quando prontos.",
             },
         }),
         next_action: {
             tool: "executar",
-            description: "Re-validar arquivos HTML após correções",
+            description: "Re-validar arquivos HTML após correções obrigatórias",
             args_template: { diretorio, acao: "avancar" },
             requires_user_input: true,
             user_prompt: "Corrija os arquivos HTML e avise quando prontos.",
@@ -959,7 +1459,7 @@ function generateValidationDocument(
 
 ## Resumo
 - **Score:** ${validation.score}/100
-- **Arquivos:** ${validation.details.length}
+- **Arquivos:** ${validation.fileDetails.length}
 - **Iterações:** ${data.iterationCount}
 - **Design System:** ${data.designSystem || 'N/A'}
 
@@ -967,7 +1467,7 @@ function generateValidationDocument(
 
 | Arquivo | Tamanho | Conteúdo | Estrutura HTML |
 |---------|---------|----------|----------------|
-${validation.details.map(d => `| ${d.file} | ${formatSize(d.size)} | ${d.hasContent ? '✅' : '❌'} | ${d.hasStructure ? '✅' : '❌'} |`).join('\n')}
+${validation.fileDetails.map((d: { file: string; size: number; hasContent: boolean; hasStructure: boolean; hasCss: boolean }) => `| ${d.file} | ${formatSize(d.size)} | ${d.hasContent ? '✅' : '❌'} | ${d.hasStructure ? '✅' : '❌'} |`).join('\n')}
 
 ## Telas Prototipadas
 ${(data.mappedScreens || []).map((s, i) => `${i + 1}. ${s}`).join('\n') || 'N/A'}

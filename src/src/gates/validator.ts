@@ -151,6 +151,7 @@ function resolverTemplatePath(skillNome: string, faseNome: string, diretorioCont
         "Segurança": "checklist-seguranca.md",
         "Backlog": "backlog.md",
         "Contrato API": "contrato-api.md",
+        "Prototipagem": "prototipo-stitch.md",
     };
     
     const templateFile = templateMap[faseNome];
@@ -226,12 +227,19 @@ function validarGateComChecklist(entregavel: string, checklist: string[]): GateR
 function verificarItem(item: string, entregavel: string): boolean {
     const conteudoLower = entregavel.toLowerCase();
 
-    // Sinônimos por item para matching mais robusto (fase 1 - PRD)
+    // Sinônimos por item para matching mais robusto
     const sinonimos: Record<string, string[][]> = {
+        // Fase 1 - PRD
         "problema claramente definido": [["problema", "problem", "dor", "oportunidade", "pain"]],
         "personas ou usuários identificados": [["persona", "usuário", "usuario", "usuarios", "usuários", "público", "publico", "user"]],
         "funcionalidades mvp listadas": [["funcionalidade", "funcionalidades", "feature", "mvp", "escopo", "solução", "soluçao"]],
         "métricas de sucesso definidas": [["métrica", "metrica", "métricas", "metricas", "kpi", "sucesso", "north star", "indicador"]],
+        // Fase Prototipagem (Stitch)
+        "design doc da fase anterior analisado e componentes mapeados": [["design", "componente", "component", "mapeado", "tela", "screen"]],
+        "prompts otimizados para google stitch gerados e salvos em prototipos/stitch-prompts.md": [["prompt", "stitch", "gerado", "salvo"]],
+        "protótipos criados no stitch.withgoogle.com usando os prompts gerados": [["protótipo", "prototipo", "prototype", "stitch", "criado"]],
+        "arquivos html exportados do stitch e salvos na pasta prototipos/": [["html", "exportado", "arquivo", "prototipos"]],
+        "protótipos html validados pelo sistema (score >= 50)": [["validado", "score", "html", "protótipo", "prototipo"]],
     };
 
     // Tenta match por sinônimos primeiro
