@@ -438,10 +438,10 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
     // v6.0: Montar perguntas condicionais por modo
     const perguntasBalanced = args.modo !== 'economy'
-        ? '\n5. **O que pode dar errado? Quais riscos você vê?** (balanced/quality)\n6. **Em quanto tempo quer lançar a primeira versão?** (balanced/quality)'
+        ? '\n5. **O que pode dar errado? Quais riscos você vê?** (balanced/quality)\n6. **O que torna seu produto diferente dos concorrentes? Qual sua vantagem competitiva?** (balanced/quality)\n7. **Em quanto tempo quer lançar a primeira versão?** (balanced/quality)'
         : '';
     const perguntasQuality = args.modo === 'quality'
-        ? '\n7. **Descreva 2-3 tipos de pessoas que vão usar (nome fictício, cargo, rotina)** (quality)\n8. **Como pretende conseguir os primeiros usuários?** (quality)'
+        ? '\n8. **Descreva 2-3 tipos de pessoas que vão usar (nome fictício, cargo, rotina)** (quality)\n9. **Como pretende conseguir os primeiros usuários?** (quality)'
         : '';
     const stitchNote = args.usar_stitch
         ? '\n> 🎨 **Google Stitch habilitado** - Disponível para prototipagem após UX Design\n'

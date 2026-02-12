@@ -150,7 +150,10 @@ const FASE_PROMPTS_MAP: Record<string, PromptRef[]> = {
         { categoria: "ux", nome: "design-system" }
     ],
     // Fase 4 (Stitch - opcional)
-    "Prototipagem": [],
+    "Prototipagem": [
+        { categoria: "prototipagem", nome: "prompt-stitch" },
+        { categoria: "prototipagem", nome: "prototipo-stitch" }
+    ],
     // Fase 4/5 
     "Modelo de Domínio": [
         { categoria: "arquitetura", nome: "modelo-dominio" },

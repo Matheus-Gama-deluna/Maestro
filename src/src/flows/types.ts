@@ -442,6 +442,7 @@ const FASE_STITCH: Fase = {
     nome: "Prototipagem",
     especialista: "Prototipagem Rápida com Google Stitch",
     template: "prototipo-stitch",
+    skill: "specialist-prototipagem-stitch",
     gate_checklist: [
         "Design Doc aprovado como base para prototipagem",
         "Prompts para Stitch gerados com base no estilo definido",

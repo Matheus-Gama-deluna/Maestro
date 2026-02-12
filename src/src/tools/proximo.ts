@@ -888,7 +888,7 @@ ${classificacaoInfo}
 | **Especialista** | ${proximaFase?.especialista || "-"} |
 | **Entregável** | ${proximaFase?.entregavel_esperado || "-"} |
 
-${getSpecialistQuestions(estado.fase_atual)}
+${getSpecialistQuestions(estado.fase_atual, proximaFase?.nome)}
 
 ## Gate de Saída
 ${proximaFase?.gate_checklist.map(item => `- [ ] ${item}`).join("\n") || "Nenhum"}

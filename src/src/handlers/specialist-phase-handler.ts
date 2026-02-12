@@ -995,10 +995,16 @@ function getFieldsByBlock(mode: string): { block: string; title: string; fields:
 /**
  * Sprint 2 (v7.0): Retorna perguntas técnicas que o especialista deve fazer
  * Distribui perguntas técnicas aos especialistas de cada fase
+ * 
+ * v8.1 FIX: Refatorado para usar nome da fase em vez de número hardcoded.
+ * Quando Stitch está habilitado, fase 4 é Prototipagem (não Arquitetura).
+ * Usar número causava injeção de perguntas de Arquitetura na fase de Prototipagem.
  */
-function getSpecialistQuestions(fase: number): string {
-    if (fase === 2) {
-        // Especialista de Requisitos
+function getSpecialistQuestions(fase: number, faseNome?: string): string {
+    // v8.1: Usar nome da fase quando disponível (mais robusto que número)
+    const nome = faseNome?.toLowerCase() || '';
+
+    if (nome === 'requisitos' || (!faseNome && fase === 2)) {
         return `
 ## 📋 Coleta de Requisitos Técnicos
 
@@ -1028,8 +1034,7 @@ Como Especialista de Requisitos, preciso entender alguns aspectos técnicos para
 `;
     }
 
-    if (fase === 4) {
-        // Especialista de Arquitetura
+    if (nome === 'arquitetura' || nome === 'arquitetura avançada') {
         return `
 ## 🏗️ Decisões de Arquitetura
 
@@ -1052,6 +1057,56 @@ Como Especialista de Arquitetura, preciso entender suas preferências e restriç
 - Precisa de cache? CDN?
 
 > 💡 Se não tiver preferência, posso sugerir a melhor stack baseado nos requisitos já definidos.
+`;
+    }
+
+    if (nome === 'prototipagem') {
+        return `
+## 🎨 Prototipagem Rápida com Google Stitch
+
+Como Especialista de Prototipagem, vou transformar o Design Doc aprovado em protótipos interativos usando Google Stitch.
+
+### 📋 Processo de 4 Etapas
+
+**Etapa 1 — Análise (15 min)**
+Vou revisar o Design Doc para identificar:
+- Componentes de UI necessários (navigation, data display, inputs, feedback, layout)
+- Fluxos de interação principais
+- Design System definido (cores, tipografia, espaçamento)
+- Prioridades de prototipagem
+
+**Etapa 2 — Geração de Prompts (20 min)**
+Vou criar prompts otimizados para o Google Stitch incluindo:
+- Contexto completo do projeto
+- Referência ao Design System
+- Especificações de responsividade
+- Interações e estados dos componentes
+
+**Etapa 3 — Prototipagem no Stitch (30 min)**
+Você vai usar os prompts gerados no stitch.withgoogle.com:
+- Inserir cada prompt no Stitch
+- Iterar até obter componentes funcionais
+- Exportar código HTML/CSS ou React
+
+**Etapa 4 — Validação (20 min)**
+Vamos validar o protótipo contra o checklist:
+- Componentes presentes e funcionais
+- Aderência ao Design System
+- Fluxos de navegação corretos
+- Código exportado e organizado
+
+### ⚠️ IMPORTANTE
+- **NÃO** vou pedir decisões de stack tecnológica — isso é da fase de Arquitetura
+- **NÃO** vou pedir decisões de infraestrutura — isso é da fase de Arquitetura
+- Meu foco é **100% visual**: transformar o Design Doc em protótipos funcionais
+
+### 🎯 Para começar, preciso saber:
+1. O Design Doc da fase anterior foi aprovado? (necessário como base)
+2. Qual Design System foi definido? (Material, Ant Design, Chakra UI, Custom)
+3. Quais são as 3-5 telas mais importantes para prototipar primeiro?
+4. Tem preferência de tema? (light/dark)
+
+> 💡 Acesse stitch.withgoogle.com para usar os prompts que vou gerar. O Stitch é gratuito e gera interfaces com código exportável.
 `;
     }
 

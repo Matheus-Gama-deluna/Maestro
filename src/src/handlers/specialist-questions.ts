@@ -1,10 +1,16 @@
 /**
  * Retorna perguntas técnicas que o especialista deve fazer no início de sua fase
  * Sprint 2: Distribuir perguntas técnicas aos especialistas
+ * 
+ * v8.1 FIX: Refatorado para usar nome da fase em vez de número hardcoded.
+ * Quando Stitch está habilitado, fase 4 é Prototipagem (não Arquitetura).
+ * 
+ * NOTA: Esta é uma versão legada. A versão principal está em specialist-phase-handler.ts.
  */
-function getSpecialistQuestions(fase: number, nivel: string): string {
-    if (fase === 2) {
-        // Especialista de Requisitos
+function getSpecialistQuestions(fase: number, nivel: string, faseNome?: string): string {
+    const nome = faseNome?.toLowerCase() || '';
+
+    if (nome === 'requisitos' || (!faseNome && fase === 2)) {
         return `
 ## 📋 Coleta de Requisitos Técnicos
 
@@ -34,8 +40,7 @@ Como Especialista de Requisitos, preciso entender alguns aspectos técnicos para
 `;
     }
 
-    if (fase === 4) {
-        // Especialista de Arquitetura
+    if (nome === 'arquitetura' || nome === 'arquitetura avançada') {
         return `
 ## 🏗️ Decisões de Arquitetura
 
@@ -58,6 +63,22 @@ Como Especialista de Arquitetura, preciso entender suas preferências e restriç
 - Precisa de cache? CDN?
 
 > 💡 Se não tiver preferência, posso sugerir a melhor stack baseado nos requisitos já definidos.
+`;
+    }
+
+    if (nome === 'prototipagem') {
+        return `
+## 🎨 Prototipagem Rápida com Google Stitch
+
+Como Especialista de Prototipagem, vou transformar o Design Doc aprovado em protótipos interativos usando Google Stitch.
+
+### 🎯 Para começar, preciso saber:
+1. O Design Doc da fase anterior foi aprovado? (necessário como base)
+2. Qual Design System foi definido? (Material, Ant Design, Chakra UI, Custom)
+3. Quais são as 3-5 telas mais importantes para prototipar primeiro?
+4. Tem preferência de tema? (light/dark)
+
+> 💡 Acesse stitch.withgoogle.com para usar os prompts que vou gerar.
 `;
     }
 

@@ -94,6 +94,12 @@ const SPECIALIST_MAP: Record<string, SpecialistPersona> = {
         expertise: ["PRDs", "especificações", "escopo", "métricas de sucesso", "riscos"],
         instructions: "Seja exaustivo nas seções do PRD. Inclua métricas mensuráveis. Defina o que está fora do escopo.",
     },
+    "Prototipagem": {
+        name: "Prototipagem Rápida com Google Stitch",
+        tone: "Visual e iterativo",
+        expertise: ["Google Stitch", "prototipagem rápida", "design system integration", "prompt engineering para UI", "export HTML/CSS/React"],
+        instructions: "Foque em transformar o Design Doc em protótipos visuais usando Google Stitch (stitch.withgoogle.com). Gere prompts otimizados para cada tela/componente. NÃO peça decisões de arquitetura ou stack — isso é responsabilidade da fase seguinte. Priorize: 1) Análise do Design Doc, 2) Geração de prompts para Stitch, 3) Instrução de uso no Stitch, 4) Validação do protótipo com stakeholders.",
+    },
 };
 
 /**
