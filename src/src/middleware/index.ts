@@ -1,15 +1,22 @@
 /**
- * Middleware Pipeline do Maestro v5
+ * Middleware Pipeline do Maestro v6
  * 
- * Composição de middlewares para tools:
- * withErrorHandling → withStateLoad → withFlowEngine → withPersistence → withSkillInjection
+ * v6.0: Pipeline Unificada — TODAS as tools usam applyOrchestrationPipeline
+ * Ordem fixa: Error → State → Flow → Persistence → Skill
+ * 
+ * DEPRECATED: applyMiddlewares, applySmartMiddlewares, applyLightMiddlewares, applyPersistenceMiddlewares
+ * Serão removidos na v7.0
  */
 
+// v6.0: Pipeline Unificada (RECOMENDADO)
+export { applyOrchestrationPipeline, applyLightOrchestrationPipeline } from "./orchestration-pipeline.middleware.js";
+
+// Middlewares individuais (para uso avançado)
 export { withStateLoad } from "./state-loader.middleware.js";
 export { withPersistence } from "./persistence.middleware.js";
 export { withFlowEngine } from "./flow-engine.middleware.js";
 export { withSkillInjection } from "./skill-injection.middleware.js";
-export { withPromptValidation, defaultValidations } from "./validation.middleware.js"; // v6.0
+export { withPromptValidation, defaultValidations } from "./validation.middleware.js";
 
 import { withStateLoad } from "./state-loader.middleware.js";
 import { withPersistence } from "./persistence.middleware.js";
@@ -32,7 +39,12 @@ type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
  * 
  * O handler original executa no centro do pipeline.
  */
+/**
+ * @deprecated v6.0 — Use applyOrchestrationPipeline instead
+ * Será removido na v7.0
+ */
 export function applyMiddlewares(toolName: string, handler: ToolHandler): ToolHandler {
+    console.warn(`[Middleware] DEPRECATED: applyMiddlewares used for ${toolName}. Use applyOrchestrationPipeline.`);
     return withErrorHandling(
         toolName,
         withStateLoad(
@@ -46,10 +58,11 @@ export function applyMiddlewares(toolName: string, handler: ToolHandler): ToolHa
 }
 
 /**
- * Aplica apenas middlewares leves (sem skill injection e sem persistence).
- * Útil para tools que já fazem injeção ativa internamente (proximo, maestro).
+ * @deprecated v6.0 — Use applyOrchestrationPipeline instead
+ * Será removido na v7.0
  */
 export function applyLightMiddlewares(toolName: string, handler: ToolHandler): ToolHandler {
+    console.warn(`[Middleware] DEPRECATED: applyLightMiddlewares used for ${toolName}. Use applyOrchestrationPipeline.`);
     return withErrorHandling(
         toolName,
         withStateLoad(handler)
@@ -57,11 +70,11 @@ export function applyLightMiddlewares(toolName: string, handler: ToolHandler): T
 }
 
 /**
- * Aplica middlewares inteligentes: estado + skill injection condicional.
- * v5.1: Injeta skill apenas quando o projeto está em fase de desenvolvimento (não onboarding).
- * Substitui applyLightMiddlewares para tools que se beneficiam de skill injection.
+ * @deprecated v6.0 — Use applyOrchestrationPipeline instead
+ * Será removido na v7.0
  */
 export function applySmartMiddlewares(toolName: string, handler: ToolHandler): ToolHandler {
+    console.warn(`[Middleware] DEPRECATED: applySmartMiddlewares used for ${toolName}. Use applyOrchestrationPipeline.`);
     return withErrorHandling(
         toolName,
         withStateLoad(
@@ -71,10 +84,11 @@ export function applySmartMiddlewares(toolName: string, handler: ToolHandler): T
 }
 
 /**
- * Aplica middlewares de persistência e estado (sem skill injection).
- * Útil para tools que não precisam de injeção de skills mas precisam de persistência.
+ * @deprecated v6.0 — Use applyOrchestrationPipeline instead
+ * Será removido na v7.0
  */
 export function applyPersistenceMiddlewares(toolName: string, handler: ToolHandler): ToolHandler {
+    console.warn(`[Middleware] DEPRECATED: applyPersistenceMiddlewares used for ${toolName}. Use applyOrchestrationPipeline.`);
     return withErrorHandling(
         toolName,
         withStateLoad(

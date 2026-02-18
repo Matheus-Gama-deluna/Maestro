@@ -11,7 +11,14 @@
  */
 
 import type { ToolResult } from "./types/index.js";
-import { applyMiddlewares, applyLightMiddlewares, applySmartMiddlewares, applyPersistenceMiddlewares } from "./middleware/index.js";
+import {
+    applyOrchestrationPipeline,
+    applyMiddlewares,
+    applySmartMiddlewares,
+    applyLightMiddlewares,
+    applyPersistenceMiddlewares
+} from "./middleware/index.js";
+import { withErrorHandling } from "./errors/index.js";
 
 // === IMPORTS DE TOOLS ===
 
@@ -142,25 +149,25 @@ const publicTools: ToolDefinition[] = [
                 },
             },
         },
-        handler: applySmartMiddlewares("maestro", (a) => maestroTool(a as any)),
+        handler: applyOrchestrationPipeline("maestro", (a) => maestroTool(a as any)),
     },
     {
         name: "executar",
         description: "⚡ Executa ações no projeto. acao='avancar' (padrão): avança fase/onboarding (com entregavel ou respostas). acao='salvar': salva conteúdo (requer conteudo). acao='checkpoint': gerencia checkpoints. Para onboarding: respostas={campo1: valor1, campo2: valor2}.",
         inputSchema: executarSchema,
-        handler: applySmartMiddlewares("executar", (a) => executar(a as any)),
+        handler: applyOrchestrationPipeline("executar", (a) => executar(a as any)),
     },
     {
         name: "validar",
         description: "✅ Valida gate, entregável ou compliance. Tipo auto-detectado ou especificado via parâmetro 'tipo'.",
         inputSchema: validarSchema,
-        handler: applyMiddlewares("validar", (a) => validar(a as any)),
+        handler: applyOrchestrationPipeline("validar", (a) => validar(a as any)),
     },
     {
         name: "analisar",
         description: "🔍 Analisa código: segurança, qualidade, performance, dependências ou relatório completo. Usa parâmetro 'tipo'.",
         inputSchema: analisarSchema,
-        handler: applyMiddlewares("analisar", (a) => analisar(a as any)),
+        handler: applyOrchestrationPipeline("analisar", (a) => analisar(a as any)),
     },
     {
         name: "contexto",
@@ -180,7 +187,7 @@ const publicTools: ToolDefinition[] = [
                 fases_completas: { type: "array" },
             },
         },
-        handler: applyMiddlewares("contexto", (a) => contexto(a as any)),
+        handler: applyOrchestrationPipeline("contexto", (a) => contexto(a as any)),
     },
 ];
 
@@ -250,13 +257,15 @@ const legacyTools: ToolDefinition[] = [
         name: "proximo",
         description: "[Interno] Avança fase. Use 'avancar' como alternativa consolidada.",
         inputSchema: proximoSchema,
-        handler: applyLightMiddlewares("proximo", (a) => proximo(a as any)),
+        // v6.2 S2.4: Migrado de applyLightMiddlewares para applyOrchestrationPipeline
+        handler: applyOrchestrationPipeline("proximo", (a) => proximo(a as any)),
     },
     {
         name: "validar_gate",
         description: "[Interno] Valida gate. Use 'validar' como alternativa consolidada.",
         inputSchema: validarGateSchema,
-        handler: (a) => validarGate(a as any),
+        // v6.2 S2.3: Adicionado withErrorHandling
+        handler: withErrorHandling("validar_gate", (a) => validarGate(a as any)),
     },
     {
         name: "aprovar_gate",
@@ -274,7 +283,8 @@ const legacyTools: ToolDefinition[] = [
         name: "confirmar_classificacao",
         description: "[Interno] Confirma reclassificação após PRD.",
         inputSchema: { type: "object", properties: { estado_json: { type: "string" }, diretorio: { type: "string" }, nivel: { type: "string", enum: ["simples", "medio", "complexo"] }, tipo_artefato: { type: "string", enum: ["poc", "script", "internal", "product"] } }, required: ["estado_json", "diretorio"] },
-        handler: (a) => confirmarClassificacao(a as any),
+        // v6.2 S2.3: Adicionado withErrorHandling
+        handler: withErrorHandling("confirmar_classificacao", (a) => confirmarClassificacao(a as any)),
     },
     {
         name: "implementar_historia",
@@ -288,19 +298,20 @@ const legacyTools: ToolDefinition[] = [
         name: "nova_feature",
         description: "[Interno] Fluxo de nova feature.",
         inputSchema: novaFeatureSchema,
-        handler: (a) => novaFeature(a as any),
+        // v6.2 S2.3: Adicionado withErrorHandling
+        handler: withErrorHandling("nova_feature", (a) => novaFeature(a as any)),
     },
     {
         name: "corrigir_bug",
         description: "[Interno] Fluxo de correção de bug.",
         inputSchema: corrigirBugSchema,
-        handler: (a) => corrigirBug(a as any),
+        handler: withErrorHandling("corrigir_bug", (a) => corrigirBug(a as any)),
     },
     {
         name: "refatorar",
         description: "[Interno] Fluxo de refatoração.",
         inputSchema: refatorarSchema,
-        handler: (a) => refatorar(a as any),
+        handler: withErrorHandling("refatorar", (a) => refatorar(a as any)),
     },
 
     // ──── ANÁLISE LEGACY ────
@@ -366,13 +377,14 @@ const legacyTools: ToolDefinition[] = [
         name: "onboarding_orchestrator",
         description: "[Interno] Use 'avancar' para fluxo de onboarding.",
         inputSchema: onboardingOrchestratorSchema,
-        handler: (a) => onboardingOrchestrator(a as any),
+        // v6.2 S2.3: Adicionado withErrorHandling
+        handler: withErrorHandling("onboarding_orchestrator", (a) => onboardingOrchestrator(a as any)),
     },
     {
         name: "brainstorm",
         description: "[Interno] Use 'avancar' para brainstorm.",
         inputSchema: brainstormSchema,
-        handler: (a) => brainstorm(a as any),
+        handler: withErrorHandling("brainstorm", (a) => brainstorm(a as any)),
     },
     {
         name: "prd_writer",

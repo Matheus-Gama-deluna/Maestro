@@ -472,11 +472,11 @@ Inclua no MESMO prompt qualquer ajuste de domínio/stack ou integrações críti
         };
     }
 
-    // Enforcement de skill + template + checklist antes de avançar
-    // AUTO-FLOW: pula verificação de skill carregada (assume que IA já seguiu o template)
+    // v6.0 Sprint 5: Enforcement de skill + template + checklist antes de avançar
+    // Verificação obrigatória em TODOS os modos (incluindo auto_flow)
     const ideDetectada = detectIDE(diretorio) || 'windsurf';
     const skillObrigatoria = getSkillParaFase(faseAtual.nome);
-    if (skillObrigatoria && !args.auto_flow) {
+    if (skillObrigatoria) {
         const skillOk = await verificarSkillCarregada(diretorio, skillObrigatoria, ideDetectada).catch(() => false);
         if (!skillOk) {
             return {
@@ -499,48 +499,74 @@ Carregue e leia a skill antes de gerar o entregável:
         }
     }
 
-    // Tentar validação com template (novo sistema inteligente)
-    const diretorioContent = getServerContentRoot();
+    // v6.1 Correção 1: Usar validateDeliverable() ao invés de validate()
+    // O validate() aplicava regras de TypeScript em documentos Markdown — ineficaz.
+    // validateDeliverable() valida conteúdo semântico por fase: seções, gate checklist, tamanho.
     const tier = estado.tier_gate || "base";
-    const validacaoTemplate = validarGateComTemplate(faseAtual, entregavelValidado, tier, diretorioContent);
 
-    let qualityScore: number;
-    let gateResultado: ReturnType<typeof validarGate>;
-    let estruturaResult: ReturnType<typeof validarEstrutura>;
-    let usouTemplate = false;
+    console.log(`[proximo] Iniciando validateDeliverable (fase: ${faseAtual.nome}, tier: ${tier})`);
 
-    if (validacaoTemplate.sucesso && validacaoTemplate.resultado) {
-        // Usar validação baseada em template (enforcement)
-        usouTemplate = true;
-        const resultado = validacaoTemplate.resultado;
+    const { ValidationPipeline } = await import("../core/validation/ValidationPipeline.js");
+    const validationPipeline = new ValidationPipeline();
 
-        // Converter resultado do template para formato legado para compatibilidade
-        qualityScore = resultado.qualidade?.scoreGeral || resultado.score || 0;
+    let validationResult;
+    try {
+        validationResult = await validationPipeline.validateDeliverable(
+            entregavelValidado,
+            faseAtual.nome,
+            tier as 'essencial' | 'base' | 'avancado',
+            faseAtual.gate_checklist || []
+        );
+    } catch (error) {
+        console.error('[proximo] Erro ao executar validateDeliverable:', error);
+        return {
+            content: [{
+                type: "text",
+                text: `# ❌ Erro na Validação do Entregável
 
-        // Criar estrutura compatível para gateResultado
-        gateResultado = {
-            valido: resultado.valido,
-            itens_validados: resultado.checkboxes?.preenchidos.map((c: any) => c.texto) || [],
-            itens_pendentes: resultado.checkboxes?.faltando.map((c: any) => c.texto) || [],
-            sugestoes: resultado.sugestoes || [],
+Ocorreu um erro ao validar o entregável da fase **${faseAtual.nome}**.
+
+**Erro:** ${error instanceof Error ? error.message : String(error)}
+
+Por favor, verifique:
+1. O entregável está formatado corretamente em Markdown?
+2. O conteúdo segue o template da fase?
+3. Todos os itens do gate checklist estão evidenciados?
+
+Se o erro persistir, contate o suporte técnico.`,
+            }],
+            isError: true,
         };
-
-        // Criar estrutura compatível para estruturaResult
-        estruturaResult = {
-            valido: resultado.estrutura?.valida || false,
-            score: resultado.estrutura?.score || 0,
-            secoes_encontradas: resultado.estrutura?.secoesEncontradas || [],
-            secoes_faltando: resultado.estrutura?.secoesFaltando || [],
-            tamanho_ok: true,
-            feedback: resultado.feedback || [],
-        };
-    } else {
-        // Fallback para sistema legado
-        usouTemplate = false;
-        estruturaResult = validarEstrutura(estado.fase_atual, entregavelValidado, "base", faseAtual.nome);
-        gateResultado = validarGate(faseAtual, entregavelValidado);
-        qualityScore = calcularQualityScore(estruturaResult, gateResultado);
     }
+
+    const qualityScore = validationResult.overallScore;
+
+    // Converter resultado para formato compatível com mensagens de erro
+    const gateResultado = {
+        valido: validationResult.passed,
+        itens_validados: validationResult.results
+            .filter(r => r.passed)
+            .map(r => `${r.layer}: ${r.score.toFixed(0)}%`),
+        itens_pendentes: validationResult.results
+            .filter(r => !r.passed)
+            .flatMap(r => r.issues.map(i => `[${r.layer}] ${i.message}`)),
+        sugestoes: validationResult.recommendations
+    };
+
+    const estruturaResult = {
+        valido: validationResult.passed,
+        score: qualityScore,
+        secoes_encontradas: validationResult.results
+            .filter(r => r.passed)
+            .map(r => r.layer),
+        secoes_faltando: validationResult.results
+            .filter(r => !r.passed)
+            .map(r => r.layer),
+        tamanho_ok: true,
+        feedback: validationResult.recommendations
+    };
+
+    console.log(`[proximo] validateDeliverable completo — Score: ${qualityScore}/100, Passou: ${validationResult.passed}`);
 
     // Score < 50: BLOQUEAR com instruções detalhadas de correção
     if (qualityScore < 50) {

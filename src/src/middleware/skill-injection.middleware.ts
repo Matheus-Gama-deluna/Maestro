@@ -60,7 +60,7 @@ export function withSkillInjection(handler: ToolHandler): ToolHandler {
                 const mode = (estado.config?.mode || "balanced") as "economy" | "balanced" | "quality";
                 const contentResolver = new ContentResolverService(diretorio);
                 const skillLoader = new SkillLoaderService(contentResolver);
-                const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, "economy");
+                const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, mode); // v6.1: usa modo real do projeto
 
                 if (contextPkg && result.content?.[0]) {
                     // Append contexto resumido à resposta

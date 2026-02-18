@@ -1,11 +1,13 @@
 /**
  * Middleware: withFlowEngine
  * 
- * Após execução da tool, calcula next_action via flow engine
- * de forma consistente, substituindo lógica local duplicada nas tools.
+ * v6.0 Sprint 4: FlowEngine FORÇADO (não sugestivo)
  * 
- * Se a tool já retornou next_action, o middleware NÃO sobrescreve
- * (permite que tools específicas tenham controle granular).
+ * Após execução da tool, calcula next_action via flow engine
+ * e SEMPRE sobrescreve, mesmo se a tool definiu um valor diferente.
+ * 
+ * Isso garante que o fluxo seja controlado centralmente pelo FlowEngine,
+ * impedindo que tools individuais desviem do caminho correto.
  */
 
 import { parsearEstado } from "../state/storage.js";
@@ -38,14 +40,24 @@ export function withFlowEngine(handler: ToolHandler): ToolHandler {
             const estado = parsearEstado(estadoJson);
             if (!estado) return result;
 
-            // Calcular next_action via flow engine (se a tool não definiu um)
-            if (!result.next_action) {
-                const nextStep = getNextStep(estado, diretorio);
-                result.next_action = flowStepToNextAction(nextStep);
+            // v6.0: SEMPRE calcular e sobrescrever next_action (forçado)
+            const nextStep = getNextStep(estado, diretorio);
+            const commandedAction = flowStepToNextAction(nextStep);
+            
+            // Logar se a tool tentou definir um next_action diferente
+            if (result.next_action && result.next_action.tool !== commandedAction.tool) {
+                console.warn(
+                    `[FlowEngine] Override detected: ` +
+                    `tool wanted "${result.next_action.tool}", ` +
+                    `flow commands "${commandedAction.tool}"`
+                );
+            }
+            
+            // SEMPRE sobrescrever (não é mais condicional)
+            result.next_action = commandedAction;
 
-                if (nextStep.specialist) {
-                    result.specialist_persona = result.specialist_persona || nextStep.specialist;
-                }
+            if (nextStep.specialist) {
+                result.specialist_persona = result.specialist_persona || nextStep.specialist;
             }
 
             // Sempre atualizar progress (é barato e útil)

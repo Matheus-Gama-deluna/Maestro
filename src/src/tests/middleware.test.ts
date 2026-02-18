@@ -7,7 +7,7 @@ import { withStateLoad } from '../middleware/state-loader.middleware.js';
 import { withPersistence } from '../middleware/persistence.middleware.js';
 import { withFlowEngine } from '../middleware/flow-engine.middleware.js';
 import { withSkillInjection } from '../middleware/skill-injection.middleware.js';
-import { applyMiddlewares, applyLightMiddlewares } from '../middleware/index.js';
+import { applyMiddlewares, applyLightMiddlewares, applyOrchestrationPipeline } from '../middleware/index.js';
 import type { ToolResult } from '../types/index.js';
 
 // Mock state service
@@ -197,18 +197,22 @@ describe('Middleware: withFlowEngine', () => {
         expect(result.progress).toBeDefined();
     });
 
-    it('não deve sobrescrever next_action já presente', async () => {
+    // v6.0: FlowEngine SEMPRE sobrescreve next_action (comportamento forçado)
+    it('deve SEMPRE sobrescrever next_action, mesmo quando já presente (v6.0)', async () => {
         const existingAction = { tool: 'validar_gate', description: 'Validar', args_template: {}, requires_user_input: false };
         const handler = vi.fn().mockResolvedValue({
             content: [{ type: 'text', text: 'ok' }],
-            estado_atualizado: JSON.stringify({ nome: 'Test' }),
+            estado_atualizado: JSON.stringify({ nome: 'Test', nivel: 'medio', fase_atual: 2, total_fases: 8 }),
             next_action: existingAction,
         });
 
         const wrapped = withFlowEngine(handler);
         const result = await wrapped({ diretorio: '/test/project' });
 
-        expect(result.next_action).toEqual(existingAction);
+        // v6.0: FlowEngine FORÇA sobrescrita — next_action deve ser do FlowEngine, não da tool
+        expect(result.next_action?.tool).toBe('proximo'); // FlowEngine define 'proximo'
+        // O next_action original ('validar_gate') deve ter sido sobrescrito
+        expect(result.next_action?.tool).not.toBe('validar_gate');
     });
 
     it('não deve calcular next_action quando isError', async () => {
@@ -274,5 +278,33 @@ describe('Pipeline: applyLightMiddlewares', () => {
         const wrapped = applyLightMiddlewares('test-tool', handler);
         const result = await wrapped({ diretorio: '/test/project' });
         expect(result.content[0].text).toBe('Light OK');
+    });
+});
+
+describe('Pipeline: applyOrchestrationPipeline (v6.0)', () => {
+    it('deve compor todos os middlewares na ordem correta', async () => {
+        const handler = vi.fn().mockResolvedValue({
+            content: [{ type: 'text', text: 'Orchestration OK' }],
+        });
+
+        const wrapped = applyOrchestrationPipeline('test-tool', handler);
+        expect(typeof wrapped).toBe('function');
+
+        const result = await wrapped({ diretorio: '/test/project' });
+        expect(result.content[0].text).toContain('Orchestration OK');
+    });
+
+    it('deve calcular next_action via FlowEngine', async () => {
+        const handler = vi.fn().mockResolvedValue({
+            content: [{ type: 'text', text: 'ok' }],
+            estado_atualizado: JSON.stringify({ nome: 'Test', nivel: 'medio', fase_atual: 2, total_fases: 8 }),
+        });
+
+        const wrapped = applyOrchestrationPipeline('test-tool', handler);
+        const result = await wrapped({ diretorio: '/test/project' });
+
+        // FlowEngine deve ter calculado next_action
+        expect(result.next_action).toBeDefined();
+        expect(result.next_action?.tool).toBe('proximo');
     });
 });

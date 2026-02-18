@@ -10,23 +10,34 @@ import { SemanticValidator } from './layers/SemanticValidator.js';
 import { QualityValidator } from './layers/QualityValidator.js';
 import { ArchitectureValidator } from './layers/ArchitectureValidator.js';
 import { SecurityValidatorWrapper } from './layers/SecurityValidatorWrapper.js';
+import { DeliverableValidator, type DeliverableContext } from './layers/DeliverableValidator.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 /**
  * Pipeline de Validação Multi-Camadas (Fase 2 - Melhoria #10)
- * 
- * Valida código em 5 camadas sequenciais:
+ *
+ * Dois modos de operação:
+ *
+ * Modo "code" (padrão): Valida código TypeScript em 5 camadas sequenciais:
  * 1. Sintática (≥ 80%) - Compilação, sintaxe, imports
  * 2. Semântica (≥ 70%) - Contexto, APIs, tipos
  * 3. Qualidade (≥ 70%) - Padrões, code smells, testabilidade
  * 4. Arquitetura (≥ 80%) - Camadas, dependências, fitness functions
  * 5. Segurança (≥ 90%) - OWASP, vulnerabilidades
+ *
+ * Modo "deliverable" (v6.1): Valida documentos Markdown de fases do projeto:
+ * - Presença de seções obrigatórias por fase
+ * - Completude do gate_checklist
+ * - Tamanho mínimo de conteúdo
+ * - Qualidade semântica do Markdown
  */
 export class ValidationPipeline {
     private layers: ValidationLayer[];
+    private deliverableValidator: DeliverableValidator;
 
     constructor() {
+        this.deliverableValidator = new DeliverableValidator();
         this.layers = [
             {
                 name: 'Sintática',
@@ -66,8 +77,52 @@ export class ValidationPipeline {
         ];
     }
 
+
     /**
-     * Valida código através do pipeline completo
+     * v6.1: Valida entregável de fase (documento Markdown)
+     *
+     * Use este método para fases do projeto (PRD, Requisitos, UX, Arquitetura, etc.).
+     * Ao contrário de validate(), não usa as camadas de código TypeScript.
+     *
+     * @param content - Conteúdo do entregável (Markdown)
+     * @param nomeFase - Nome da fase (ex: "Produto", "Requisitos")
+     * @param tier - Tier de rigor da validação
+     * @param gateChecklist - Itens do gate checklist da fase
+     */
+    async validateDeliverable(
+        content: string,
+        nomeFase: string,
+        tier: 'essencial' | 'base' | 'avancado' = 'base',
+        gateChecklist: string[] = []
+    ): Promise<PipelineResult> {
+        const startTime = new Date().toISOString();
+        console.log(`[ValidationPipeline] Validando entregável (fase: ${nomeFase}, tier: ${tier})`);
+
+        const deliverableContext: DeliverableContext = {
+            projectPath: '',
+            nomeFase,
+            gateChecklist,
+            tier
+        };
+
+        const result = await this.deliverableValidator.validate(content, deliverableContext);
+
+        const pipelineResult: PipelineResult = {
+            overallScore: result.score,
+            passed: result.passed,
+            results: [result],
+            recommendations: result.suggestions,
+            tier,
+            timestamp: startTime
+        };
+
+        await this.saveReport(pipelineResult);
+        return pipelineResult;
+    }
+
+    /**
+     * Valida código TypeScript através do pipeline completo (5 camadas).
+     * Para entregáveis de fase (Markdown), use validateDeliverable() ao invés.
      */
     async validate(
         code: string,
