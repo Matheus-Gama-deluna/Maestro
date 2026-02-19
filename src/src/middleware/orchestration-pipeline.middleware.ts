@@ -1,7 +1,7 @@
 /**
- * Pipeline Unificada de Orquestração v6.2
+ * Pipeline Unificada de Orquestração v6.3
  *
- * Ordem fixa de execução (v6.2):
+ * Ordem fixa de execução:
  * 1. Error Handling     — captura erros e formata resposta
  * 2. State Load         — auto-carrega estado se não fornecido
  * 3. [Handler executa]  — tool original
@@ -9,11 +9,12 @@
  * 5. ADR Generation     — extrai decisões de fases arquiteturais (best-effort)
  * 6. Flow Engine        — calcula next_action com estado já persistido (FORÇADO)
  * 7. Skill Inject       — injeta contexto do especialista (OBRIGATÓRIA)
- * 8. Prompt Validation  — valida uso correto das tools na resposta (v6.2)
+ * 8. Prompt Validation  — valida uso correto das tools na resposta
  *
  * @since v6.0 — Sprint 1 do Roadmap de Orquestração
  * @since v6.1 — Correção 3: Persistence antes de FlowEngine + Sprint 6: ADR Generation
  * @since v6.2 — Sprint 2: withPromptValidation integrado
+ * @since v6.3 — S1.1: Corrigido withPromptValidation (era no-op — expectedTool não era passado)
  */
 
 import { withErrorHandling } from "../errors/index.js";
@@ -43,7 +44,9 @@ export function applyOrchestrationPipeline(
 ): ToolHandler {
     console.log(`[OrchestrationPipeline] Registering tool: ${toolName}`);
 
-    // v6.2: Persistence → ADR → FlowEngine → Skill → PromptValidation
+    // v6.3: Persistence → ADR → FlowEngine → Skill → PromptValidation
+    // CORREÇÃO S1.1: withPromptValidation(toolName, toolName) — segundo argumento é expectedTool.
+    // Sem ele, o middleware verificava `if (!expectedTool) return result` e nunca validava nada.
     return withErrorHandling(
         toolName,
         withStateLoad(
@@ -51,7 +54,7 @@ export function applyOrchestrationPipeline(
                 withADRGeneration(
                     withFlowEngine(
                         withSkillInjection(
-                            withPromptValidation(toolName)(handler)
+                            withPromptValidation(toolName, toolName)(handler)
                         )
                     )
                 )

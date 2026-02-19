@@ -72,12 +72,11 @@ export const GATE_CHECKLISTS: Record<number, string[]> = {
 };
 
 /**
- * Valida gate usando template da skill (novo sistema)
- * @param fase - Fase a validar
- * @param entregavel - Conteúdo do entregável
- * @param tier - Tier de validação
- * @param diretorioContent - Diretório base do content (ex: d:/Sistemas/Maestro/content)
- * @param checklistItems - Checklist opcional da skill para validação adicional
+ * Valida gate usando template da skill (sistema legado)
+ * @deprecated v6.3 — Use IntelligentGateEngine.validateDeliverable() em vez disso.
+ *   O IntelligentGateEngine unifica este sistema, o GATE_CHECKLISTS e o DeliverableValidator
+ *   em um único motor com scoring adaptativo e 5 níveis de maturidade.
+ *   Mantido apenas como fallback interno de validar-gate.ts.
  */
 export function validarGateComTemplate(
     fase: Fase,
@@ -86,6 +85,13 @@ export function validarGateComTemplate(
     diretorioContent?: string,
     checklistItems?: string[]
 ): { sucesso: boolean; resultado?: any; resultadoLegacy?: GateResultado; erro?: string } {
+    if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+            `[DEPRECATED v6.3] validarGateComTemplate() foi substituído por IntelligentGateEngine.validateDeliverable(). ` +
+            `Será removido na v7.0.`
+        );
+    }
+
     const skillNome = getSkillParaFase(fase.nome);
     
     if (!skillNome || !diretorioContent) {

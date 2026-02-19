@@ -13,6 +13,7 @@ import { formatError, embedAllMetadata } from "../utils/response-formatter.js";
 import { withStructuredContent } from "../services/structured-content.service.js";
 import { ContentResolverService } from "../services/content-resolver.service.js";
 import { SkillLoaderService } from "../services/skill-loader.service.js";
+import { KnowledgeBase } from "../core/knowledge/KnowledgeBase.js";
 
 interface ContextoArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -64,6 +65,48 @@ export async function contexto(args: ContextoArgs): Promise<ToolResult> {
 
     // Identificar stack e modelo (se disponíveis nas fases anteriores)
     const fasesCompletas = estado.gates_validados.map(num => getFase(estado.nivel, num)?.nome).join(", ");
+
+    // v6.3 S3.3: Carregar ADRs e decisões acumuladas do KnowledgeBase
+    let knowledgeSection = "";
+    try {
+        const kb = new KnowledgeBase(diretorio);
+        const [adrs, decisions] = await Promise.all([
+            kb.listByType('adr'),
+            kb.listByType('decision'),
+        ]);
+
+        const partes: string[] = [];
+
+        if (adrs.length > 0) {
+            partes.push(`## 📚 Decisões Arquiteturais (ADRs)\n`);
+            partes.push(`> ${adrs.length} ADR(s) registrado(s) ao longo do projeto.\n`);
+            adrs.slice(0, 10).forEach(adr => {
+                const content = adr.content as any;
+                const faseInfo = getFase(estado.nivel, adr.metadata.fase);
+                partes.push(`**${adr.id}** _(Fase ${adr.metadata.fase}: ${faseInfo?.nome || '?'})_`);
+                partes.push(`> ${content?.decision || 'Decisão não disponível'}\n`);
+            });
+            if (adrs.length > 10) {
+                partes.push(`_... e mais ${adrs.length - 10} ADR(s). Consulte \`.maestro/adrs/\` para ver todos._\n`);
+            }
+        }
+
+        if (decisions.length > 0) {
+            partes.push(`## 📌 Decisões Técnicas\n`);
+            decisions.slice(0, 5).forEach(d => {
+                const content = d.content as any;
+                partes.push(`- **${d.id}**: ${content?.action || d.id}`);
+                if (content?.reason) partes.push(`  _Motivo: ${content.reason}_`);
+            });
+            partes.push('');
+        }
+
+        if (partes.length > 0) {
+            knowledgeSection = partes.join('\n');
+        }
+    } catch {
+        // KnowledgeBase é best-effort
+    }
 
     // v6.0 (P13): Carregar conteúdo real da skill ANTES do template
     let skillInjectionContent = "";
@@ -163,6 +206,7 @@ ${fluxo.fases.map(f => {
         return `${status} **Fase ${f.numero}**: ${f.nome}`;
     }).join("\n")}
 
+${knowledgeSection ? `\n${knowledgeSection}\n` : ""}
 ---
 
 *Use este contexto para manter consistência entre as fases do projeto.*

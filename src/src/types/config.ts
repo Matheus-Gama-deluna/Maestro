@@ -179,6 +179,8 @@ export interface ProjectConfig {
     frontend_first: boolean;
     auto_checkpoint: boolean;
     auto_fix: boolean;
+    /** v6.3: Controla se o brainstorm é sugerido no fluxo. Padrão: false em economy, true nos demais. */
+    wantsBrainstorm: boolean;
 }
 
 export function getDefaultConfig(flow: FlowType, mode: OperationMode): ProjectConfig {
@@ -192,6 +194,8 @@ export function getDefaultConfig(flow: FlowType, mode: OperationMode): ProjectCo
         frontend_first: flowConfig.frontend_first,
         auto_checkpoint: modeConfig.checkpoint_frequency !== 'never',
         auto_fix: modeConfig.auto_fix_enabled,
+        // v6.3 S1.2: economy não quer brainstorm por padrão (foco em velocidade)
+        wantsBrainstorm: mode !== 'economy',
     };
 }
 

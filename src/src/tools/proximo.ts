@@ -26,6 +26,11 @@ import { getSpecialistQuestions } from "../handlers/specialist-phase-handler.js"
 import { resolverPathEntregavel, listarPathsEsperados } from "../utils/entregavel-path.js"; // v5.5.0
 import { readFile } from "fs/promises";
 import { isPrototypePhase } from "../handlers/prototype-phase-handler.js"; // v9.0
+// v6.3 S5.1: Autonomia calibrada
+import { DecisionEngine } from "../core/decision/DecisionEngine.js";
+import { RiskEvaluator } from "../core/risk/RiskEvaluator.js";
+import type { RiskLevel as DecisionRiskLevel } from "../core/decision/types.js";
+
 
 interface ProximoArgs {
     entregavel?: string;  // v5.5.0: Opcional - sistema lê do disco automaticamente
@@ -34,6 +39,87 @@ interface ProximoArgs {
     nome_arquivo?: string;
     diretorio: string;           // Diretório do projeto (obrigatório)
     auto_flow?: boolean;         // Modo fluxo automático: auto-confirma classificação e avança sem bloqueios
+}
+
+/**
+ * v6.3 S5.2-S5.3: Avalia autonomia para o avanço de fase usando RiskEvaluator + DecisionEngine.
+ * Retorna null se pode prosseguir, ou ToolResult de bloqueio se requer aprovação humana.
+ */
+async function avaliarAutonomia(
+    estado: EstadoProjeto,
+    nomeFase: string,
+    diretorio: string,
+    autoFlow: boolean
+): Promise<null | ToolResult> {
+    if (autoFlow) return null; // Modo automático: sempre passa direto
+
+    try {
+        const riskEvaluator = new RiskEvaluator(diretorio);
+        const decisionEngine = new DecisionEngine();
+
+        // Avaliar risco do avanço de fase
+        const riskInfo = await riskEvaluator.evaluate(`advance-phase-${nomeFase}`, {
+            filesAffected: 1,
+            hasTests: estado.gates_validados.length > 0,
+        });
+
+        // Mapear nível do RiskEvaluator para DecisionEngine
+        const riskMap: Record<string, DecisionRiskLevel> = {
+            SAFE: 'baixo', LOW: 'baixo', MEDIUM: 'medio', HIGH: 'alto', DANGEROUS: 'critico',
+        };
+        const decisionRisk: DecisionRiskLevel = riskMap[riskInfo.level] ?? 'medio';
+
+        const decision = await decisionEngine.evaluate({
+            operation: `advance-phase-${nomeFase}`,
+            riskLevel: decisionRisk,
+            context: {
+                fase: estado.fase_atual,
+                hasHistoricalMatch: estado.gates_validados.length > 0,
+                matchesKnownPattern: true,
+                isNovelOperation: estado.fase_atual === 1,
+                hasFullContext: !!nomeFase,
+            },
+        });
+
+        // v6.3 S5.4: Só bloqueia em risco crítico / human_only
+        if (decision.action === 'human_only') {
+            return {
+                content: [{
+                    type: "text" as const,
+                    text: `# ✋ Aprovação Necessária — Autonomia Calibrada (v6.3)
+
+O sistema avaliou que esta operação requer aprovação explícita do usuário.
+
+| Fator | Valor |
+|-------|-------|
+| **Fase** | ${estado.fase_atual} — ${nomeFase} |
+| **Risco** | ${riskInfo.level} (score: ${riskInfo.score}) |
+| **Confiança da IA** | ${Math.round(decision.confidence * 100)}% |
+
+## Fatores de Risco Detectados
+${riskInfo.factors.map(f => `- **${f.name}** (peso: ${f.weight}) — ${f.description}`).join('\n')}
+
+## Raciocínio
+\`\`\`
+${decision.reasoning}
+\`\`\`
+
+> 🔐 Para prosseguir, confirme: **"Confirmo o avanço da fase ${estado.fase_atual}"**
+> Ou use \`auto_flow: true\` para modo automático sem checagens de risco.
+`,
+                }],
+            };
+        }
+
+        // Para outros níveis, apenas loga (não bloqueia)
+        console.log(`[Autonomia v6.3] fase=${estado.fase_atual} nome=${nomeFase} confianca=${Math.round(decision.confidence * 100)}% risco=${riskInfo.level} acao=${decision.action}`);
+
+    } catch (err) {
+        // Best-effort — nunca bloqueia o fluxo
+        console.warn('[Autonomia v6.3] Falha na avaliação (non-blocking):', err);
+    }
+
+    return null;
 }
 
 /**
@@ -56,6 +142,7 @@ function calcularQualityScore(
         (tamanhoScore * 0.20)
     );
 }
+
 
 /**
  * Tool: proximo
@@ -300,8 +387,18 @@ ${instrucoesSkill}
     // TypeScript assertion para evitar erros de tipo
     const entregavelValidado: string = entregavel!;
 
+    // v6.3 S5.3: Avaliação de autonomia — RiskEvaluator + DecisionEngine
+    const autonomiaBlock = await avaliarAutonomia(
+        estado,
+        faseAtualInfo?.nome ?? `Fase ${estado.fase_atual}`,
+        diretorio,
+        args.auto_flow ?? false
+    );
+    if (autonomiaBlock) return autonomiaBlock;
+
     // Verificar se há bloqueio de aprovação pendente (Gate)
     if (estado.aguardando_aprovacao) {
+
         // v5.5.0: Incluir instruções de correção no bloqueio
         const ideParaInstrucao = detectIDE(diretorio) || 'windsurf';
         const instrucaoCorrecao = faseAtualInfo

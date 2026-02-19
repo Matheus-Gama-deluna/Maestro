@@ -13,6 +13,7 @@ import { getSpecialistPersona } from "../services/specialist.service.js";
 import { formatResponse, formatError, embedAllMetadata } from "../utils/response-formatter.js";
 import { withStructuredContent } from "../services/structured-content.service.js";
 import type { FlowProgress } from "../types/response.js";
+import { MetricsCollector } from "../core/metrics/MetricsCollector.js";
 
 interface StatusArgs {
     estado_json: string;     // Estado atual (obrigatório)
@@ -48,6 +49,33 @@ export async function status(args: StatusArgs): Promise<ToolResult> {
     }
 
     setCurrentDirectory(args.diretorio);
+
+    // v6.3 S4.3: Coletar métricas reais do projeto (best-effort)
+    let metricsSection = "";
+    try {
+        const collector = new MetricsCollector();
+        const metrics = await collector.collect(args.diretorio, estado);
+
+        const scoreBar = (score: number) => {
+            const filled = Math.round(score / 10);
+            return "█".repeat(filled) + "░".repeat(10 - filled) + ` ${score}%`;
+        };
+
+        metricsSection = `
+## 📊 Métricas do Projeto
+
+| Métrica | Valor |
+|---------|-------|
+| **Score Geral** | ${scoreBar(metrics.scoreGeral)} |
+| **Documentação** | ${scoreBar(metrics.scoreDocumentacao)} |
+| **Entregaveis** | ${metrics.entregaveisGerados}/${metrics.totalFases} fases |
+| **ADRs gerados** | ${metrics.adrsEncontrados} |
+| **Arquivos de código** | ${metrics.arquivosCodigo} |
+| **Arquivos de teste** | ${metrics.arquivosTeste} (ratio: ${Math.round(metrics.ratioTestesCodigo * 100)}%) |
+`;
+    } catch {
+        // Métricas são best-effort
+    }
 
     // Verifica se há conteúdo local disponível (via npx)
     const avisoContentLocal = temContentLocal(args.diretorio) ? "" : `
@@ -130,6 +158,7 @@ ${Object.keys(estado.entregaveis).length > 0
 ---
 
 **Última atualização:** ${new Date(estado.atualizado_em).toLocaleString("pt-BR")}
+${metricsSection}
 `;
 
     const specialist = faseAtual ? getSpecialistPersona(faseAtual.nome) : null;

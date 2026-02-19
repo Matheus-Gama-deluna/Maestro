@@ -1,17 +1,61 @@
 /**
- * Global project context management
+ * Global project context management — v6.3
  * Tracks the current project directory across tool calls
+ * S4.1: Adds state cache to avoid repeated disk reads within the same session
  */
 
 import { existsSync } from "fs";
 import { join } from "path";
 import { setProjectDirectory } from "../utils/files.js";
+import type { EstadoProjeto } from "../types/index.js";
 
 // Global state: stores the current project directory
 let currentProjectDirectory: string | null = null;
 
 // Path to state file
 const ESTADO_FILE = ".maestro/estado.json";
+
+// ─── v6.3 S4.1: Estado cache ──────────────────────────────────────────────────
+// Evita leituras de disco repetidas entre tool calls na mesma sessão.
+// TTL de 30s: suficiente para calls em sequência, mas evita dados stale.
+
+interface CacheEntry {
+    estado: EstadoProjeto;
+    timestamp: number;
+    diretorio: string;
+}
+
+const CACHE_TTL_MS = 30_000;
+let estadoCache: CacheEntry | null = null;
+
+/**
+ * Armazena estado no cache (chamar após salvarEstado / parsearEstado bem-sucedido)
+ */
+export function setCachedEstado(estado: EstadoProjeto, diretorio: string): void {
+    estadoCache = { estado, timestamp: Date.now(), diretorio };
+}
+
+/**
+ * Recupera estado do cache se ainda válido para o diretório informado
+ */
+export function getCachedEstado(diretorio: string): EstadoProjeto | null {
+    if (!estadoCache) return null;
+    if (estadoCache.diretorio !== diretorio) return null;
+    if (Date.now() - estadoCache.timestamp > CACHE_TTL_MS) {
+        estadoCache = null;
+        return null;
+    }
+    return estadoCache.estado;
+}
+
+/**
+ * Invalida o cache (chamar quando estado for modificado)
+ */
+export function invalidateEstadoCache(): void {
+    estadoCache = null;
+}
+
+// ─── Directory management ─────────────────────────────────────────────────────
 
 /**
  * Check if a directory contains a valid Maestro project
@@ -26,8 +70,11 @@ export function isValidProject(dir: string): boolean {
  * Also updates the files utility for local content reading
  */
 export function setCurrentDirectory(dir: string): void {
+    // Invalida cache se mudar de diretório
+    if (currentProjectDirectory !== dir) {
+        invalidateEstadoCache();
+    }
     currentProjectDirectory = dir;
-    // Sincroniza com files.ts para leitura de content local
     setProjectDirectory(dir);
 }
 
@@ -44,6 +91,7 @@ export function getCurrentDirectory(): string {
  */
 export function clearCurrentDirectory(): void {
     currentProjectDirectory = null;
+    estadoCache = null;
     setProjectDirectory(null);
 }
 
@@ -56,40 +104,29 @@ export function hasCurrentDirectory(): boolean {
 
 /**
  * Get default projects directory based on environment
- * In production (Docker), use /app/projects (where volume is mounted)
- * In development, use current working directory
  */
 export function getDefaultProjectsDirectory(): string {
-    return process.env.NODE_ENV === "production" 
-        ? "/app/projects" 
+    return process.env.NODE_ENV === "production"
+        ? "/app/projects"
         : process.cwd();
 }
 
 /**
  * Get project directory from args or fallback to current/cwd
- * Also performs auto-detection of existing projects
  */
 export function resolveDirectory(argsDir?: string): string {
-    // If directory provided, use it and update global state
     if (argsDir) {
         setCurrentDirectory(argsDir);
         return argsDir;
     }
-
-    // If we have a current directory, use it
     if (currentProjectDirectory) {
         return currentProjectDirectory;
     }
-
-    // Fallback to cwd
     const cwd = process.cwd();
-
-    // Check if cwd has a valid project
     if (isValidProject(cwd)) {
         setCurrentDirectory(cwd);
         return cwd;
     }
-
     return cwd;
 }
 

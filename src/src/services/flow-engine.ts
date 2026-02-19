@@ -243,7 +243,8 @@ export function getFlowState(estado: EstadoProjeto, diretorio: string): FlowStat
         prdStatus: onboarding?.prdStatus || "pending",
         aguardandoAprovacao: estado.aguardando_aprovacao || false,
         aguardandoClassificacao: estado.aguardando_classificacao || false,
-        wantsBrainstorm: true,
+        // v6.3 S1.2: Respeita configuração do projeto. Modo 'economy' não quer brainstorm por padrão.
+        wantsBrainstorm: estado.config?.wantsBrainstorm ?? (estado.config?.mode !== 'economy'),
         nivel: estado.nivel,
         usarStitch: estado.usar_stitch || false,
         diretorio,

@@ -1,74 +1,195 @@
-import type { ToolResult, EstadoProjeto } from "../types/index.js";
+import type { ToolResult, EstadoProjeto, TierGate } from "../types/index.js";
 import type { NextAction, FlowProgress } from "../types/response.js";
 import { parsearEstado } from "../state/storage.js";
 import { getFase } from "../flows/types.js";
-import { validarGate as validarGateCore, formatarResultadoGate, validarGateComTemplate } from "../gates/validator.js";
-import { formatarResultadoValidacao } from "../gates/template-validator.js";
-import { gerarRelatorioQualidade, compararComTier } from "../gates/quality-scorer.js";
+import { IntelligentGateEngine, type IntelligentGateResult } from "../gates/intelligent-gate-engine.js";
+import { validarGate as validarGateLegacy, formatarResultadoGate } from "../gates/validator.js";
 import { normalizeProjectPath, resolveProjectPath, getServerContentRoot } from "../utils/files.js";
 import { setCurrentDirectory } from "../state/context.js";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
 import { getSkillParaFase } from "../utils/prompt-mapper.js";
 import { getSkillResourcePath, detectIDE } from "../utils/ide-paths.js";
 import { readFile } from "fs/promises";
-import { join } from "path";
 import { getSpecialistPersona } from "../services/specialist.service.js";
+
+/**
+ * v6.3: Sistema de gates unificado usando IntelligentGateEngine
+ * Substitui os 3 sistemas paralelos anteriores:
+ *   - gates/validator.ts (GATE_CHECKLISTS legado)
+ *   - core/validation/layers/DeliverableValidator.ts
+ *   - gates/template-validator.ts
+ */
 
 interface ValidarGateArgs {
     fase?: number;
     entregavel?: string;
-    estado_json: string;     // Estado atual (obrigatório)
-    diretorio: string;       // Diretório do projeto (obrigatório)
+    estado_json: string;
+    diretorio: string;
+}
+
+/** Mapeia tipo de artefato do estado para tipo de projeto do engine */
+function mapProjectType(
+    tipoArtefato?: string
+): 'poc' | 'internal' | 'product' | 'critical' {
+    switch (tipoArtefato) {
+        case 'poc':      return 'poc';
+        case 'product':  return 'product';
+        case 'script':   return 'poc';
+        case 'internal': return 'internal';
+        default:         return 'internal';
+    }
+}
+
+/** Mapeia tier do estado para tier do engine */
+function mapTier(tier?: string): TierGate {
+    if (tier === 'essencial' || tier === 'base' || tier === 'avancado') return tier;
+    return 'base';
+}
+
+/** Ícone e label para cada nível de maturidade */
+const MATURITY_LABELS: Record<number, { icon: string; label: string }> = {
+    1: { icon: '🌱', label: 'Conceito Inicial' },
+    2: { icon: '🔨', label: 'Estrutura Básica' },
+    3: { icon: '✅', label: 'Padrão Profissional' },
+    4: { icon: '⭐', label: 'Alta Qualidade' },
+    5: { icon: '🏆', label: 'Exemplar' },
+};
+
+/** Formata resultado do IntelligentGateEngine em texto legível */
+function formatIntelligentResult(
+    result: IntelligentGateResult,
+    faseNumero: number,
+    faseNome: string,
+    tier: string
+): string {
+    const maturity = MATURITY_LABELS[result.maturityLevel] ?? MATURITY_LABELS[1];
+    const { summary, validationResult, adaptiveScore } = result;
+
+    let text = `# Gate da Fase ${faseNumero}: ${faseNome}\n\n`;
+
+    // Status principal
+    text += `## ${summary.statusIcon} ${summary.title}\n\n`;
+    text += `${summary.mainMessage}\n\n`;
+
+    // Score e nível de maturidade
+    text += `## 📊 Avaliação\n\n`;
+    text += `| Dimensão | Score |\n|----------|-------|\n`;
+    text += `| **Score Geral** | **${result.overallScore}/100** |\n`;
+    text += `| Semântica | ${adaptiveScore.components.semantic}/100 |\n`;
+    text += `| Completude | ${adaptiveScore.components.completeness}/100 |\n`;
+    text += `| Qualidade | ${adaptiveScore.components.quality}/100 |\n`;
+    text += `| Estrutura | ${adaptiveScore.components.structure}/100 |\n\n`;
+
+    text += `**Nível de Maturidade:** ${maturity.icon} Nível ${result.maturityLevel} — ${maturity.label}\n`;
+    text += `**Tier de Validação:** ${tier}\n`;
+    text += `**Confiança:** ${Math.round(result.confidenceLevel * 100)}%\n\n`;
+
+    // Pontos fortes
+    if (summary.keyStrengths.length > 0) {
+        text += `## 💪 Pontos Fortes\n\n`;
+        summary.keyStrengths.forEach(s => { text += `- ${s}\n`; });
+        text += '\n';
+    }
+
+    // Bloqueadores críticos
+    if (validationResult.blockers.length > 0) {
+        text += `## 🔴 Bloqueadores Críticos\n\n`;
+        validationResult.blockers.forEach(b => {
+            text += `**${b.message}**\n`;
+            text += `> Como corrigir: ${b.howToFix}\n\n`;
+        });
+    }
+
+    // Ações prioritárias
+    if (summary.priorityActions.length > 0) {
+        text += `## ⚡ Ações Prioritárias\n\n`;
+        summary.priorityActions.forEach((a, i) => { text += `${i + 1}. ${a}\n`; });
+        text += '\n';
+    }
+
+    // Recomendações inteligentes
+    const criticalRecs = validationResult.recommendations.filter(r => r.type === 'critical');
+    const improvRecs = validationResult.recommendations.filter(r => r.type === 'improvement').slice(0, 3);
+
+    if (criticalRecs.length > 0) {
+        text += `## 🔧 Melhorias Necessárias\n\n`;
+        criticalRecs.forEach(r => {
+            text += `**[${r.impact.toUpperCase()}] ${r.title}**`;
+            if (r.estimatedTimeMinutes) text += ` _(~${r.estimatedTimeMinutes}min)_`;
+            text += `\n${r.description}\n`;
+            if (r.examples && r.examples.length > 0) {
+                text += `> Exemplo: ${r.examples[0]}\n`;
+            }
+            text += '\n';
+        });
+    }
+
+    if (improvRecs.length > 0) {
+        text += `## 💡 Sugestões de Melhoria\n\n`;
+        improvRecs.forEach(r => {
+            text += `- **${r.title}** _(esforço: ${r.effort})_: ${r.description}\n`;
+        });
+        text += '\n';
+    }
+
+    // Próximos passos
+    if (summary.nextSteps.length > 0) {
+        text += `## 🗺️ Próximos Passos\n\n`;
+        summary.nextSteps.forEach((s, i) => { text += `${i + 1}. ${s}\n`; });
+        text += '\n';
+    }
+
+    // Decisão final
+    if (result.canAdvance) {
+        text += `---\n✅ **Você pode avançar!** Use \`proximo(entregavel: "...", estado_json: "...", diretorio: "...")\` para ir para a próxima fase.`;
+    } else {
+        text += `---\n⚠️ **Complete os itens pendentes** ou use \`proximo(entregavel: "...", estado_json: "...", confirmar_usuario: true)\` para forçar avanço.`;
+    }
+
+    return text;
+}
+
+/** Fallback para sistema legado quando engine falha */
+function formatLegacyResult(
+    resultado: ReturnType<typeof validarGateLegacy>,
+    faseNumero: number,
+    faseNome: string
+): string {
+    const resultadoFormatado = formatarResultadoGate(resultado);
+    let text = `# Gate da Fase ${faseNumero}: ${faseNome}\n\n`;
+    text += `## ⚠️ Validação Legada (Engine indisponível)\n\n`;
+    text += resultadoFormatado + '\n\n';
+    text += resultado.valido
+        ? `✅ **Você pode avançar!** Use \`proximo(entregavel: "...", estado_json: "...", diretorio: "...")\` para ir para a próxima fase.`
+        : `⚠️ **Complete os itens pendentes** ou use \`proximo(entregavel: "...", estado_json: "...", confirmar_usuario: true)\` para forçar avanço.`;
+    return text;
 }
 
 /**
  * Tool: validar_gate
- * Valida checklist de saída da fase (modo stateless)
+ * v6.3: Usa IntelligentGateEngine como sistema principal (com fallback legado automático)
  */
 export async function validarGate(args: ValidarGateArgs): Promise<ToolResult> {
-    // Validar parâmetros
     if (!args.estado_json) {
         return {
             content: [{
                 type: "text",
-                text: `# 📋 Validar Gate (Modo Stateless)
-
-Para validar um gate, a IA deve:
-1. Ler o arquivo \`.maestro/estado.json\` do projeto
-2. Passar o conteúdo como parâmetro
-
-**Uso:**
-\`\`\`
-validar_gate(
-    entregavel: "[conteúdo]",
-    estado_json: "...",
-    diretorio: "C:/projetos/meu-projeto"
-)
-\`\`\`
-`,
+                text: `# 📋 Validar Gate (Modo Stateless)\n\nPara validar um gate, a IA deve:\n1. Ler o arquivo \`.maestro/estado.json\` do projeto\n2. Passar o conteúdo como parâmetro\n\n**Uso:**\n\`\`\`\nvalidar_gate(\n    entregavel: "[conteúdo]",\n    estado_json: "...",\n    diretorio: "C:/projetos/meu-projeto"\n)\n\`\`\`\n`,
             }],
         };
     }
 
     if (!args.diretorio) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Parâmetro `diretorio` é obrigatório.",
-            }],
+            content: [{ type: "text", text: "❌ **Erro**: Parâmetro `diretorio` é obrigatório." }],
             isError: true,
         };
     }
 
-    // Parsear estado
     const estado = parsearEstado(args.estado_json);
     if (!estado) {
         return {
-            content: [{
-                type: "text",
-                text: "❌ **Erro**: Não foi possível parsear o estado JSON.",
-            }],
+            content: [{ type: "text", text: "❌ **Erro**: Não foi possível parsear o estado JSON." }],
             isError: true,
         };
     }
@@ -81,130 +202,86 @@ validar_gate(
 
     if (!fase) {
         return {
-            content: [{
-                type: "text",
-                text: `❌ **Erro**: Fase ${numeroFase} não encontrada.`,
-            }],
+            content: [{ type: "text", text: `❌ **Erro**: Fase ${numeroFase} não encontrada.` }],
             isError: true,
         };
     }
 
     // Buscar entregável automaticamente se não foi passado
     let entregavel = args.entregavel;
-    
+
     if (!entregavel) {
-        // Tentar ler do arquivo de entregável da fase
-        // Compatibilidade: proximo() salva com chave "fase_X" e caminho completo
-        // Tentamos ambas as convenções para retrocompatibilidade
         const chaveNova = `fase_${numeroFase}`;
         const chaveLegacy = numeroFase.toString();
         const caminhoOuNome = estado.entregaveis[chaveNova] || estado.entregaveis[chaveLegacy];
-        
+
         if (caminhoOuNome) {
             try {
-                // Verificar se é caminho absoluto ou relativo completo (novo formato)
-                // ou apenas nome de arquivo (formato legacy)
                 let caminhoEntregavel: string;
-                
                 if (caminhoOuNome.includes('/') || caminhoOuNome.includes('\\')) {
-                    // Novo formato: caminho completo ou relativo
-                    // Se começa com diretório, é absoluto; senão, é relativo ao projeto
-                    if (caminhoOuNome.startsWith(diretorio)) {
-                        caminhoEntregavel = caminhoOuNome;
-                    } else {
-                        caminhoEntregavel = join(diretorio, caminhoOuNome);
-                    }
+                    caminhoEntregavel = caminhoOuNome.startsWith(diretorio)
+                        ? caminhoOuNome
+                        : join(diretorio, caminhoOuNome);
                 } else {
-                    // Formato legacy: apenas nome do arquivo em .maestro/entregaveis/
                     caminhoEntregavel = join(diretorio, ".maestro", "entregaveis", caminhoOuNome);
                 }
-                
                 entregavel = await readFile(caminhoEntregavel, "utf-8");
             } catch {
-                // Se não conseguir ler, continua sem entregável
+                // Continua sem entregável
             }
         }
-        
-        // Se ainda não tem entregável, mostrar checklist
-        if (!entregavel) {
-            const resposta = `# 📋 Gate da Fase ${numeroFase}: ${fase.nome}\n\n## ⚠️ Validação Automática\n\nNenhum entregável encontrado para esta fase.\n\n## Checklist de Saída\n\n${fase.gate_checklist.map((item, i) => `${i + 1}. ${item}`).join("\n")}\n\n## 💡 Como Proceder\n\n1. Gere o entregável da fase usando os especialistas\n2. Salve com \`proximo()\` para validação automática\n3. Ou passe manualmente: \`validar_gate(entregavel: "...", estado_json: "...", diretorio: "...")\`\n`;
 
-            return {
-                content: [{ type: "text", text: resposta }],
-            };
+        if (!entregavel) {
+            const resposta = `# 📋 Gate da Fase ${numeroFase}: ${fase.nome}\n\n## ⚠️ Nenhum Entregável Encontrado\n\nNenhum entregável encontrado para esta fase.\n\n## Checklist de Saída\n\n${fase.gate_checklist.map((item, i) => `${i + 1}. ${item}`).join("\n")}\n\n## 💡 Como Proceder\n\n1. Gere o entregável da fase usando os especialistas\n2. Salve com \`proximo()\` para validação automática\n3. Ou passe manualmente: \`validar_gate(entregavel: "...", estado_json: "...", diretorio: "...")\`\n`;
+            return { content: [{ type: "text", text: resposta }] };
         }
     }
 
-    // Tentar validação com template (novo sistema)
-    // Usar getServerContentRoot ao invés de __dirname (ES modules)
-    const diretorioContent = getServerContentRoot();
-    const tier = estado.tier_gate || "base";
-    
-    const validacaoTemplate = validarGateComTemplate(fase, entregavel, tier, diretorioContent);
-    
-    let resposta = "";
-    
-    if (validacaoTemplate.sucesso && validacaoTemplate.resultado) {
-        // Usar novo sistema baseado em template
-        const resultado = validacaoTemplate.resultado;
-        
-        resposta = `# Gate da Fase ${numeroFase}: ${fase.nome}
+    const tier = mapTier(estado.tier_gate);
+    const projectType = mapProjectType(estado.tipo_artefato);
 
-`;
-        resposta += `## 🎯 Validação Baseada em Template\n\n`;
-        resposta += `**Template:** \`${resultado.skillNome}\`\n`;
-        resposta += `**Tier:** ${tier}\n\n`;
-        
-        resposta += formatarResultadoValidacao(resultado, tier);
-        
-        // Relatório de qualidade
-        if (resultado.qualidade) {
-            resposta += "\n" + gerarRelatorioQualidade(resultado.qualidade, tier);
-            
-            const comparacao = compararComTier(resultado.qualidade, tier);
-            resposta += "\n" + comparacao.mensagem + "\n\n";
-        }
-        
-        // Link para template
+    // === SISTEMA PRINCIPAL: IntelligentGateEngine (v6.3) ===
+    let resposta: string;
+    let canAdvance: boolean;
+
+    try {
+        const engine = new IntelligentGateEngine();
+        const result = await engine.validateDeliverable(
+            entregavel,
+            fase,
+            tier,
+            projectType,
+            { fallbackToLegacy: false, maxRecommendations: 6 }
+        );
+
+        resposta = formatIntelligentResult(result, numeroFase, fase.nome, tier);
+        canAdvance = result.canAdvance;
+
+        // Link para template da skill (mantido do sistema anterior)
         const skillAtual = getSkillParaFase(fase.nome);
         if (skillAtual) {
             const ide = estado.ide || detectIDE(args.diretorio) || 'windsurf';
             const templatesPath = getSkillResourcePath(skillAtual, 'templates', ide);
-            resposta += `## 📄 Template de Referência\n\n`;
-            resposta += `**Localização:** \`${templatesPath}\`\n\n`;
-            resposta += `> 💡 Consulte o template para ver a estrutura completa esperada.\n\n`;
+            resposta += `\n\n## 📄 Template de Referência\n\n**Localização:** \`${templatesPath}\`\n\n> 💡 Consulte o template para ver a estrutura completa esperada.\n`;
         }
-        
-        resposta += resultado.valido
-            ? "✅ **Você pode avançar!** Use `proximo(entregavel: \"...\", estado_json: \"...\")` para ir para a próxima fase."
-            : "⚠️ **Complete os itens pendentes** ou use `proximo(entregavel: \"...\", estado_json: \"...\", confirmar_usuario: true)` para forçar avanço.";
-    } else {
-        // Fallback para sistema legado
-        const resultado = validarGateCore(fase, entregavel);
-        const resultadoFormatado = formatarResultadoGate(resultado);
-        
-        resposta = `# Gate da Fase ${numeroFase}: ${fase.nome}\n\n`;
-        resposta += `## ⚠️ Validação Legada (Template não disponível)\n\n`;
-        resposta += resultadoFormatado + "\n\n";
-        
+    } catch (engineError) {
+        // === FALLBACK: Sistema legado ===
+        console.warn(`[validar_gate] IntelligentGateEngine falhou, usando fallback legado:`, engineError);
+        const resultado = validarGateLegacy(fase, entregavel);
+        resposta = formatLegacyResult(resultado, numeroFase, fase.nome);
+        canAdvance = resultado.valido;
+
         const skillAtual = getSkillParaFase(fase.nome);
         if (skillAtual) {
             const ide = estado.ide || detectIDE(args.diretorio) || 'windsurf';
             const checklistPath = getSkillResourcePath(skillAtual, 'checklists', ide);
-            resposta += `## 📋 Checklist da Skill\n\n`;
-            resposta += `**Localização:** \`${checklistPath}\`\n\n`;
-            resposta += `> 💡 Consulte o checklist completo da skill para validação detalhada.\n\n`;
+            resposta += `\n\n## 📋 Checklist da Skill\n\n**Localização:** \`${checklistPath}\`\n`;
         }
-        
-        resposta += resultado.valido
-            ? "✅ **Você pode avançar!** Use `proximo(entregavel: \"...\", estado_json: \"...\")` para ir para a próxima fase."
-            : "⚠️ **Complete os itens pendentes** ou use `proximo(entregavel: \"...\", estado_json: \"...\", confirmar_usuario: true)` para forçar avanço.";
     }
 
     const specialist = fase ? getSpecialistPersona(fase.nome) : null;
-    const isValid = resposta.includes("✅ **Você pode avançar");
 
-    const next_action: NextAction = isValid ? {
+    const next_action: NextAction = canAdvance ? {
         tool: "proximo",
         description: `Gate validado. Avançar com o entregável da fase ${numeroFase} (${fase.nome})`,
         args_template: { entregavel: "{{conteudo_do_entregavel}}", estado_json: "{{estado_json}}", diretorio },

@@ -527,8 +527,274 @@ export class ContextualRecommender {
             }
         ]);
 
-        // Adiciona mais templates para outras fases...
+        // Adiciona templates para outras fases (v6.3 S2.3)
+
+        // Templates para fase UX Design
+        this.templates.set('UX Design', [
+            {
+                id: 'ux_wireframes',
+                phase: 'UX Design',
+                trigger: 'missing_wireframes',
+                title: 'Incluir wireframes ou protótipos',
+                description: 'Adicione representações visuais das telas principais',
+                examples: [
+                    'Wireframe da tela de login com campos email/senha e botão de acesso',
+                    'Protótipo do dashboard principal com navegação lateral e cards de métricas',
+                    'Fluxo de onboarding em 3 passos com indicador de progresso'
+                ],
+                effort: 'moderate',
+                impact: 'high'
+            },
+            {
+                id: 'ux_jornadas',
+                phase: 'UX Design',
+                trigger: 'missing_jornadas',
+                title: 'Mapear jornadas do usuário',
+                description: 'Documente o fluxo completo que o usuário percorre para atingir seus objetivos',
+                examples: [
+                    'Jornada de cadastro: Landing → Formulário → Confirmação de email → Onboarding → Dashboard',
+                    'Jornada de compra: Busca → Produto → Carrinho → Checkout → Confirmação'
+                ],
+                effort: 'moderate',
+                impact: 'high',
+                autofix: {
+                    type: 'append',
+                    pattern: '## Jornadas',
+                    replacement: '## Jornadas do Usuário\n\n### Jornada Principal: [Nome]\n\n1. **[Passo 1]** — [Descrição do passo]\n2. **[Passo 2]** — [Descrição do passo]\n3. **[Passo 3]** — [Descrição do passo]\n\n**Ponto de dor:** [O que pode dar errado]\n**Solução:** [Como o sistema ajuda]\n',
+                    confidence: 0.8
+                }
+            },
+            {
+                id: 'ux_acessibilidade',
+                phase: 'UX Design',
+                trigger: 'missing_acessibilidade',
+                title: 'Considerar acessibilidade (WCAG)',
+                description: 'Documente as considerações de acessibilidade para o design',
+                examples: [
+                    'Contraste mínimo de 4.5:1 para texto normal (WCAG AA)',
+                    'Navegação por teclado em todos os elementos interativos',
+                    'Labels descritivos em todos os campos de formulário'
+                ],
+                effort: 'quick',
+                impact: 'medium'
+            }
+        ]);
+
+        // Templates para fase Arquitetura
+        this.templates.set('Arquitetura', [
+            {
+                id: 'arq_c4',
+                phase: 'Arquitetura',
+                trigger: 'missing_diagrama',
+                title: 'Incluir diagrama C4 (pelo menos Contexto)',
+                description: 'Adicione pelo menos o diagrama de Contexto do modelo C4',
+                examples: [
+                    'Diagrama C4 Nível 1 (Contexto): Sistema central + usuários + sistemas externos',
+                    'Diagrama C4 Nível 2 (Container): Frontend SPA + API REST + Banco PostgreSQL + Cache Redis'
+                ],
+                effort: 'moderate',
+                impact: 'high',
+                autofix: {
+                    type: 'append',
+                    pattern: '## Arquitetura',
+                    replacement: '## Arquitetura\n\n### Diagrama C4 — Nível 1: Contexto\n\n```\n[Usuário] → [Sistema: Nome] → [Sistema Externo 1]\n                           → [Sistema Externo 2]\n```\n\n### Diagrama C4 — Nível 2: Containers\n\n```\n[Frontend: React SPA] → [API: Node.js REST] → [DB: PostgreSQL]\n                                            → [Cache: Redis]\n```\n',
+                    confidence: 0.7
+                }
+            },
+            {
+                id: 'arq_adrs',
+                phase: 'Arquitetura',
+                trigger: 'missing_adrs',
+                title: 'Documentar ADRs (Architecture Decision Records)',
+                description: 'Registre as principais decisões arquiteturais com justificativas',
+                examples: [
+                    'ADR-001: Escolha de PostgreSQL vs MongoDB — Dados relacionais com transações ACID necessárias',
+                    'ADR-002: Arquitetura monolítica vs microsserviços — Equipe pequena, MVP, monolito modular preferido'
+                ],
+                effort: 'moderate',
+                impact: 'high'
+            },
+            {
+                id: 'arq_stack',
+                phase: 'Arquitetura',
+                trigger: 'missing_stack',
+                title: 'Justificar escolhas de stack tecnológica',
+                description: 'Documente o porquê de cada tecnologia escolhida',
+                examples: [
+                    'Frontend: React — Ecossistema maduro, equipe familiarizada, componentes reutilizáveis',
+                    'Backend: Node.js — I/O assíncrono, mesmo idioma que frontend, NPM ecosystem'
+                ],
+                effort: 'quick',
+                impact: 'medium'
+            }
+        ]);
+
+        // Templates para fase Backlog
+        this.templates.set('Backlog', [
+            {
+                id: 'backlog_epicos',
+                phase: 'Backlog',
+                trigger: 'missing_epicos',
+                title: 'Definir épicos do produto',
+                description: 'Agrupe funcionalidades em épicos de alto nível',
+                examples: [
+                    'EP001 — Autenticação e Autorização: Login, cadastro, recuperação de senha, perfis',
+                    'EP002 — Dashboard Principal: Métricas, gráficos, filtros, exportação'
+                ],
+                effort: 'moderate',
+                impact: 'high',
+                autofix: {
+                    type: 'append',
+                    pattern: '## Épicos',
+                    replacement: '## Épicos\n\n**EP001** — [Nome do Épico]\n- Descrição: [O que este épico engloba]\n- Valor de negócio: [Por que é importante]\n- Histórias: [US001, US002, US003]\n\n**EP002** — [Nome do Épico]\n- Descrição: [O que este épico engloba]\n',
+                    confidence: 0.85
+                }
+            },
+            {
+                id: 'backlog_historias',
+                phase: 'Backlog',
+                trigger: 'missing_historias',
+                title: 'Escrever histórias de usuário com critérios de aceite',
+                description: 'Defina histórias no formato "Como [persona], quero [ação], para [benefício]"',
+                examples: [
+                    'US001 — Como gerente, quero visualizar métricas do time em tempo real, para tomar decisões rápidas\n  AC: Dashboard atualiza a cada 30s; Filtro por período; Exportação em PDF',
+                    'US002 — Como desenvolvedor, quero receber alertas de build quebrado, para corrigir rapidamente'
+                ],
+                effort: 'moderate',
+                impact: 'high'
+            },
+            {
+                id: 'backlog_dod',
+                phase: 'Backlog',
+                trigger: 'missing_definition_of_done',
+                title: 'Estabelecer Definition of Done',
+                description: 'Defina critérios claros para considerar uma história concluída',
+                examples: [
+                    'Código revisado por pelo menos 1 desenvolvedor',
+                    'Testes unitários com cobertura ≥ 80%',
+                    'Documentação de API atualizada',
+                    'Deploy em staging sem erros'
+                ],
+                effort: 'quick',
+                impact: 'high'
+            }
+        ]);
+
+        // Templates para fase Frontend
+        this.templates.set('Frontend', [
+            {
+                id: 'fe_componentes',
+                phase: 'Frontend',
+                trigger: 'missing_componentes',
+                title: 'Documentar componentes principais',
+                description: 'Liste os componentes React/Vue/Angular implementados com suas props',
+                examples: [
+                    '<DataTable columns={[]} rows={[]} onSort={} onFilter={} pagination={} />',
+                    '<UserAvatar src={} name={} size="sm|md|lg" showStatus={} />'
+                ],
+                effort: 'moderate',
+                impact: 'medium'
+            },
+            {
+                id: 'fe_responsividade',
+                phase: 'Frontend',
+                trigger: 'missing_responsividade',
+                title: 'Validar responsividade (mobile-first)',
+                description: 'Documente como o layout se adapta a diferentes tamanhos de tela',
+                examples: [
+                    'Mobile (< 768px): Menu hamburguer, cards empilhados, tabelas com scroll horizontal',
+                    'Tablet (768-1024px): Sidebar colapsável, grid 2 colunas',
+                    'Desktop (> 1024px): Sidebar fixa, grid 3 colunas, tabelas completas'
+                ],
+                effort: 'moderate',
+                impact: 'high'
+            },
+            {
+                id: 'fe_performance',
+                phase: 'Frontend',
+                trigger: 'missing_performance',
+                title: 'Documentar otimizações de performance',
+                description: 'Registre as estratégias de performance implementadas',
+                examples: [
+                    'Lazy loading de rotas com React.lazy() + Suspense',
+                    'Memoização de componentes pesados com React.memo()',
+                    'Virtualização de listas longas com react-virtual'
+                ],
+                effort: 'moderate',
+                impact: 'medium'
+            }
+        ]);
+
+        // Templates para fase Backend
+        this.templates.set('Backend', [
+            {
+                id: 'be_endpoints',
+                phase: 'Backend',
+                trigger: 'missing_endpoints',
+                title: 'Documentar endpoints da API',
+                description: 'Liste os endpoints implementados com método, rota e contrato',
+                examples: [
+                    'GET /api/users — Lista usuários (paginado, filtros: status, role)',
+                    'POST /api/users — Cria usuário (body: { name, email, role })',
+                    'PUT /api/users/:id — Atualiza usuário (body parcial)'
+                ],
+                effort: 'moderate',
+                impact: 'high',
+                autofix: {
+                    type: 'append',
+                    pattern: '## Endpoints',
+                    replacement: '## Endpoints da API\n\n### [Recurso]\n\n| Método | Rota | Descrição | Auth |\n|--------|------|-----------|------|\n| GET | /api/[recurso] | Lista [recursos] | JWT |\n| POST | /api/[recurso] | Cria [recurso] | JWT |\n| GET | /api/[recurso]/:id | Busca por ID | JWT |\n| PUT | /api/[recurso]/:id | Atualiza | JWT |\n| DELETE | /api/[recurso]/:id | Remove | JWT+Admin |\n',
+                    confidence: 0.8
+                }
+            },
+            {
+                id: 'be_testes',
+                phase: 'Backend',
+                trigger: 'missing_testes',
+                title: 'Documentar estratégia de testes',
+                description: 'Descreva os testes implementados e cobertura',
+                examples: [
+                    'Testes unitários: Jest, cobertura 85%, foco em services e utils',
+                    'Testes de integração: Supertest, endpoints críticos (auth, pagamentos)',
+                    'Testes de contrato: Pact para comunicação com serviços externos'
+                ],
+                effort: 'moderate',
+                impact: 'high'
+            },
+            {
+                id: 'be_seguranca',
+                phase: 'Backend',
+                trigger: 'missing_seguranca',
+                title: 'Documentar medidas de segurança',
+                description: 'Registre as proteções implementadas contra vulnerabilidades',
+                examples: [
+                    'Autenticação: JWT com refresh token, expiração 15min/7dias',
+                    'Rate limiting: 100 req/min por IP, 1000 req/min por usuário autenticado',
+                    'Validação: Zod/Joi em todos os inputs, sanitização de SQL'
+                ],
+                effort: 'moderate',
+                impact: 'high'
+            }
+        ]);
+
+        // Templates para fase Banco de Dados
+        this.templates.set('Banco de Dados', [
+            {
+                id: 'db_schema',
+                phase: 'Banco de Dados',
+                trigger: 'missing_schema',
+                title: 'Documentar schema do banco de dados',
+                description: 'Descreva as tabelas/coleções com seus campos e relacionamentos',
+                examples: [
+                    'users: id, email (unique), name, role (enum), created_at, updated_at',
+                    'orders: id, user_id (FK), status (enum), total, items (jsonb), created_at'
+                ],
+                effort: 'moderate',
+                impact: 'high'
+            }
+        ]);
     }
+
 
     /**
      * Inicializa padrões por fase

@@ -2,17 +2,20 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { parsearEstado } from "../state/storage.js";
 import { getFluxoComStitch } from "../flows/types.js";
+import { KnowledgeBase } from "../core/knowledge/KnowledgeBase.js";
 import type { ToolResult } from "../types/index.js";
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
 
-// Fases que disparam geração automática de ADR
+// v6.3 S3.1: Fases que disparam geração automática de ADR (expandido)
 const FASES_ARQUITETURAIS = new Set([
     'Arquitetura',
     'Arquitetura Avançada',
     'Banco de Dados',
     'Segurança',
     'Contrato API',
+    'Requisitos',
+    'Modelo de Domínio',
 ]);
 
 // Padrões regex para detectar decisões arquiteturais no texto
@@ -75,8 +78,11 @@ export function withADRGeneration(handler: ToolHandler): ToolHandler {
             const decisoes = extrairDecisoes(entregavel, nomeFaseConcluida);
             if (decisoes.length === 0) return result;
 
-            // Salvar ADRs no diretório do projeto
+            // Salvar ADRs no diretório do projeto (arquivos .md)
             await salvarADRs(diretorio, decisoes, nomeFaseConcluida);
+
+            // v6.3 S3.2: Persistir ADRs no KnowledgeBase para consulta futura
+            await persistirNoKnowledgeBase(diretorio, decisoes, faseConcluidaNum);
 
             console.log(`[ADRGeneration] ${decisoes.length} ADR(s) gerados para fase: ${nomeFaseConcluida}`);
 
@@ -84,7 +90,8 @@ export function withADRGeneration(handler: ToolHandler): ToolHandler {
             if (result.content?.[0]?.text) {
                 result.content[0].text +=
                     `\n\n---\n\n📋 **${decisoes.length} ADR(s) gerado(s) automaticamente** em \`.maestro/adrs/\`\n` +
-                    decisoes.map(d => `- ${d.id}: ${d.titulo}`).join('\n');
+                    decisoes.map(d => `- ${d.id}: ${d.titulo}`).join('\n') +
+                    `\n\n> 💡 Use \`contexto()\` para ver todas as decisões acumuladas do projeto.`;
             }
 
         } catch (error) {
@@ -154,6 +161,36 @@ function extrairDecisoes(entregavel: string, nomeFase: string): ADR[] {
     }
 
     return decisoes;
+}
+
+/**
+ * v6.3 S3.2: Persiste ADRs no KnowledgeBase para consulta via contexto()
+ */
+async function persistirNoKnowledgeBase(diretorio: string, adrs: ADR[], faseNum: number): Promise<void> {
+    try {
+        const kb = new KnowledgeBase(diretorio);
+        for (const adr of adrs) {
+            await kb.record({
+                id: adr.id,
+                type: 'adr',
+                content: {
+                    decision: adr.decisao,
+                    context: adr.contexto,
+                    alternatives: [],
+                    consequences: { positive: [], negative: [] },
+                },
+                metadata: {
+                    fase: faseNum,
+                    timestamp: adr.timestamp,
+                    tags: [adr.fase.toLowerCase().replace(/\s+/g, '-'), 'auto-generated'],
+                    relevance: 0.8,
+                },
+            });
+        }
+    } catch (err) {
+        // KnowledgeBase é best-effort — não bloqueia o fluxo
+        console.warn('[ADRGeneration] Falha ao persistir no KnowledgeBase (non-blocking):', err);
+    }
 }
 
 async function salvarADRs(diretorio: string, adrs: ADR[], nomeFase: string): Promise<void> {

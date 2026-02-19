@@ -72,6 +72,8 @@ export interface EstadoProjeto {
         frontend_first: boolean;
         auto_checkpoint: boolean;
         auto_fix: boolean;
+        /** v6.3 S1.2: Controla se brainstorm é sugerido. Padrão: false em economy, true nos demais. */
+        wantsBrainstorm?: boolean;
         // v3.0: Novos campos de onboarding
         auto_flow?: boolean;  // Auto-avanço quando score >= 70
         onboarding?: {
