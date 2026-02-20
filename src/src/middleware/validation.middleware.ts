@@ -93,3 +93,62 @@ export const defaultValidations = validateTools({
     'analisar': 'analisar',
     'contexto': 'contexto',
 });
+
+/**
+ * V6 Sprint 2: Middleware de Estado Compulsório
+ *
+ * Intercepta chamadas de tools ANTES de executar o handler.
+ * Quando `em_estado_compulsorio = true`, bloqueia qualquer tool
+ * que não esteja na whitelist (`tools_permitidas_no_compulsorio`).
+ *
+ * Objetivo: Impedir que a IA "divague" chamando `maestro()`, `analisar()` etc
+ * enquanto deveria estar corrigindo o entregável reprovado no Gate.
+ */
+export function withCompulsoryStateGuard(
+    toolName: string
+): (handler: ToolHandler) => ToolHandler {
+    return (handler: ToolHandler) => {
+        return async (args: Record<string, unknown>): Promise<ToolResult> => {
+            // Tentar ler o estado do projeto para verificar modo compulsório
+            const diretorio = args.diretorio as string | undefined;
+            if (diretorio) {
+                try {
+                    const { readFileSync } = await import('fs');
+                    const { join } = await import('path');
+                    const estadoPath = join(diretorio, '.maestro', 'estado.json');
+                    const estadoRaw = readFileSync(estadoPath, 'utf-8');
+                    const estado = JSON.parse(estadoRaw);
+
+                    if (estado?.em_estado_compulsorio === true) {
+                        const allowed: string[] = estado?.tools_permitidas_no_compulsorio
+                            ?? ['executar', 'validar', 'contexto'];
+
+                        if (!allowed.includes(toolName)) {
+                            return {
+                                content: [{
+                                    type: 'text' as const,
+                                    text: [
+                                        `⛔ **SISTEMA: Gate Reprovado — Modo Compulsório Ativo**`,
+                                        ``,
+                                        `A tool \`${toolName}\` está bloqueada até que o Gate seja aprovado.`,
+                                        ``,
+                                        `**Tools disponíveis agora:** ${allowed.map(t => `\`${t}\``).join(', ')}`,
+                                        ``,
+                                        `**Para sair deste modo:**`,
+                                        `1. Corrija o entregável aplicando os itens ❌ da última validação`,
+                                        `2. Chame: \`executar({ diretorio: "${diretorio}", acao: "avancar" })\``,
+                                    ].join('\n'),
+                                }],
+                                isError: true,
+                            };
+                        }
+                    }
+                } catch {
+                    // Se não conseguir ler o estado, continua normalmente
+                }
+            }
+
+            return handler(args);
+        };
+    };
+}

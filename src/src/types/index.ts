@@ -51,6 +51,14 @@ export interface EstadoProjeto {
         criterios: string[];
     };
 
+    // V6 Sprint 2: Estado compulsório — bloqueia tools durante correção de gate
+    em_estado_compulsorio?: boolean;
+    tools_permitidas_no_compulsorio?: string[];
+
+    // V6 Sprint 6: Classificação de tipo de fase para Smart Auto-Flow
+    flow_phase_type?: 'input_required' | 'derived' | 'technical' | 'correction_loop';
+    auto_flow_enabled?: boolean;
+
     // Inferência contextual (balanceada para evitar excesso de suposições)
     inferencia_contextual?: InferenciaContextual;
 

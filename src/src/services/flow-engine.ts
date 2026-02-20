@@ -31,6 +31,8 @@ export interface FlowState {
     nivel: string;
     usarStitch: boolean;
     diretorio: string;
+    // V6 Sprint 6: Tipo de fase para Smart Auto-Flow
+    flowPhaseType: 'input_required' | 'derived' | 'technical' | 'correction_loop';
 }
 
 /**
@@ -248,6 +250,8 @@ export function getFlowState(estado: EstadoProjeto, diretorio: string): FlowStat
         nivel: estado.nivel,
         usarStitch: estado.usar_stitch || false,
         diretorio,
+        // V6 Sprint 6: Ler tipo da fase atual do estado para Smart Auto-Flow
+        flowPhaseType: estado.flow_phase_type ?? 'input_required',
     };
 }
 
@@ -325,12 +329,21 @@ export function getNextStep(estado: EstadoProjeto, diretorio: string): FlowStep 
     );
     const specialist = faseInfo ? getSpecialistPersona(faseInfo.nome) : null;
 
+    // V6 Sprint 6: Smart Auto-Flow — sobrescreve requires_user_input baseado no tipo da fase
+    // Fases 'derived' (Requisitos, UX, Arquitetura...) e 'technical' (Frontend, Backend...)
+    // podem avançar sem pausa para input humano.
+    const effectiveRequiresInput = (() => {
+        const phaseType = flowState.flowPhaseType;
+        if (phaseType === 'derived' || phaseType === 'technical') return false;
+        return transition.requires_user_input;
+    })();
+
     return {
         phase: transition.to,
         tool: transition.tool,
         description: transition.description,
         args_template: { estado_json: "{{estado_json}}", diretorio },
-        requires_user_input: transition.requires_user_input,
+        requires_user_input: effectiveRequiresInput,
         user_prompt: transition.user_prompt,
         auto_execute: transition.auto_execute,
         specialist,

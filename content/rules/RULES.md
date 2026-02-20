@@ -309,6 +309,20 @@ Disponíveis sob demanda, fora do fluxo de fases:
 3. Que TEMPLATE usar?
 4. Como isso DIFERE de output genérico?
 
+### 🔄 Regra de Transição de Fase (Active Rules Auto-Hydration)
+
+**Sempre que o servidor MCP confirmar avanço de fase:**
+1. Leia **imediatamente** o arquivo SKILL.md do especialista indicado no retorno da tool
+2. O path será fornecido no formato nativo da sua IDE:
+   - **Antigravity/Gemini:** `@[.agent/skills/{specialist}/SKILL.md]`
+   - **Cursor:** `@.cursor/skills/{specialist}/SKILL.md`
+   - **Windsurf:** `#.windsurf/skills/{specialist}/SKILL.md`
+3. Assuma a persona descrita no SKILL.md **sem aguardar confirmação do usuário**
+4. Confirme dizendo: "Sou [nome do especialista], meu foco é [entregável desta fase]."
+
+> ❌ NUNCA aguarde o usuário pedir para carregar o especialista
+> ✅ SEMPRE assuma a persona imediatamente ao receber a transição de fase
+
 ---
 
 ## 🏗️ FLUXO DO PROJETO

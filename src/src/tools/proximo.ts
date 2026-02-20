@@ -7,7 +7,7 @@ import { classificarPRD, descreverNivel } from "../flows/classifier.js"; // @dep
 import { validarGate, formatarResultadoGate, validarGateComTemplate } from "../gates/validator.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { parsearResumo, serializarResumo, criarResumoInicial, extrairResumoEntregavel } from "../state/memory.js";
-import { gerarInstrucaoProximaFase, gerarInstrucaoCorrecao } from "../utils/instructions.js";
+import { gerarInstrucaoProximaFase, gerarInstrucaoCorrecao, gerarInstrucaoContinuidade } from "../utils/instructions.js";
 import type { EntregavelResumo, ProjectSummary } from "../types/memory.js";
 import { logEvent, EventTypes } from "../utils/history.js";
 import { getSpecialistPersona } from "../services/specialist.service.js";
@@ -15,7 +15,7 @@ import { gerarSystemMd } from "../utils/system-md.js";
 import { gerarSecaoPrompts, getSkillParaFase, getSkillPath, getSkillResourcePath } from "../utils/prompt-mapper.js";
 import { validarEstrutura } from "../gates/estrutura.js";
 import { normalizeProjectPath, resolveProjectPath, joinProjectPath, getServerContentRoot } from "../utils/files.js";
-import { formatSkillMessage, detectIDE, getSkillResourcePath as getIDESkillResourcePath } from "../utils/ide-paths.js";
+import { formatSkillMessage, formatSkillHydrationCommand, detectIDE, getSkillResourcePath as getIDESkillResourcePath } from "../utils/ide-paths.js";
 import { inferirContextoBalanceado } from "../utils/inferencia-contextual.js";
 import { verificarSkillCarregada } from "../utils/content-injector.js";
 import { ContentResolverService } from "../services/content-resolver.service.js";
@@ -28,6 +28,9 @@ import { readFile } from "fs/promises";
 import { isPrototypePhase } from "../handlers/prototype-phase-handler.js"; // v9.0
 // v6.3 S5.1: Autonomia calibrada
 import { DecisionEngine } from "../core/decision/DecisionEngine.js";
+// V6 Sprint 4+5: Gate orientation e watcher de entregáveis
+import { generateGateOrientationDoc } from "../utils/gate-orientation.js";
+import { startFileWatcher, stopFileWatcher } from "../services/watcher.service.js";
 import { RiskEvaluator } from "../core/risk/RiskEvaluator.js";
 import type { RiskLevel as DecisionRiskLevel } from "../core/decision/types.js";
 
@@ -667,6 +670,13 @@ Se o erro persistir, contate o suporte técnico.`,
 
     // Score < 50: BLOQUEAR com instruções detalhadas de correção
     if (qualityScore < 50) {
+        // V6 Sprint 2: Ativar modo compulsório também no score < 50
+        estado.em_estado_compulsorio = true;
+        estado.aguardando_aprovacao = false; // Score < 50 não aguarda aprovação — é bloqueio total
+        try {
+            await saveFile(`${diretorio}/.maestro/estado.json`, serializarEstado(estado).content);
+        } catch { /* silencioso */ }
+
         const ideParaBloqueio = detectIDE(diretorio) || 'windsurf';
         const feedbackBloqueio = gerarInstrucaoCorrecao(
             faseAtual.nome,
@@ -675,7 +685,8 @@ Se o erro persistir, contate o suporte técnico.`,
             gateResultado.itens_pendentes || [],
             gateResultado.sugestoes || [],
             estruturaResult.secoes_faltando || [],
-            ideParaBloqueio
+            ideParaBloqueio,
+            diretorio  // V6 Sprint 1: payload de auto-correção
         );
 
         // Feedback de leitura do disco
@@ -709,6 +720,8 @@ ${feedbackBloqueio}
         estado.aguardando_aprovacao = true;
         estado.motivo_bloqueio = "Score abaixo de 70 - requer aprovação do usuário";
         estado.score_bloqueado = qualityScore;
+        // V6 Sprint 2: Ativar modo compulsório — bloqueia divagação da IA
+        estado.em_estado_compulsorio = true;
 
         // Serializar estado bloqueado
         const estadoBloqueado = serializarEstado(estado);
@@ -729,7 +742,8 @@ ${feedbackBloqueio}
             gateResultado.itens_pendentes || [],
             gateResultado.sugestoes || [],
             estruturaResult.secoes_faltando || [],
-            ideParaAprovacao
+            ideParaAprovacao,
+            diretorio  // V6 Sprint 1: para payload de auto-correção
         );
 
         // Feedback de leitura do disco
@@ -784,6 +798,38 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
 
     // Atualizar estado com entregável registrado
     estado.entregaveis[`fase_${estado.fase_atual}`] = caminhoArquivo;
+
+    // V6 Sprint 2: Garantir que ga saiu do modo compulsório ao avançar com sucesso
+    estado.em_estado_compulsorio = false;
+    estado.aguardando_aprovacao = false;
+    estado.motivo_bloqueio = undefined;
+    estado.score_bloqueado = undefined;
+
+    // V6 Sprint 6: PHASE_TYPE_MAP — classifica o tipo da PROXIMA fase para Smart Auto-Flow
+    // Nomes canônicos extraídos de flows/types.ts (FLUXO_SIMPLES, FLUXO_MEDIO, FLUXO_COMPLEXO, FASE_STITCH)
+    const PHASE_TYPE_MAP: Record<string, EstadoProjeto['flow_phase_type']> = {
+        // --- input_required: fase de coleta com o usuário ---
+        'Produto': 'input_required',
+        // --- derived: fases que derivam de fases anteriores, sem dúvidas do usuário ---
+        'Requisitos': 'derived',
+        'UX Design': 'derived',
+        'Modelo de Domínio': 'derived',
+        'Arquitetura': 'derived',
+        'Arquitetura Avançada': 'derived',
+        'Backlog': 'derived',
+        'Contrato API': 'derived',
+        'Prototipagem': 'derived',  // Sprint Stitch: deriva do Design Doc
+        // --- technical: implementação pura, sem perguntas conceituais ---
+        'Banco de Dados': 'technical',
+        'Segurança': 'technical',
+        'Testes': 'technical',
+        'Performance': 'technical',
+        'Observabilidade': 'technical',
+        'Frontend': 'technical',
+        'Backend': 'technical',
+        'Integração': 'technical',
+        'Deploy Final': 'technical',
+    };
 
     // Preparar/atualizar resumo
     let resumo: ProjectSummary;
@@ -1011,6 +1057,46 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
         console.warn('Aviso: Não foi possível atualizar histórico/SYSTEM.md:', error);
     }
 
+    // V6 Sprint 4: Gerar guia de Gate da PRÓXIMA fase (TDD Invertido)
+    // Cria docs/fase-XX/.orientacoes-gate.md com os critérios exatos de validação
+    if (proximaFase) {
+        try {
+            const gateOrientationPath = await generateGateOrientationDoc(
+                diretorio,
+                proximaFase.nome,
+                estado.fase_atual
+            );
+            // Atualizar flow_phase_type da próxima fase no estado (Sprint 6)
+            estado.flow_phase_type = PHASE_TYPE_MAP[proximaFase.nome] ?? 'derived';
+            if (gateOrientationPath) {
+                console.log(`[proximo] Guia de Gate gerado: ${gateOrientationPath}`);
+            }
+        } catch (error) {
+            console.warn('[proximo] Falha ao gerar orientação de gate (não crítico):', error);
+        }
+    }
+
+    // V6 Sprint 5: Gerenciar ciclo de vida do watcher de entregáveis
+    // Parar watcher da fase anterior (evita leak de file handles)
+    stopFileWatcher(diretorio);
+    // Iniciar watcher para o PRÓXIMO entregável assim que a fase avançar
+    if (proximaFase) {
+        const proximaFaseDirName = `fase-${estado.fase_atual.toString().padStart(2, '0')}-${proximaFase.nome.toLowerCase().replace(/\s/g, '-')}`;
+        const proximoEntregavelPath = `${diretorio}/docs/${proximaFaseDirName}/${proximaFase.entregavel_esperado}`;
+        startFileWatcher({
+            filePath: proximoEntregavelPath,
+            diretorio,
+            faseNome: proximaFase.nome,
+            tier: estado.tier_gate || 'base',
+            gateChecklist: proximaFase.gate_checklist || [],
+            onValidationResult: (score, feedback, filePath) => {
+                // Log no console — o usuário será notificado via IDE ao chamar executar
+                console.log(`\n==========================================\n[watcher] ${proximaFase.nome} | Score: ${score} | ${filePath}`);
+                if (score >= 0) console.log(`[watcher] Feedback:\n${feedback}\n==========================================\n`);
+            }
+        }).catch(err => console.warn('[watcher] Não foi possível iniciar o watcher:', err));
+    }
+
     // v6.0: Bloco de interrupção pós-PRD removido — classificação progressiva já cuida disso
 
     // v5.5.0: Feedback visual quando entregável foi lido do disco
@@ -1044,19 +1130,13 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
             console.warn("[proximo] Falha ao carregar skill ativa, usando fallback:", error);
         }
 
-        // Fallback: referência textual (compatibilidade v4)
+        // Fallback: referência textual com comando de hydration (V6 Sprint 3)
         const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
         return `
 
 ## 🤖 Próximo Especialista
 
-${formatSkillMessage(proximaSkill, ide)}
-
-> 💡 **Próximos passos:**
-> 1. Ative a skill: \`@${proximaSkill}\`
-> 2. Leia SKILL.md para entender a fase
-> 3. Consulte o template apropriado
-> 4. Siga o checklist de validação
+${formatSkillHydrationCommand(proximaSkill, ide)}
 `;
     })();
 
@@ -1086,6 +1166,15 @@ ${proximaSkillInfo}
 
 `;
 
+    // V6 Sprint 6: Instrução de continuidade autônoma
+    // Retorna vazio para fases 'input_required' (especialista faz as perguntas naturalmente)
+    const continuidade = gerarInstrucaoContinuidade(
+        diretorio,
+        faseAnterior,
+        proximaFase?.nome ?? '',
+        estado.flow_phase_type ?? 'derived'
+    );
+
     // v5.3: Persistência direta — salvar todos os arquivos via fs
     try {
         await saveMultipleFiles(filesToSave);
@@ -1100,7 +1189,7 @@ ${proximaSkillInfo}
     // v5: next_action e progress são calculados automaticamente pelo middleware flow-engine.middleware.ts
     // Mantemos apenas specialist_persona e estado_atualizado para o middleware processar
     return {
-        content: [{ type: "text", text: feedbackLeitura + resposta + confirmacao }],
+        content: [{ type: "text", text: feedbackLeitura + resposta + confirmacao + continuidade }],
         estado_atualizado: estadoFile.content,
         specialist_persona: specialist || undefined,
         // next_action e progress serão adicionados pelo middleware withFlowEngine

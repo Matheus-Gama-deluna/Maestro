@@ -23,7 +23,7 @@ import { withFlowEngine } from "./flow-engine.middleware.js";
 import { withSkillInjection } from "./skill-injection.middleware.js";
 import { withPersistence } from "./persistence.middleware.js";
 import { withADRGeneration } from "./adr-generation.middleware.js";
-import { withPromptValidation } from "./validation.middleware.js";
+import { withPromptValidation, withCompulsoryStateGuard } from "./validation.middleware.js";
 import type { ToolResult } from "../types/index.js";
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
@@ -44,17 +44,19 @@ export function applyOrchestrationPipeline(
 ): ToolHandler {
     console.log(`[OrchestrationPipeline] Registering tool: ${toolName}`);
 
-    // v6.3: Persistence → ADR → FlowEngine → Skill → PromptValidation
-    // CORREÇÃO S1.1: withPromptValidation(toolName, toolName) — segundo argumento é expectedTool.
-    // Sem ele, o middleware verificava `if (!expectedTool) return result` e nunca validava nada.
-    return withErrorHandling(
-        toolName,
-        withStateLoad(
-            withPersistence(
-                withADRGeneration(
-                    withFlowEngine(
-                        withSkillInjection(
-                            withPromptValidation(toolName, toolName)(handler)
+    // V6 Sprint 2: withCompulsoryStateGuard é o PRIMEIRO middleware da cadeia.
+    // Bloqueia tools não-permitidas quando `em_estado_compulsorio = true`,
+    // antes de qualquer outra lógica ser executada.
+    return withCompulsoryStateGuard(toolName)(
+        withErrorHandling(
+            toolName,
+            withStateLoad(
+                withPersistence(
+                    withADRGeneration(
+                        withFlowEngine(
+                            withSkillInjection(
+                                withPromptValidation(toolName, toolName)(handler)
+                            )
                         )
                     )
                 )
@@ -79,7 +81,7 @@ export function applyLightOrchestrationPipeline(
         `[OrchestrationPipeline] DEPRECATED: applyLightOrchestrationPipeline used for ${toolName}. ` +
         `Use applyOrchestrationPipeline instead.`
     );
-    
+
     // Mesmo comportamento — não há mais "light" vs "full"
     return applyOrchestrationPipeline(toolName, handler);
 }

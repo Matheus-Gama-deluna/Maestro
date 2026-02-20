@@ -74,8 +74,18 @@ export function criarEstadoInicial(
         aguardando_aprovacao: false,
         motivo_bloqueio: undefined,
         score_bloqueado: undefined,
+
+        // V6 Sprint 2: Estado compulsório (bloqueio durante correção de gate)
+        em_estado_compulsorio: false,
+        tools_permitidas_no_compulsorio: ['executar', 'validar', 'contexto'],
+
+        // V6 Sprint 6: Smart Auto-Flow
+        flow_phase_type: 'input_required' as const,  // Fase 1 (Produto) começa com input required
+        auto_flow_enabled: false,
+
         criado_em: new Date().toISOString(),
         atualizado_em: new Date().toISOString(),
+
     };
 }
 

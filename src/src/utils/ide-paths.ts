@@ -121,3 +121,33 @@ export function formatSkillMessage(skillName: string, ide: IDEType): string {
 - 📚 Reference: \`${getSkillResourcePath(skillName, 'reference', ide)}\`
 - 🔧 MCP Functions: \`${getSkillMCPPath(skillName, ide)}\``;
 }
+
+/**
+ * V6 Sprint 3: Gera comando imperativo de hidratação de contexto (Active Rules Pointer).
+ * Usa o formato de @menção nativo de cada IDE para forçar leitura imediata do SKILL.md
+ * na transição de fase, sem criar arquivos extras e sem aguardar confirmação do usuário.
+ *
+ * Formatos nativos:
+ * - Antigravity: @[.agent/skills/{skill}/SKILL.md]
+ * - Cursor:      @.cursor/skills/{skill}/SKILL.md
+ * - Windsurf:    #.windsurf/skills/{skill}/SKILL.md
+ */
+export function formatSkillHydrationCommand(skillName: string, ide: IDEType): string {
+    const skillPath = getSkillFilePath(skillName, ide);
+    const mention = ide === 'cursor' ? `@${skillPath}`
+        : ide === 'windsurf' ? `#${skillPath}`
+            : `@[${skillPath}]`; // antigravity (default)
+
+    return [
+        ``,
+        `---`,
+        ``,
+        `> ⚙️ **SISTEMA — AÇÃO OBRIGATÓRIA (Nova Fase Iniciada)**`,
+        `> Leia AGORA o arquivo do especialista: ${mention}`,
+        `> Assuma a persona descrita no arquivo **imediatamente**.`,
+        `> Não aguarde confirmação do usuário para iniciar.`,
+        `> Confirme dizendo: "Sou [nome do especialista], meu foco é [entregável desta fase]."`,
+        ``,
+    ].join('\n');
+}
+

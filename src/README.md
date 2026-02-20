@@ -1,12 +1,12 @@
-# MCP Maestro v2.1
+# MCP Maestro v5.5.0
 
-Servidor MCP (Model Context Protocol) para o Maestro - Guia de Desenvolvimento Assistido por IA.
+Servidor MCP (Model Context Protocol) para o Maestro - Orquestração Autônoma Avançada e Zero-API.
 
-**Pacote**: `@maestro-ai/mcp-server@2.1.0`
+**Pacote**: `@maestro-ai/mcp-server@5.5.0`
 
 ## 🚀 Uso via npx (Recomendado)
 
-O Maestro agora é distribuído como pacote npm e executado localmente via `npx`, garantindo acesso direto aos arquivos do seu projeto.
+O Maestro agora é distribuído como pacote npm e executado localmente via `npx`, garantindo acesso direto aos arquivos do seu projeto e orquestração autônoma da IA da IDE.
 
 ### Instalação e Configuração
 
@@ -43,38 +43,28 @@ O Maestro agora é distribuído como pacote npm e executado localmente via `npx`
 
 
 
-### Fluxo de Uso (inclui modos e discovery)
+### Mecânica 5 Tools (V3+)
+
+O Maestro consolidou suas dezenas de tools antigas em **5 Entry Points Inteligentes** que auto-gerenciam o estado do projeto.
 
 ```bash
-# 1. Iniciar novo projeto (analisa e sugere classificação)
-iniciar_projeto(
-    nome: "Meu App",
-    descricao: "Sistema de gestão de tarefas",
-    diretorio: "D:\\Projetos\\meu-app",
-    ide: "windsurf",
-    modo: "balanced"   # economy | balanced | quality
-)
+# 1. Maestro (Entry Point)
+maestro({ diretorio: "D:\\Projetos\\meu-app" })                      # Autodetecta status atual
+maestro({ acao: "criar_projeto", respostas: {...} })                  # Cria novo projeto
+maestro({ acao: "setup_inicial", respostas: { ide: "windsurf" } })    # Define ambiente
 
-# 2. Confirmar criação (injeta conteúdo automaticamente)
-confirmar_projeto(
-    nome: "Meu App",
-    diretorio: "D:\\Projetos\\meu-app",
-    tipo_artefato: "product",
-    nivel_complexidade: "medio",
-    ide: "windsurf",
-    modo: "balanced"
-)
+# 2. Executar (Ações Mutações)
+executar({ acao: "avancar", entregavel: "..." })                     # Avança fluxo com validação
+executar({ acao: "salvar", conteudo: "...", tipo: "rascunho" })      # Gravação intermediária
 
-# 3. Coletar discovery (reduz prompts)
-discovery(
-    estado_json: "<conteudo do estado.json>",
-    diretorio: "D:\\Projetos\\meu-app"
-)
+# 3. Validar (Checagens)
+validar({ diretorio: "D:\\Projetos\\meu-app" })                      # Roda pipeline de validação da fase
 
-# 4. Trabalhar nas fases
-proximo()      # Avança para próxima fase
-status()       # Ver status completo
-salvar()       # Salva entregáveis
+# 4. Analisar (Insights e Refatoração)
+analisar({ diretorio: "D:\\Projetos\\meu-app", tipo: "completo" })   # Relatório de Technical/AI Debt
+
+# 5. Contextualizar
+contexto({ diretorio: "D:\\Projetos\\meu-app" })                     # Sumarização de estado e regras base
 ```
 
 ### Injeção Automática de Conteúdo
@@ -93,48 +83,42 @@ meu-app/
 │   └── resumo.json       # Memória do projeto
 ```
 
-### Comandos Principais
+### Comandos Principais e Fluxo Inteligente (Automação Zero-API)
 
-| Comando | Descrição |
-|---------|-----------|
-| `iniciar_projeto` | Analisa e sugere classificação |
-| `confirmar_projeto` | Cria projeto e injeta conteúdo |
-| `carregar_projeto` | Carrega projeto existente |
-| `proximo` | Salva entregável e avança fase |
-| `status` | Retorna status completo |
-| `discovery` | Coleta perguntas iniciais agrupadas e salva em `estado.discovery` |
-| `injetar_conteudo` | Reinjeta conteúdo (use `force:true`) |
-
----
-
-## Destaques do Changelog v2.1
-- Modos de operação: economy / balanced / quality com otimizações automáticas
-- Discovery agrupado para reduzir 40-75% dos prompts iniciais
-- Multi-IDE consolidado via `ide-paths.ts` (Windsurf, Cursor, Antigravity)
-- Correções de dependências e atualização do SDK MCP para 1.25.3
-
----
-
-## Tools Disponíveis
+Com a arquitetura Fat MCP v5.5, a IA agora conta com um **Pipeline de Validação Watcher** (`chokidar`) totalmente engrenado.
 
 | Tool | Descrição |
-|------|-----------|
-| `iniciar_projeto` | Inicia um novo projeto com classificação |
-| `confirmar_projeto` | Confirma criação e injeta conteúdo |
-| `carregar_projeto` | Carrega projeto existente |
-| `proximo` | Salva entregável e avança para próxima fase |
-| `status` | Retorna status atual do projeto |
-| `validar_gate` | Valida checklist antes de avançar fase |
-| `contexto` | Obtém contexto completo do projeto |
-| `salvar` | Salva artefatos do projeto |
-| `injetar_conteudo` | Injeta conteúdo base no projeto |
-| `nova_feature` | Fluxo para adicionar nova feature |
-| `corrigir_bug` | Fluxo para correção de bugs |
-| `refatorar` | Fluxo para refatoração de código |
-| `classificar` | Classifica entregáveis |
-| `avaliar_entregavel` | Avalia qualidade com score |
+|---------|-----------|
+| `maestro` | Portal de engajamento do projeto. Auto-resolve entre inicializar e obter status. |
+| `executar` | Comando central para mutações, lidar com TDD invertido, auto-correção forçada e transições lógicas. |
+| `validar` | Disparo manual ou auto-acionado pelo Watcher ao salvar um MD (score baseado em regex e semântica). |
+| `analisar` | Camada de verificação de Code Smells e Architectural Debt. |
+| `contexto` | Permite à IA compreender regras atuais com segurança sem divagar. |
 
 ---
+
+## Destaques do Changelog v5.5 (V6)
+- **Watcher Progressivo (Sprint 5):** Qualquer save num entregável via IDE agora dispara a pontuação via background automaticamente sem queima de tokens.
+- **TDD Invertido (Sprint 4):** A IA passa a ler um `.checklist-esperante.md` obrigatório ANTES de escrever o documento.
+- **Hydration Multi-IDE (Sprint 3):** Prompt adaptável que manda links reais locais em favorísticos MCP (`@.cursor`, etc).
+- **Zero Pause Points & Auto-Flow (Sprint 6):** Pipeline de transição avança automaticamente as etapas (derivação ou técnicas), parando unicamente em bloqueios (Score < 70) ou requerimentos explícitos humanos.
+
+---
+
+## Estrutura do Projeto Gerada
+
+Quando instanciado, um esqueleto como este rege a progressão:
+```
+meu-app/
+├── .maestro/
+│   ├── validation/       # Reports das validações locais 
+│   ├── estado.json       # Maquina de estados da IA e fluxo
+│   └── resumo.json       # Memoria Cache Limitada
+├── .agent/
+│   └── skills/           # Especialistas Injetados
+├── docs/                 # Entregáveis de cada sprint/fase
+│   ├── fase-xx/          # Entregáveis iterativos 
+```
 
 ## 📚 Resources Disponíveis
 
@@ -213,31 +197,32 @@ npm publish --access public
 ## 📋 Exemplo de Fluxo Completo (Modo npx)
 
 ```bash
-# 1. Iniciar projeto
-iniciar_projeto(
-    nome: "meu-app",
-    descricao: "Sistema de gestão de tarefas",
+# 1. Iniciar projeto (detectará que o estado não existe)
+maestro({
     diretorio: "D:\\Projetos\\meu-app"
-)
+})
 
-# 2. Confirmar criação (injeta conteúdo automaticamente)
-confirmar_projeto(
-    nome: "meu-app",
+# 2. Configurar (injeta conteúdo e inicializa estrutura)
+maestro({
+    acao: "setup_inicial",
     diretorio: "D:\\Projetos\\meu-app",
-    tipo_artefato: "product",
-    nivel_complexidade: "medio"
-)
+    respostas: {
+       ide: "windsurf",
+       modo: "balanced"
+    }
+})
 
-# 3. Verificar status
-status(
+# 3. Validar estado do projeto a qualquer momento
+contexto({
     diretorio: "D:\\Projetos\\meu-app"
-)
+})
 
-# 4. Avançar fase
-proximo(
+# 4. Avançar iterações/fases do desenvolvimento
+executar({
+    acao: "avancar",
     entregavel: "# PRD - Produto\n\n## Problema\n...",
     diretorio: "D:\\Projetos\\meu-app"
-)
+})
 ```
 
 ---

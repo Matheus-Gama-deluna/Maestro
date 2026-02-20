@@ -6,6 +6,26 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.
 
 ---
 
+## [5.5.0] - 2026-02-20
+
+### 🚀 V6 "Fat MCP" - Zero API Architecture (Sprint 5)
+- **Event-Driven Watcher Integrado:** A `ValidationPipeline` agora roda de forma totalmente autônoma e silenciosa ouvindo saves nos arquivos Markdown usando `chokidar`.
+- **Auto-Correção e TDD Invertido (Sinais 1 a 4):** IA é orientada ativamente pelo Node.js via System Prompts imperativos nos erros do Gate.
+- **Estado Compulsório:** Sistema restringe a divagação da IA para rotas de erro até que os Gates passem, bloqueando execução leviana de ferramentas.
+- **Smart Auto-Flow:** O servidor avança silenciosamente e assume payloads das próximas etapas sem parar a execução em "fases derivadas" e "fases técnicas".
+- Refinamentos no `WatcherConfig` e `proximo.ts` para enviar o `tier` o `gate_checklist` corretamente para o watcher passivo.
+
+---
+
+## [5.4.7] - 2026-02-18
+
+### 🤖 Onboarding V3 e Classificação Progressiva
+- Transformação do `ClassificadorProgressivo` para reavaliar dinamicamente ao longo das fases.
+- Reestruturação global do modelo e tipagens (`EstadoProjeto`).
+- Adição silenciosa de metadados em ferramentas chave para evitar leaks de contexto MCP.
+
+---
+
 ## [2.3.0] - 2026-02-01
 
 ### 🤖 Modern Skills v2.0

@@ -1,61 +1,35 @@
-# MCP Maestro v2.1
+# MCP Maestro v5.5.0
 
-Servidor **MCP (Model Context Protocol)** para desenvolvimento assistido por IA com **otimizações inteligentes**, **frontend-first** e **gerenciamento de tarefas**.
+Servidor **MCP (Model Context Protocol)** autônomo. Uma orquestração "Fat MCP" para desenvolvimento assistido por IA com **Zero-API approach**, auto-correção, TDD Invertido e pipelines nativos.
 
 [![Status](https://img.shields.io/badge/status-online-success)](https://maestro.deluna.dev.br/health)
-[![npm](https://img.shields.io/npm/v/@maestro-ai/cli)](https://www.npmjs.com/package/@maestro-ai/cli)
+[![npm](https://img.shields.io/npm/v/@maestro-ai/mcp-server)](https://www.npmjs.com/package/@maestro-ai/mcp-server)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.1.0-blue)](CHANGELOG_V2.md)
+[![Version](https://img.shields.io/badge/version-5.5.0-blue)](CHANGELOG.md)
 
-## 🆕 Novidades v2.1
+## 🆕 Novidades v5.5 (V6)
 
-### 💰 Modos de Operação (Economy / Balanced / Quality)
-- Seleção logo no `iniciar_projeto`
-- Otimizações automáticas por modo (batch, one-shot, caching, checkpoints)
-- Mapeamento automático tipo → modo sugerido
+### 🚀 Watcher Nativo Event-Driven (Sprint 5)
+- Ao invés de paradas bloqueantes a cada arquivo salvo, a `ValidationPipeline` agora corre local em background acionada por eventos `chokidar` do sistema operacional.
 
-### 🧠 Discovery Agrupado (redução de prompts)
-- Nova tool `discovery` para coletar todas as perguntas iniciais em 1 prompt
-- Questionário adaptado ao modo (economy/balanced/quality)
-- Respostas salvas em `estado.discovery` e usadas pelos especialistas
+### 🛡️ TDD Invertido (Sprint 4)
+- Documentos de `.orientacao-gate.md` pré-gerados contendo as métricas de sucesso que a IA lê _antes_ de escrever a funcionalidade. Sucesso ou Rollback compulsório se Score < 70.
 
-### 🌐 Multi-IDE consolidado
-- Paths dinâmicos via `ide-paths.ts` (Windsurf, Cursor, Antigravity)
-- Mensagens de skill com localização correta por IDE
+### ⚙️ Auto-Correção Injetada (Sprint 1) e Smart Auto-Flow
+- Ao falhar um Gate, a IA é orientada ativamente pelo MCP sobre *como* corrigir no próprio erro, dispensando requisições extras.
+- Etapas "tecnicas" (Backend/Frontend/Deploy) auto-avançam (`auto_flow`) sem esperar comando do humano se os scores permitirem.
 
-### 🎨 Frontend-First Architecture
-- Geração automática de contratos de API (OpenAPI 3.0)
-- Schemas TypeScript + Zod para validação
-- Mocks realistas com MSW e Faker.js
-- Cliente API gerado automaticamente
-- Desenvolvimento paralelo Frontend + Backend
+### 💰 5 Tools Paradigm
+- Com a abolição das APIs fechadas (Fat MCP), os 17 tools antigos condensaram-se em **5 Core Tools**: `maestro`, `executar`, `validar`, `analisar` e `contexto`. Modos autônomos gerenciam o projeto de forma inteligente.
 
-### 📋 Sistema de Gerenciamento de Tarefas
-- Hierarquia completa: Epic → Feature → Story → Task → Subtask
-- Dependências e detecção de ciclos
-- Tracking de progresso em tempo real
-- Estatísticas e métricas
-
-### ⚡ Otimizações Inteligentes
-- **6 estratégias** de economia de prompts
-- Cache inteligente de contexto (TTL 1h)
-- Validação incremental com early exit
-- Batch prompts (consolida perguntas)
-- One-shot generation (código completo)
-- Differential updates (apenas diffs)
-
-**[Ver CHANGELOG completo](./CHANGELOG_V2.md)** | **[Guia de Migração v1→v2](./docs/MIGRACAO_V1_V2.md)**
+**[Ver CHANGELOG completo](./src/CHANGELOG.md)** | **[Roadmap Master](./docs/Roadmap_V6_Maestro_ZeroAPI.md)**
 
 ## 🚀 Início Rápido
 
 ```bash
-# 1. Inicialize seu projeto
-npx @maestro-ai/cli
-
-# 2. Configure o MCP na sua IDE (veja abaixo)
-
-# 3. Comece a desenvolver!
-@mcp:maestro iniciar_projeto
+# 1. Certifique-se de configurar a extensao/MCP da sua IDE.
+# 2. Use o tool de maestro para ligar e provisionar o projeto em um prompt
+# EX: "Crie um projeto do Maestro neste diretório focado em gerenciar tarefas"
 ```
 
 ---
@@ -95,42 +69,39 @@ Para especificar manualmente um diretório, adicione o caminho ao final de `args
 ---
 
 
-## Fluxo de Desenvolvimento
+## Fluxo de Desenvolvimento V6 (Fat MCP)
 
 ```mermaid
 graph TD
-    A[npx @maestro-ai/cli] --> B[Projeto Inicializado]
-    B --> C[iniciar_projeto]
-    C --> D[Fase 1: Produto - PRD]
-    D --> E[proximo]
-    E --> F[Fase 2: Requisitos]
-    F --> G[...]
-    G --> H[Projeto Concluído]
+    A[Setup npx na IDE] --> B[Tool: maestro - Cria Projeto]
+    B --> C[Tool: contexto - Injeta Rules e Skills]
+    C --> D[Fase 1: Produto]
+    D --> E[Tool: executar - Salva e Submete]
+    E --> F{Watcher Valida?}
+    F -- Score > 70 --> G[Aplica Auto Flow p/ Prox Fase]
+    F -- Score < 70 --> H[TDD Invertido - IA se Auto Corrige]
+    H --> E
 ```
 
-1. **Inicialize** o projeto com o CLI
-2. **Configure** o MCP na sua IDE
-3. **Inicie** um projeto com `iniciar_projeto`
-4. **Avance** pelas fases com `proximo`
-5. **Valide** gates com `validar_gate`
+1. **Ative** a MCP na IDE e chame a IA com sua intenção inicial.
+2. A IDE invocará o `maestro({ acao: "criar_projeto" })` e injetará as skills e rules base.
+3. O desenvolvimento segue com a submissão de artefatos pelo `executar`.
+4. Os Gates são auto-checados pela `ValidationPipeline` (background watcher).
+5. Se scores forem atingidos, o Node.js assume a transição automaticamente (Zero-Pause) nas fases técnicas.
 
 ---
 
-## 🛠️ Tools Disponíveis
+## 🛠️ Tools Disponíveis (V3+)
 
-| Tool | Descrição |
+O número de comandos expostos foi drasticamente reduzido para otimizar overhead de tokens de função no prompt ("The 5 Core Tools").
+
+| Tool | Função Central |
 |------|-----------|
-| `iniciar_projeto` | Inicia novo projeto com classificação |
-| `confirmar_projeto` | Confirma criação do projeto |
-| `proximo` | Salva entregável e avança fase |
-| `status` | Retorna status do projeto |
-| `validar_gate` | Valida checklist da fase |
-| `contexto` | Obtém contexto completo |
-| `salvar` | Salva artefatos |
-| `discovery` | Coleta perguntas iniciais agrupadas e salva no estado |
-| `nova_feature` | Fluxo para nova feature |
-| `corrigir_bug` | Fluxo para correção de bugs |
-| `refatorar` | Fluxo para refatoração |
+| `maestro` | Engine de Iniciação e Status Check do projeto inteiro. |
+| `executar` | Responsável pelas mutações (`avancar` com entregável, documentar draft `salvar`, etc). |
+| `validar` | Portal manual para rodar a `ValidationPipeline` em qualquer Markdown desejado ou sob demanda de compliance. |
+| `analisar` | Auditor de Technical Debt, performance e AI logic integrity |
+| `contexto` | Permite à IDE recuperar imediatamente ADRs e a memória histórica contida em `resumo.json` sem desvios. |
 
 ---
 

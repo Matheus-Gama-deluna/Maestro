@@ -149,7 +149,8 @@ export function gerarInstrucaoCorrecao(
     itensPendentes: string[],
     sugestoes: string[],
     secoesFaltando: string[],
-    ide?: IDEType
+    ide?: IDEType,
+    diretorio?: string  // V6 Sprint 1: para payload de auto-correção
 ): string {
     const skillNome = getSkillParaFase(faseNome);
     const ideUsada = ide || 'windsurf';
@@ -210,7 +211,21 @@ export function gerarInstrucaoCorrecao(
 5. **Re-submeta** → Chame \`executar({ acao: "avancar" })\` novamente
 
 > 💡 **Dica:** Foque nos itens ❌ pendentes listados acima. Cada item precisa estar presente no conteúdo do entregável.
+
+---
+
+> ⚙️ **INSTRUÇÃO DE SISTEMA — AÇÃO AUTÔNOMA REQUERIDA**
+> O usuário humano NÃO precisa intervir neste ciclo de correção.
+> **Você (IA assistente) deve, na ordem, SEM pedir confirmação:**
+> 1. Abrir o template indicado acima em \`resources/templates/\`
+> 2. Editar o entregável no disco aplicando as correções dos itens ❌
+> 3. Salvar o arquivo no mesmo caminho
+> 4. Chamar imediatamente: \`executar({ diretorio: "${diretorio}", acao: "avancar" })\`
+>
+> ⚠️ Se após 3 tentativas o score ainda for < 70, pare e apresente as opções ao usuário.
 `;
+
+
 
     return `
 ## 📊 Resultado da Validação: ${qualityScore}/100
@@ -222,3 +237,26 @@ ${recursosSection}
 ${instrucaoCorrecao}`;
 }
 
+/**
+ * V6 Sprint 6: Gera instrução de continuidade autônoma.
+ * Para fases do tipo 'input_required', retorna vazio — especialista fará as perguntas.
+ */
+export function gerarInstrucaoContinuidade(
+    diretorio: string,
+    faseAtual: number,
+    proximaFase: string,
+    phaseType: 'input_required' | 'derived' | 'technical' | 'correction_loop'
+): string {
+    if (phaseType === 'input_required') return '';
+
+    return [
+        ``,
+        `---`,
+        ``,
+        `> ✅ **Gate aprovado — Fase ${faseAtual} concluída.**`,
+        `> **AÇÃO AUTOMÁTICA DO SISTEMA:** Inicie imediatamente a fase "${proximaFase}".`,
+        `> Leia o SKILL.md do especialista indicado acima e gere o entregável completo.`,
+        `> Não aguarde mensagem do usuário. Chame \`executar({ diretorio: "${diretorio}", acao: "avancar" })\` quando pronto.`,
+        ``,
+    ].join('\n');
+}

@@ -1,0 +1,30 @@
+{
+  "overallScore": 70.5,
+  "passed": true,
+  "results": [
+    {
+      "layer": "Entregável (Teste Fase)",
+      "score": 70.5,
+      "passed": true,
+      "issues": [
+        {
+          "type": "content-too-short",
+          "severity": "high",
+          "message": "Entregável muito curto: 81 caracteres (mínimo: 300)",
+          "suggestion": "Expanda o conteúdo da fase \"Teste Fase\" com mais detalhes"
+        },
+        {
+          "type": "gate-checklist-incomplete",
+          "severity": "high",
+          "message": "Gate checklist incompleto — 1/1 itens não evidenciados",
+          "suggestion": "Adicione evidências para: Deve ter introdução"
+        }
+      ],
+      "suggestions": [],
+      "timestamp": "2026-02-20T18:46:01.224Z"
+    }
+  ],
+  "recommendations": [],
+  "tier": "base",
+  "timestamp": "2026-02-20T18:46:01.222Z"
+}

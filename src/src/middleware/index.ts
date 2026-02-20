@@ -16,7 +16,7 @@ export { withStateLoad } from "./state-loader.middleware.js";
 export { withPersistence } from "./persistence.middleware.js";
 export { withFlowEngine } from "./flow-engine.middleware.js";
 export { withSkillInjection } from "./skill-injection.middleware.js";
-export { withPromptValidation, defaultValidations } from "./validation.middleware.js";
+export { withPromptValidation, withCompulsoryStateGuard, defaultValidations } from "./validation.middleware.js";
 
 import { withStateLoad } from "./state-loader.middleware.js";
 import { withPersistence } from "./persistence.middleware.js";
