@@ -124,7 +124,7 @@ describe('DeliverableValidator: Fase Produto (PRD)', () => {
     });
 
     it('deve ter score maior quando gate checklist é evidenciado', async () => {
-        const gate = ['problema definido', 'persona identificada', 'mvp listado'];
+        const gate = ['problema', 'persona', 'funcionalidades'];
 
         const resultSemGate = await validator.validate(PRD_COMPLETO, makeContext('Produto', []));
         const resultComGate = await validator.validate(PRD_COMPLETO, makeContext('Produto', gate));
