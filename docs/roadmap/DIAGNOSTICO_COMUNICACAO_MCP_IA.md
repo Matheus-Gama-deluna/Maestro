@@ -172,6 +172,15 @@ proximo      → salva arquivos diretamente via fs → retorna confirmação →
 
 **Solução:** Normalizar para um único campo `respostas` em todo o sistema, ou fazer `avancar.ts` mapear corretamente.
 
+### P7: Inicialização Falha em Diretórios "Sujos" (Falsos Positivos)
+
+**Onde ocorre:**
+- `maestro-tool.ts:98` → Bloco `if (!estado)` ignora explicitamente a ação `criar_projeto` ou `setup_inicial` se um `estado.json` fantasma for encontrado no diretório (ex: testes de fallback falhos).
+
+**Impacto:** Se o usuário apagar o código, mas esquecer a pasta `.maestro/`, e chamar `maestro({acao: "criar_projeto"})`, o sistema ignora a requisição e devolve o estado antigo. Essa manobra pula a cópia dos scripts de injeção, induz a IA ao erro (ela fica tentando usar comandos e não recebe o onboarding real do 0) e supostamente bloqueia a "Gestão de Produto" das etapas iniciais.
+
+**Solução:** Adicionar `args.acao === "criar_projeto"` ou `args.acao === "setup_inicial"` na condição de força para resetar/sobrepor caso a action esteja explícita.
+
 ---
 
 ## 3. Inventário Completo de Mudanças
@@ -194,6 +203,7 @@ proximo      → salva arquivos diretamente via fs → retorna confirmação →
 | 12 | `src/router.ts` | Schema do maestro com propriedades de respostas + descriptions | P1 |
 | 13 | `src/utils/next-step-formatter.ts` | NOVO: Helper para gerar próximo passo correto | P1 |
 | 14 | `src/utils/persistence.ts` | NOVO: Helper para salvar arquivos do projeto diretamente | P1 |
+| 15 | `src/tools/maestro-tool.ts` | Permitir `acao: "criar_projeto"` forçar a sobreposição caso já exista um `.maestro/estado.json` perdido de testes. | P0 |
 
 ### Arquivos que NÃO precisam de mudança:
 - `src/stdio.ts` — Entry point, sem lógica de comunicação

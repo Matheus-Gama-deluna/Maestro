@@ -36,11 +36,17 @@ export function withPromptValidation(
                 return result;
             }
 
-            // Extrair conteúdo da resposta para validação
-            const responseText = result.content.map(c => c.type === 'text' ? c.text : '').join('\n');
-
-            // Validar chamada de tool
-            const validation = promptValidator.validateToolCall(responseText, expectedTool);
+            // Em um MCP real, o "toolName" da própria chamada (ex: "maestro", "executar")
+            // já é determinado na rota. A validação antiga verificava se a string
+            // de resposta continha a chamada de tool, o que causava disparo de
+            // falso positivo baseando-se nas próprias instruções do servidor.
+            // Para não quebrar a lógica global, faremos a validação comparando
+            // apenas se a toolName que engatilhou esse handler corresponde a expectedTool,
+            // ou desativaremos o validador confuso se expectedTool === toolName.
+            
+            // Validar chamada de tool usando a própria ferramenta chamada no endpoint
+            // No futuro, promptValidator pode inspecionar o args para ver formatacoes.
+            const validation = promptValidator.validateToolCall(`${toolName}()`, expectedTool);
 
             // Se válido, retornar resultado original
             if (validation.valid) {

@@ -13,6 +13,8 @@ import { getSpecialistPersona } from "../services/specialist.service.js";
 import { ContentResolverService } from "../services/content-resolver.service.js";
 import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { getRegisteredTools } from "../router.js";
+import { formatSkillHydrationCommand, detectIDE } from "../utils/ide-paths.js";
+import { getSkillParaFase } from "../utils/prompt-mapper.js";
 
 // === TIPOS ===
 
@@ -144,26 +146,26 @@ async function buildSpecialistPrompt(diretorio: string): Promise<PromptResult> {
         };
     }
 
-    const mode = (estado.config?.mode || "balanced") as "economy" | "balanced" | "quality";
-    const contentResolver = new ContentResolverService(diretorio);
-    const skillLoader = new SkillLoaderService(contentResolver);
-
     try {
-        const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, mode);
-        if (contextPkg) {
+        const skillName = getSkillParaFase(faseInfo.nome);
+        if (skillName) {
+            const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
+            const hydrationCommand = formatSkillHydrationCommand(skillName, ide);
+            const specialist = getSpecialistPersona(faseInfo.nome);
+            
             return {
-                description: `Especialista: ${contextPkg.specialist?.name || faseInfo.nome} — Fase ${estado.fase_atual}/${estado.total_fases}`,
+                description: `Especialista: ${specialist?.name || faseInfo.nome} — Fase ${estado.fase_atual}/${estado.total_fases}`,
                 messages: [{
                     role: "user",
                     content: {
                         type: "text",
-                        text: `# Especialista da Fase: ${faseInfo.nome}\n\n${skillLoader.formatAsMarkdown(contextPkg)}\n\n${ANTI_INFERENCE_RULES}`,
+                        text: `# Especialista da Fase: ${faseInfo.nome}\n\n${hydrationCommand}\n\n${ANTI_INFERENCE_RULES}`,
                     },
                 }],
             };
         }
     } catch (error) {
-        console.warn("[Prompt] Falha ao carregar skill:", error);
+        console.warn("[Prompt] Falha ao injetar comando de hydração:", error);
     }
 
     // Fallback: persona básica
@@ -424,12 +426,11 @@ ${toolsList}`,
     // Skill injection
     if (faseInfo) {
         try {
-            const contentResolver = new ContentResolverService(diretorio);
-            const skillLoader = new SkillLoaderService(contentResolver);
-            const mode = (estado.config?.mode || "balanced") as "economy" | "balanced" | "quality";
-            const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, mode);
-            if (contextPkg) {
-                sessionContent += `## 📚 Skill da Fase\n\n${skillLoader.formatAsMarkdown(contextPkg)}\n\n`;
+            const skillName = getSkillParaFase(faseInfo.nome);
+            if (skillName) {
+                const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
+                const hydrationCommand = formatSkillHydrationCommand(skillName, ide);
+                sessionContent += `## 📚 Skill da Fase\n\n${hydrationCommand}\n\n`;
             }
         } catch {
             // Fallback silencioso

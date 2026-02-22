@@ -20,6 +20,8 @@ import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { buildResourceLinksBlock, skillResourceLink, templateResourceLink } from "../utils/resource-links.js";
 import { loadUserConfig } from "../utils/config.js";
 import { forAssistantOnly } from "../services/annotations-fallback.service.js";
+import { formatSkillHydrationCommand, detectIDE } from "../utils/ide-paths.js";
+import { getSkillParaFase } from "../utils/prompt-mapper.js";
 
 interface MaestroArgs {
     diretorio: string;
@@ -74,8 +76,8 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
         estado = await stateService.load();
     }
 
-    // Sem projeto: guiar para criação ou executar ação se fornecida
-    if (!estado) {
+    // Sem projeto ou comando explícito de recriação: guiar para criação ou executar ação se fornecida
+    if (!estado || args.acao === "setup_inicial" || args.acao === "criar_projeto") {
         // Se acao for setup_inicial, executar diretamente
         if (args.acao === "setup_inicial") {
             const { setupInicial } = await import("./setup-inicial.js");
@@ -95,12 +97,18 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
             }, diretorio);
         }
 
-        // v5.3: Ação criar_projeto — combina setup + iniciar + confirmar em 1 passo
+        // v5.3 / v6.1: Ação criar_projeto — combina setup + iniciar + confirmar em 1 passo (mesmo se estado fantasma existir)
         if (args.acao === "criar_projeto") {
             return handleCriarProjeto({ ...args, diretorio });
         }
 
         return await handleNoProject(diretorio);
+    }
+
+    // v7.0: Delegação de avanços para unificar o fluxo no maestro
+    if (args.acao === "avancar") {
+        const { executar } = await import("./consolidated/executar.js");
+        return executar({ ...args, acao: "avancar" });
     }
 
     // Com projeto: analisar estado e recomendar
@@ -115,15 +123,14 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
     const phaseLabel = inOnboarding ? "Onboarding" : `Fase ${estado.fase_atual}/${estado.total_fases}`;
     const nextAction = flowStepToNextAction(nextStep);
 
-    // Injeção ativa v5: contexto resumido do especialista
+    // v7.0: Substituído injeção ativa massiva por comando de hidratação dinâmico da IDE
     let specialistContext = "";
-    if (!inOnboarding && faseInfo) {
+    if (faseInfo) {
         try {
-            const contentResolver = new ContentResolverService(diretorio);
-            const skillLoader = new SkillLoaderService(contentResolver);
-            const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, "economy");
-            if (contextPkg) {
-                specialistContext = skillLoader.formatAsMarkdown(contextPkg);
+            const skillName = getSkillParaFase(faseInfo.nome);
+            if (skillName) {
+                const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
+                specialistContext = formatSkillHydrationCommand(skillName, ide);
             }
         } catch {
             // Fallback silencioso
@@ -166,7 +173,7 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
     });
 
     // v5.2: Resource links para especialista/skill referenciado
-    if (!inOnboarding && faseInfo) {
+    if (faseInfo) {
         try {
             const { getSkillParaFase } = await import("../utils/prompt-mapper.js");
             const skillName = getSkillParaFase(faseInfo.nome);
@@ -327,6 +334,23 @@ maestro({
     const modo = params.modo as string;
     const usarStitch = params.usar_stitch as boolean | undefined;
 
+    // Prioridade 4 (Diag): Forçar sequência de Setup caso a config global não exista
+    if (!configGlobal) {
+        const content = formatResponse({
+            titulo: "⚠️ Maestro — Setup Necessário",
+            resumo: `É necessário realizar a configuração inicial antes de criar novos projetos.`,
+            instrucoes: `⚠️ OBRIGATÓRIO: Inicie o setup_inicial antes de criar o projeto.`,
+            proximo_passo: {
+                tool: "maestro",
+                descricao: "Realizar o setup inicial",
+                args: `{ "diretorio": "${diretorio}", "acao": "setup_inicial" }`,
+                requer_input_usuario: true,
+                prompt_usuario: "Qual IDE você usa? Qual modo prefere (economy/balanced/quality)? Deseja usar Stitch?",
+            },
+        });
+        return { content };
+    }
+
     // Se ide/modo não foram fornecidos explicitamente, pedir ao usuário
     if (!ide || !modo) {
         const content = formatResponse({
@@ -456,7 +480,7 @@ export const maestroToolSchema = {
         acao: {
             type: "string",
             description: "Ação específica a executar (opcional)",
-            enum: ["setup_inicial", "criar_projeto"],
+            enum: ["setup_inicial", "criar_projeto", "avancar"],
         },
         estado_json: {
             type: "string",

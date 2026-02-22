@@ -98,7 +98,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "specialist_active",
         to: "specialist_collecting",
-        tool: "executar",
+        tool: "maestro",
         description: "Responder perguntas do especialista sobre o produto",
         requires_user_input: true,
         user_prompt: "Responda as perguntas do especialista sobre seu produto (problema, público, MVP).",
@@ -106,7 +106,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "specialist_collecting",
         to: "specialist_collecting",
-        tool: "executar",
+        tool: "maestro",
         description: "Continuar respondendo perguntas do especialista",
         requires_user_input: true,
         user_prompt: "Continue respondendo as perguntas do especialista.",
@@ -114,7 +114,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "specialist_generating",
         to: "specialist_validating",
-        tool: "executar",
+        tool: "maestro",
         description: "Validar PRD gerado pelo especialista",
         requires_user_input: false,
         auto_execute: true,
@@ -122,7 +122,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "specialist_validating",
         to: "specialist_approved",
-        tool: "executar",
+        tool: "maestro",
         description: "PRD aprovado, preparar transição para próximo especialista",
         condition: (s) => true,
         requires_user_input: true,
@@ -141,7 +141,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "discovery_in_progress",
         to: "discovery_next_block",
-        tool: "executar",
+        tool: "maestro",
         description: "Responder próximo bloco do discovery",
         requires_user_input: true,
         user_prompt: "Responda as perguntas do próximo bloco de discovery.",
@@ -149,7 +149,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "discovery_complete",
         to: "brainstorm",
-        tool: "executar",
+        tool: "maestro",
         description: "Brainstorm exploratório para refinar ideias",
         condition: (s) => s.mode !== "economy" && s.wantsBrainstorm,
         requires_user_input: true,
@@ -158,7 +158,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "discovery_complete",
         to: "prd",
-        tool: "executar",
+        tool: "maestro",
         description: "Gerar PRD a partir do discovery",
         condition: (s) => s.mode === "economy" || !s.wantsBrainstorm,
         requires_user_input: false,
@@ -167,7 +167,7 @@ const ONBOARDING_FLOW: FlowTransition[] = [
     {
         from: "brainstorm_complete",
         to: "prd",
-        tool: "executar",
+        tool: "maestro",
         description: "Gerar PRD a partir do discovery + brainstorm",
         requires_user_input: false,
         auto_execute: true,

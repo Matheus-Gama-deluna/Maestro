@@ -1107,30 +1107,13 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
 `
         : "";
 
-    // Gerar informações da próxima skill — INJEÇÃO ATIVA v5
+    // v7.0: Gerar informações da próxima skill usando menção dinâmica da IDE
     const proximaSkillInfo = await (async () => {
         if (!proximaFase) return "";
 
         const proximaSkill = getSkillParaFase(proximaFase.nome);
         if (!proximaSkill) return "";
 
-        // Detectar modo do projeto
-        const mode = (estado.config?.mode || "balanced") as "economy" | "balanced" | "quality";
-
-        try {
-            // Injeção ativa: carregar e incluir conteúdo real da skill na resposta
-            const contentResolver = new ContentResolverService(diretorio);
-            const skillLoader = new SkillLoaderService(contentResolver);
-            const contextPackage = await skillLoader.loadForPhase(proximaFase.nome, mode);
-
-            if (contextPackage) {
-                return `\n\n---\n\n# 🧠 Contexto do Especialista — ${proximaFase.nome}\n\n${skillLoader.formatAsMarkdown(contextPackage)}\n`;
-            }
-        } catch (error) {
-            console.warn("[proximo] Falha ao carregar skill ativa, usando fallback:", error);
-        }
-
-        // Fallback: referência textual com comando de hydration (V6 Sprint 3)
         const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
         return `
 

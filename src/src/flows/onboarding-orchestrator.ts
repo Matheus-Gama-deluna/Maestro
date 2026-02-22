@@ -151,7 +151,7 @@ async function handleIniciar(
         text: "✅ **Discovery já concluído!**\n\nTodos os blocos foram preenchidos. Próximo passo: brainstorm.",
       }],
       next_action: {
-        tool: "executar",
+        tool: "maestro",
         description: "Iniciar brainstorm assistido após discovery completo",
         args_template: { diretorio: diretorio, acao: "avancar" },
         requires_user_input: false,
@@ -209,7 +209,7 @@ ${blocoFormatado}
     content: [{ type: "text", text: resposta }],
     estado_atualizado: estadoFile.content,
     next_action: {
-      tool: "executar",
+      tool: "maestro",
       description: `Coletar respostas do bloco "${progresso.proximoBloco.title}" e enviar`,
       args_template: {
         diretorio: diretorio,
@@ -334,7 +334,7 @@ Todas as informações foram coletadas com sucesso! Agora vamos para o **Brainst
       content: [{ type: "text", text: resposta }],
       estado_atualizado: estadoFile.content,
       next_action: {
-        tool: "executar",
+        tool: "maestro",
         description: "Iniciar brainstorm assistido com dados do discovery",
         args_template: { diretorio: diretorio, acao: "avancar" },
         requires_user_input: false,
@@ -412,7 +412,7 @@ ${blocoFormatado}
       content: [{ type: "text", text: resposta }],
       estado_atualizado: estadoFile.content,
       next_action: {
-        tool: "executar",
+        tool: "maestro",
         description: `Coletar respostas do bloco "${progresso.proximoBloco.title}" e enviar`,
         args_template: {
           diretorio: diretorio,
@@ -445,7 +445,7 @@ ${blocoFormatado}
     }],
     estado_atualizado: estadoFile.content,
     next_action: {
-      tool: "executar",
+      tool: "maestro",
       description: "Iniciar brainstorm assistido",
       args_template: { diretorio: diretorio, acao: "avancar" },
       requires_user_input: false,

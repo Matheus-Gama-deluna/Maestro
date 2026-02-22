@@ -10,10 +10,9 @@
  */
 
 import { parsearEstado } from "../state/storage.js";
-import { ContentResolverService } from "../services/content-resolver.service.js";
-import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { getSkillParaFase } from "../utils/prompt-mapper.js";
 import { getFaseComStitch } from "../flows/types.js";
+import { formatSkillHydrationCommand, detectIDE } from "../utils/ide-paths.js";
 import type { ToolResult } from "../types/index.js";
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
@@ -57,14 +56,12 @@ export function withSkillInjection(handler: ToolHandler): ToolHandler {
                     return result;
                 }
 
-                const mode = (estado.config?.mode || "balanced") as "economy" | "balanced" | "quality";
-                const contentResolver = new ContentResolverService(diretorio);
-                const skillLoader = new SkillLoaderService(contentResolver);
-                const contextPkg = await skillLoader.loadForPhase(faseInfo.nome, mode); // v6.1: usa modo real do projeto
+                // v7.0: Substituído injeção ativa por menção dinâmica da IDE
+                const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
+                const hydrationCommand = formatSkillHydrationCommand(skillName, ide);
 
-                if (contextPkg && result.content?.[0]) {
-                    // Append contexto resumido à resposta
-                    result.content[0].text += `\n\n---\n\n## 🧠 Contexto do Especialista (${faseInfo.nome})\n\n${skillLoader.formatAsMarkdown(contextPkg)}`;
+                if (result.content?.[0]) {
+                    result.content[0].text += `\n\n---\n\n## 🧠 Contexto do Especialista (${faseInfo.nome})\n\n${hydrationCommand}`;
                 }
             } catch (error) {
                 console.warn("[withSkillInjection] Falha ao injetar skill:", error);

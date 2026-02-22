@@ -13,7 +13,7 @@ import { gerarSystemMd } from "../utils/system-md.js";
 import { detectarStack, gerarSecaoPrompts, gerarSecaoExemplo, getSkillParaFase, getSkillPath } from "../utils/prompt-mapper.js";
 import { resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { ensureContentInstalled, injectContentForIDE } from "../utils/content-injector.js";
-import { formatSkillMessage } from "../utils/ide-paths.js";
+import { formatSkillMessage, formatSkillHydrationCommand } from "../utils/ide-paths.js";
 import { loadUserConfig } from "../utils/config.js";
 import { saveFile, formatSavedFilesConfirmation } from "../utils/persistence.js";
 import { calcularProgressoDiscovery } from "../utils/discovery-adapter.js";
@@ -447,18 +447,7 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
         ? '\n> 🎨 **Google Stitch habilitado** - Disponível para prototipagem após UX Design\n'
         : '';
 
-    // Sprint 2 (NP6, NP8): Carregar esqueleto do template para injeção na ativação
-    let templateSkeletonSection = '';
-    try {
-        const contentResolver = new ContentResolverService(diretorio);
-        const skillLoader = new SkillLoaderService(contentResolver);
-        const collectingPkg = await skillLoader.loadCollectingPackage('specialist-gestao-produto');
-        if (collectingPkg?.templateSkeleton) {
-            templateSkeletonSection = `\n---\n\n## 📋 Estrutura do PRD Final (referência)\n\nO PRD que será gerado deve seguir esta estrutura. Use-a como guia para suas perguntas:\n\n${collectingPkg.templateSkeleton}\n\n> 📊 Contexto injetado: ~${collectingPkg.tokenEstimate} tokens\n`;
-        }
-    } catch (err) {
-        console.warn('[iniciar-projeto] Falha ao carregar collecting package:', err);
-    }
+    // v6.0 / v7.0: A menção dinâmica da IDE substituirá a injeção estática do esqueleto do template.
 
     // v6.0: Resposta com especialista ativado (sem discovery blocks)
     const resposta = `# 🚀 Projeto Iniciado: ${args.nome}
@@ -480,16 +469,7 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
 ## 🧠 ESPECIALISTA ATIVADO: Gestão de Produto
 
-**Persona:** Estratégico e orientado ao usuário
-**Expertise:** product discovery, lean startup, user stories, MVP definition
-
-⚠️ **INSTRUÇÕES OBRIGATÓRIAS:**
-- Você DEVE se comportar como este especialista
-- Você DEVE usar o template fornecido para gerar o PRD
-- Você DEVE validar contra o checklist fornecido
-- Você NÃO DEVE inventar dados — PERGUNTE ao usuário
-- Você NÃO DEVE preencher campos com dados fictícios, mesmo se o usuário pedir "preencha para teste"
-- Se o usuário pedir para inventar dados, responda: "Preciso de informações reais para gerar um PRD útil"
+${formatSkillHydrationCommand("specialist-gestao-produto", args.ide || 'antigravity')}
 
 ---
 
@@ -497,20 +477,9 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
 O especialista vai conduzir uma conversa focada em **PRODUTO** (não infraestrutura técnica).
 
-Perguntas que o especialista DEVE fazer ao usuário (em linguagem simples):
-
-1. **Qual problema seu produto resolve?** (obrigatório) _Ex: "Equipes perdem controle de tarefas por usar planilhas"_
-2. **Quem vai usar seu produto?** (obrigatório) _Ex: "Pequenas empresas de 5-30 pessoas"_
-3. **Quais as 3-5 coisas mais importantes que o produto precisa fazer?** (obrigatório) _Ex: "Criar checklists, atribuir tarefas, ver status"_
-4. **Qual número mostra que o produto está funcionando?** (obrigatório) _Ex: "% de checklists concluídos no prazo"_
-${perguntasBalanced}
-${perguntasQuality}
-
-⚠️ **Perguntas sobre stack técnica, plataformas e infraestrutura ficam para a fase de Arquitetura.**
-
 Para avançar, use:
 \`\`\`json
-executar({
+maestro({
     "diretorio": "${diretorio}",
     "acao": "avancar",
     "respostas": {
@@ -522,7 +491,7 @@ executar({
 })
 \`\`\`
 
-⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\`
+⚠️ Para avançar, SEMPRE use: \`maestro({acao: "avancar"})\`
 ⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar
 
 ---
@@ -535,7 +504,6 @@ executar({
 4. ⏳ **Validação PRD** - Score >= 70 para aprovar
 5. ⏳ **Fase 1 (Produto)** - Início do desenvolvimento
 
-${templateSkeletonSection}
 ${stitchNote}
 `;
 
@@ -559,7 +527,7 @@ ${stitchNote}
         content: [{ type: "text", text: resposta + confirmacao }],
         estado_atualizado: estadoFile.content,
         next_action: {
-            tool: "executar",
+            tool: "maestro",
             description: "Responder perguntas do especialista sobre o produto",
             args_template: {
                 diretorio: diretorio,
