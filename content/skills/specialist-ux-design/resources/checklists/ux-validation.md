@@ -56,10 +56,7 @@
 - [ ] Interfaces externas representadas
 
 ## ✅ Checklist Final (10 pts)
-- [ ] Wireframes entregues em formato padronizado
-- [ ] Jornadas assinadas por stakeholders
-- [ ] Protótipo aprovado pelo time
-- [ ] Documentação carregada em docs/03-ux-design
+- [ ] Tudo consolidado e entregue no arquivo `docs/03-ux-design/design-doc.md`
 - [ ] Score ≥ 75 pontos
 
 ---

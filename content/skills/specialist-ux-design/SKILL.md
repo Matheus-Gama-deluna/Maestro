@@ -24,10 +24,8 @@ Transformar requisitos em design de interface e experiência do usuário em 45-6
 - Restrições técnicas e de negócio
 
 ## Outputs gerados
-- `docs/03-ux-design/design-doc.md` — Documento de design completo
-- `docs/03-ux-design/wireframes.md` — Wireframes de todas as telas
-- `docs/03-ux-design/jornada-usuario.md` — Mapa de jornadas do usuário
-- `docs/03-ux-design/prototipos.md` — Protótipos interativos
+- `docs/03-ux-design/design-doc.md` — Documento consolidado contendo arquitetura, wireframes, jornadas e protótipos
+- Score de validação ≥ 75 pontos
 - Score de validação ≥ 75 pontos
 
 ## Quality Gate
@@ -83,9 +81,7 @@ Crie protótipos validáveis:
 ## 📚 Recursos Adicionais
 
 ### Templates e Guias
-- **Template Design:** [resources/templates/design-doc.md](resources/templates/design-doc.md)
-- **Template Wireframes:** [resources/templates/wireframes.md](resources/templates/wireframes.md)
-- **Template Jornadas:** [resources/templates/jornada-usuario.md](resources/templates/jornada-usuario.md)
+- **Template Único e Consolidado:** [resources/templates/design-doc.md](resources/templates/design-doc.md)
 - **Exemplos práticos:** [resources/examples/ux-examples.md](resources/examples/ux-examples.md)
 - **Guia completo:** [resources/reference/ux-guide.md](resources/reference/ux-guide.md)
 - **Validação:** [resources/checklists/ux-validation.md](resources/checklists/ux-validation.md)
@@ -138,27 +134,13 @@ Use função de processamento para preparar contexto para Modelagem de Domínio 
 
 ## 📊 Estrutura dos Templates
 
-### Template Design Doc
-- **Visão do Sistema** e objetivos
-- **Personas e Jornadas** detalhadas
+### Template Design Doc (Consolidado)
+- **Visão do Sistema e Personas**
+- **Mapa da Jornada do Usuário** (O que antes era um arquivo separado, agora vive aqui)
 - **Arquitetura de Informação** e fluxos
 - **Design Visual** e identidade
-- **Wireframes** de todas as telas
+- **Wireframes** de todas as telas (detalhamento estrutural em markdown)
 - **Protótipos** e validação
-
-### Template Wireframes
-- **Estrutura de páginas** e layouts
-- **Componentes** reutilizáveis
-- **Navegação** e menus
-- **Formulários** e interações
-- **Estados** e feedback visual
-
-### Template Jornadas
-- **Mapa completo** da experiência
-- **Pontos de contato** e momentos
-- **Dores e ganhos** por etapa
-- **Fluxos principais** e alternativos
-- **Oportunidades** de melhoria
 
 ## 🎯 Performance e Métricas
 
@@ -195,11 +177,8 @@ Use função de processamento para preparar contexto para Modelagem de Domínio 
 
 ### Referências Essenciais
 - **Especialista original:** `content/specialists/Especialista em UX Design.md`
-- **Artefatos gerados:**
-  - `docs/03-ux-design/design-doc.md` (principal)
-  - `docs/03-ux-design/wireframes.md` (estrutura)
-  - `docs/03-ux-design/jornada-usuario.md` (experiência)
-  - `docs/03-ux-design/prototipos.md` (validação)
+### Artefatos gerados
+- `docs/03-ux-design/design-doc.md` (Arquivo único consolidado cobrindo estrutura, jornadas e wireframes)
 
 ### Próximo Especialista
 **Modelagem de Domínio** - Transformará design em entidades de negócio e regras de domínio.

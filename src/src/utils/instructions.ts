@@ -254,9 +254,10 @@ export function gerarInstrucaoContinuidade(
         `---`,
         ``,
         `> ✅ **Gate aprovado — Fase ${faseAtual} concluída.**`,
-        `> **AÇÃO AUTOMÁTICA DO SISTEMA:** Inicie imediatamente a fase "${proximaFase}".`,
-        `> Leia o SKILL.md do especialista indicado acima e gere o entregável completo.`,
-        `> Não aguarde mensagem do usuário. Chame \`executar({ diretorio: "${diretorio}", acao: "avancar" })\` quando pronto.`,
+        `> **AÇÃO DO SISTEMA:** Nova fase "${proximaFase}" iniciada.`,
+        `> Leia o SKILL.md do especialista indicado acima.`,
+        `> ✋ **NÃO GERE O ENTREGÁVEL COMPLETO AINDA.** Em vez disso, apresente ao usuário uma sugestão de esqueleto ou faça perguntas de alinhamento para garantir que a direção está correta.`,
+        `> Só avance gerando os artefatos completos após a resposta ou aprovação do usuário.`,
         ``,
     ].join('\n');
 }

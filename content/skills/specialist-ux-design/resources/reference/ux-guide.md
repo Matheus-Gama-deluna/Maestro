@@ -84,7 +84,7 @@ Descobrir → Definir → Idear → Prototipar → Validar → Iterar
 ### 5.2 Prototipagem
 - Figma como padrão (modo protótipo)
 - Microinterações básicas (hover, focus, loading)
-- Links atualizados em docs/03-ux-design
+- Links atualizados no `design-doc.md`
 
 ---
 
@@ -157,7 +157,7 @@ Descobrir → Definir → Idear → Prototipar → Validar → Iterar
 ## 10. Integração com Squad
 
 ### 10.1 Artefatos Entregues
-- Design Doc + Wireframes + Jornadas
+- Documento consolidado `design-doc.md` contendo wireframes e jornadas
 - Protótipos navegáveis
 - Anotações para Dev/QA
 - Checklist de acessibilidade

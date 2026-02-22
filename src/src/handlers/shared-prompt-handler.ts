@@ -97,7 +97,9 @@ const ANTI_INFERENCE_RULES = `---
 4. **SEMPRE pergunte** quando uma informação for necessária e não estiver disponível
 5. Se o usuário pedir "preencha para teste" ou "invente dados", responda: "Preciso de informações reais para gerar um resultado útil. Quais são os dados reais?"
 6. **NUNCA use** \`maestro({acao: "status"})\` para tentar avançar — use \`executar({acao: "avancar"})\`
-7. Quando respostas forem vagas (< 20 palavras), faça perguntas de follow-up antes de prosseguir`;
+7. Quando respostas forem vagas (< 20 palavras), faça perguntas de follow-up antes de prosseguir
+8. **NUNCA assuma a persona da próxima fase** por conta própria. Seu limite de atuação é a aprovação do gate da fase ATUAL.
+9. **NUNCA gere código ou artefatos de fases futuras**. (ex: se está em UX Design ou Produto, JAMAIS gere HTML/código).`;
 
 const FLOW_RULES = `## 🔄 REGRAS DE FLUXO — Ferramentas Corretas
 

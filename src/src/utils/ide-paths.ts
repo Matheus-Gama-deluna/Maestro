@@ -1,5 +1,5 @@
 import { join } from "path";
-import { existsSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
 
 /**
  * Configurações de diretórios para cada IDE
@@ -122,10 +122,32 @@ export function formatSkillMessage(skillName: string, ide: IDEType): string {
 - 🔧 MCP Functions: \`${getSkillMCPPath(skillName, ide)}\``;
 }
 
+function getAllMdFiles(dirPath: string, relativeBase: string): string[] {
+    let results: string[] = [];
+    if (!existsSync(dirPath)) return results;
+    
+    try {
+        const items = readdirSync(dirPath);
+        for (const item of items) {
+            const fullPath = join(dirPath, item);
+            const relPath = join(relativeBase, item).replace(/\\/g, '/');
+            if (statSync(fullPath).isDirectory()) {
+                results = results.concat(getAllMdFiles(fullPath, relPath));
+            } else if (item.endsWith('.md')) {
+                results.push(relPath);
+            }
+        }
+    } catch (e) {
+        // Ignorar erros silenciados
+    }
+    return results;
+}
+
 /**
  * V6 Sprint 3: Gera comando imperativo de hidratação de contexto (Active Rules Pointer).
  * Usa o formato de @menção nativo de cada IDE para forçar leitura imediata do SKILL.md
- * na transição de fase, sem criar arquivos extras e sem aguardar confirmação do usuário.
+ * e todos os templates e checklists das subpastas na transição de fase,
+ * sem criar arquivos extras e sem aguardar confirmação do usuário.
  *
  * Formatos nativos:
  * - Antigravity: @[.agent/skills/{skill}/SKILL.md]
@@ -134,19 +156,39 @@ export function formatSkillMessage(skillName: string, ide: IDEType): string {
  */
 export function formatSkillHydrationCommand(skillName: string, ide: IDEType): string {
     const skillPath = getSkillFilePath(skillName, ide);
-    const mention = ide === 'cursor' ? `@${skillPath}`
-        : ide === 'windsurf' ? `#${skillPath}`
-            : `@[${skillPath}]`; // antigravity (default)
+    
+    const formatMention = (path: string) => {
+        return ide === 'cursor' ? `@${path}`
+             : ide === 'windsurf' ? `#${path}`
+             : `@[${path}]`; // antigravity (default)
+    };
+
+    const mentions = [formatMention(skillPath)];
+
+    try {
+        const resourcesRelDir = `${IDE_CONFIGS[ide].skillsDir}/${skillName}/resources`;
+        const resourcesAbsDir = join(process.cwd(), resourcesRelDir);
+        
+        const mdFiles = getAllMdFiles(resourcesAbsDir, resourcesRelDir);
+        for (const file of mdFiles) {
+            mentions.push(formatMention(file));
+        }
+    } catch (e) {
+        // Fallback seguro caso path reading falhe
+    }
+
+    const mentionsList = mentions.map((m, i) => `> ${i + 1}. ${m}`).join('\n');
 
     return [
         ``,
         `---`,
         ``,
         `> ⚙️ **SISTEMA — AÇÃO OBRIGATÓRIA (Nova Fase Iniciada)**`,
-        `> Leia AGORA o arquivo do especialista: ${mention}`,
-        `> Assuma a persona descrita no arquivo **imediatamente**.`,
-        `> Não aguarde confirmação do usuário para iniciar.`,
-        `> Confirme dizendo: "Sou [nome do especialista], meu foco é [entregável desta fase]."`,
+        `> Leia AGORA os arquivos da sua função:`,
+        mentionsList,
+        `> Assuma a persona descrita no arquivo principal **imediatamente**.`,
+        `> Confirme a mudança de fase dizendo: "Sou [nome do especialista], meu foco é [entregável desta fase]." e sugira os primeiros passos para o usuário.`,
+        `> ✋ **NÃO** gere o entregável completo sem interagir com o usuário primeiro.`,
         ``,
     ].join('\n');
 }

@@ -294,6 +294,14 @@ A fase de Prototipagem requer que os arquivos HTML exportados do Google Stitch e
 `,
                 }],
                 isError: true,
+                next_action: {
+                    tool: "executar",
+                    description: "Aguardar o usuário exportar os arquivos HTML do Google Stitch",
+                    args_template: { diretorio, acao: "avancar" },
+                    requires_user_input: true,
+                    user_prompt: "Por favor, gere os protótipos no stitch.withgoogle.com e salve os arquivos .html. Me avise quando terminar para eu validar!",
+                    auto_execute: false
+                }
             };
         }
 
