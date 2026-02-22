@@ -23,7 +23,7 @@ import { ContentResolverService } from "../services/content-resolver.service.js"
 import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { existsSync, readFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
-import { detectIDE, getSkillsDir, getSkillResourcePath, getSkillFilePath, type IDEType } from "../utils/ide-paths.js";
+import { detectIDE, getSkillsDir, getSkillResourcePath, getSkillFilePath, type IDEType, formatSkillHydrationCommand } from "../utils/ide-paths.js";
 import { classificarPRD } from "../flows/classifier.js"; // @deprecated v6.0 - usar ClassificacaoProgressivaService
 import { inferirContextoBalanceado } from "../utils/inferencia-contextual.js";
 import { classificacaoProgressiva } from "../services/classificacao-progressiva.service.js"; // v6.0
@@ -172,7 +172,7 @@ async function handleCollecting(
 
     // Se não há respostas, mostrar o que falta
     if (!respostas || Object.keys(respostas).length === 0) {
-        return buildCollectionPrompt(diretorio, sp, mode);
+        return buildCollectionPrompt(estado, diretorio, sp, mode);
     }
 
     // Acumular dados recebidos (com fuzzy matching de campos — Sprint 5)
@@ -228,7 +228,7 @@ async function handleCollecting(
             },
             instrucoes: `⚠️ OBRIGATÓRIO: Pergunte ao usuário os campos que ainda faltam. NÃO invente dados.
 
-${await loadCollectingContext(diretorio, sp.skillName)}
+${loadCollectingContext(sp.skillName, resolveIDEForProject(estado, diretorio))}
 
 Campos já coletados:
 ${collected.map(f => `✅ **${f.label}**: ${truncateValue(sp.collectedData[f.id])}`).join('\n')}
@@ -291,21 +291,6 @@ async function handleGenerating(
     const { estado, diretorio } = args;
     const mode = onboarding.mode || 'balanced';
 
-    // Carregar template e checklist reais da skill
-    let templateContent = "";
-    let checklistContent = "";
-    try {
-        const contentResolver = new ContentResolverService(diretorio);
-        const skillLoader = new SkillLoaderService(contentResolver);
-        const pkg = await skillLoader.loadFullPackage(sp.skillName);
-        if (pkg) {
-            templateContent = pkg.templateContent;
-            checklistContent = pkg.checklistContent;
-        }
-    } catch (err) {
-        console.warn('[specialist-phase] Falha ao carregar recursos:', err);
-    }
-
     // Montar contexto para geração do PRD
     const collectedSummary = Object.entries(sp.collectedData)
         .map(([key, value]) => `- **${key}**: ${value}`)
@@ -328,18 +313,7 @@ Você DEVE gerar o PRD e salvá-lo no disco IMEDIATAMENTE, sem esperar comando d
 
 ${collectedSummary}
 
-${templateContent ? `## 🔧 Recursos do Especialista
-
-� **Leia estes arquivos ANTES de gerar o PRD:**
-- Template: \`${skillPaths.templatePath}\` 
-- Checklist: \`${skillPaths.checklistPath}\` 
-- Guia: \`${skillPaths.guidePath}\` 
-
-> ⚠️ Use \`view_file\` para ler os arquivos. NÃO dependa apenas do esqueleto abaixo.
-
-## Esqueleto do Template (referência rápida)
-
-${extractTemplateSkeleton(templateContent)}` : '## Template do PRD\n\nGere um PRD estruturado com: Visão, Problema, Público-alvo, Funcionalidades MVP, Métricas de Sucesso, Riscos.'}
+${formatSkillHydrationCommand(sp.skillName, resolveIDEForProject(estado, diretorio))}
 
 ---
 
@@ -809,47 +783,17 @@ function formatMissingFieldsByBlock(missing: RequiredField[], mode: string): str
 
 /**
  * Sprint 2 (NP6, NP8): Carrega contexto resumido do especialista para injeção na fase collecting.
- * Retorna markdown com esqueleto do template + checklist resumido + guia da skill.
+ * v7.0: Substituído injeção ativa por menção dinâmica da IDE
  */
-async function loadCollectingContext(diretorio: string, skillName: string): Promise<string> {
-    try {
-        const contentResolver = new ContentResolverService(diretorio);
-        const skillLoader = new SkillLoaderService(contentResolver);
-        const pkg = await skillLoader.loadCollectingPackage(skillName);
-        if (!pkg) return '';
-
-        const parts: string[] = [];
-
-        if (pkg.templateSkeleton) {
-            parts.push(`## 📋 Estrutura do PRD Final (use como guia para suas perguntas)
-
-${pkg.templateSkeleton}`);
-        }
-
-        if (pkg.checklistSummary) {
-            parts.push(`## ✅ Checklist de Validação (resumo)
-
-${pkg.checklistSummary}`);
-        }
-
-        if (pkg.skillGuide) {
-            parts.push(`## 🧠 Guia do Especialista
-
-${pkg.skillGuide}`);
-        }
-
-        if (parts.length === 0) return '';
-        return parts.join('\n\n') + `\n\n> 📊 Contexto injetado: ~${pkg.tokenEstimate} tokens`;
-    } catch (err) {
-        console.warn('[specialist-phase] Falha ao carregar collecting context:', err);
-        return '';
-    }
+function loadCollectingContext(skillName: string, ide: IDEType): string {
+    return formatSkillHydrationCommand(skillName, ide);
 }
 
 /**
  * Constrói prompt de coleta quando não há respostas
  */
 async function buildCollectionPrompt(
+    estado: EstadoProjeto,
     diretorio: string,
     sp: SpecialistPhaseState,
     mode: string
@@ -868,7 +812,7 @@ async function buildCollectionPrompt(
         : '';
 
     // Sprint 2 (NP6, NP8): Injetar contexto do especialista desde a coleta
-    const collectingContext = await loadCollectingContext(diretorio, sp.skillName);
+    const collectingContext = loadCollectingContext(sp.skillName, resolveIDEForProject(estado, diretorio));
 
     return {
         content: formatResponse({
