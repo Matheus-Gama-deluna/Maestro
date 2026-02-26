@@ -3,7 +3,24 @@ import { join } from "path";
 import type { EstadoProjeto, Fase } from "../types/index.js";
 
 /**
- * Constrói path dinâmico: docs/fase-XX-nome/entregavel
+ * PADRÃO CANÔNICO: Gera o nome do diretório de uma fase.
+ * Formato: fase-XX-nome-da-fase
+ * Exemplo: fase-01-produto, fase-05-banco-de-dados
+ *
+ * Esta é a ÚNICA fonte de verdade para nomes de pasta de fase.
+ * Todos os outros módulos (salvar.ts, gate-orientation.ts, proximo.ts) devem importar e usar esta função.
+ */
+export function getFaseDirName(fase: number, faseNome: string): string {
+    const num = fase.toString().padStart(2, "0");
+    const slug = faseNome.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // remove acentos
+        .replace(/\s+/g, '-')                                // espaços → hífens
+        .replace(/[^a-z0-9-]/g, '');                        // remove caracteres especiais
+    return `fase-${num}-${slug}`;
+}
+
+/**
+ * Constrói path canônico: docs/fase-XX-nome/entregavel
  * Exemplo: docs/fase-01-produto/PRD.md
  */
 function construirPathDinamico(
@@ -11,21 +28,7 @@ function construirPathDinamico(
     fase: number,
     faseInfo: Fase
 ): string {
-    const faseDirName = `fase-${fase.toString().padStart(2, "0")}-${faseInfo.nome.toLowerCase().replace(/\s/g, "-")}`;
-    return join(diretorio, "docs", faseDirName, faseInfo.entregavel_esperado);
-}
-
-/**
- * Constrói path convencional: docs/XX-nome/entregavel
- * Exemplo: docs/01-produto/PRD.md
- */
-function construirPathConvencional(
-    diretorio: string,
-    fase: number,
-    faseInfo: Fase
-): string {
-    const faseDirName = `${fase.toString().padStart(2, "0")}-${faseInfo.nome.toLowerCase().replace(/\s/g, "-")}`;
-    return join(diretorio, "docs", faseDirName, faseInfo.entregavel_esperado);
+    return join(diretorio, "docs", getFaseDirName(fase, faseInfo.nome), faseInfo.entregavel_esperado);
 }
 
 /**
@@ -37,6 +40,20 @@ function construirPathLegado(
     faseInfo: Fase
 ): string {
     return join(diretorio, ".maestro", "entregaveis", faseInfo.entregavel_esperado);
+}
+
+/**
+ * Constrói path convencional legado: docs/XX-nome/entregavel
+ * Mantido APENAS para resolver projetos antigos — NÃO usar para criar novos paths.
+ * @deprecated Use getFaseDirName() + construirPathDinamico() para novos arquivos.
+ */
+function construirPathConvencional(
+    diretorio: string,
+    fase: number,
+    faseInfo: Fase
+): string {
+    const faseDirName = `${fase.toString().padStart(2, "0")}-${faseInfo.nome.toLowerCase().replace(/\s/g, "-")}`;
+    return join(diretorio, "docs", faseDirName, faseInfo.entregavel_esperado);
 }
 
 /**

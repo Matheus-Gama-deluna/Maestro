@@ -134,6 +134,8 @@ O projeto deve primeiro:
         estado.aguardando_aprovacao = false;
         estado.motivo_bloqueio = undefined;
         estado.score_bloqueado = undefined;
+        estado.itens_aprovados_bloqueio = undefined;
+        estado.itens_pendentes_bloqueio = undefined;
         // V6 Sprint 2: Desativar modo compulsório ao aprovar
         estado.em_estado_compulsorio = false;
 
@@ -203,6 +205,8 @@ ${estadoFile.content}
         estado.aguardando_aprovacao = false;
         estado.motivo_bloqueio = undefined;
         estado.score_bloqueado = undefined;
+        estado.itens_aprovados_bloqueio = undefined;
+        estado.itens_pendentes_bloqueio = undefined;
         // V6 Sprint 2: Desativar modo compulsório ao rejeitar também
         estado.em_estado_compulsorio = false;
 

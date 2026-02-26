@@ -5,6 +5,8 @@ import { parsearEstado } from "../state/storage.js";
 import { normalizeProjectPath, resolveProjectPath, joinProjectPath } from "../utils/files.js";
 import { setCurrentDirectory } from "../state/context.js";
 import { formatError, embedNextAction } from "../utils/response-formatter.js";
+import { getFaseDirName } from "../utils/entregavel-path.js";
+import { getFluxoComStitch } from "../flows/types.js";
 
 interface SalvarArgs {
     conteudo: string;
@@ -66,6 +68,12 @@ export async function salvar(args: SalvarArgs): Promise<ToolResult> {
     let nomeArquivo: string;
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 
+    // Resolver nome da fase atual para gerar path canônico
+    const fluxo = getFluxoComStitch(estado.nivel, estado.usar_stitch ?? false);
+    const faseAtualInfo = fluxo?.fases?.find(f => f.numero === estado.fase_atual);
+    const faseNomeAtual = faseAtualInfo?.nome ?? `fase-${estado.fase_atual}`;
+    const faseDirName = getFaseDirName(estado.fase_atual, faseNomeAtual);
+
     switch (args.tipo) {
         case "rascunho":
             nomeArquivo = args.nome_arquivo || `rascunho-${timestamp}.md`;
@@ -73,11 +81,11 @@ export async function salvar(args: SalvarArgs): Promise<ToolResult> {
             break;
         case "anexo":
             nomeArquivo = args.nome_arquivo || `anexo-${timestamp}.md`;
-            targetPath = `${diretorio}/docs/fase-${estado.fase_atual.toString().padStart(2, "0")}/anexos/${nomeArquivo}`;
+            targetPath = `${diretorio}/docs/${faseDirName}/anexos/${nomeArquivo}`;
             break;
         case "entregavel":
             nomeArquivo = args.nome_arquivo || `entregavel-${timestamp}.md`;
-            targetPath = `${diretorio}/docs/fase-${estado.fase_atual.toString().padStart(2, "0")}/${nomeArquivo}`;
+            targetPath = `${diretorio}/docs/${faseDirName}/${nomeArquivo}`;
             break;
     }
 

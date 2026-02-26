@@ -55,6 +55,10 @@ export interface EstadoProjeto {
     em_estado_compulsorio?: boolean;
     tools_permitidas_no_compulsorio?: string[];
 
+    // Itens de validação salvos ao bloquear gate (score 50-69) para exibição na retomada
+    itens_aprovados_bloqueio?: string[];
+    itens_pendentes_bloqueio?: string[];
+
     // V6 Sprint 6: Classificação de tipo de fase para Smart Auto-Flow
     flow_phase_type?: 'input_required' | 'derived' | 'technical' | 'correction_loop';
     auto_flow_enabled?: boolean;

@@ -150,7 +150,8 @@ export function gerarInstrucaoCorrecao(
     sugestoes: string[],
     secoesFaltando: string[],
     ide?: IDEType,
-    diretorio?: string  // V6 Sprint 1: para payload de auto-correção
+    diretorio?: string,  // V6 Sprint 1: para payload de auto-correção
+    requiresUserDecision: boolean = false  // true = score 50-69, aguarda usuário; false = bloqueio total <50
 ): string {
     const skillNome = getSkillParaFase(faseNome);
     const ideUsada = ide || 'windsurf';
@@ -198,6 +199,23 @@ export function gerarInstrucaoCorrecao(
 `;
     }
 
+    const dirStr = diretorio || '<diretorio_do_projeto>';
+
+    // Instrução autônoma: apenas para bloqueio total (<50), nunca quando requer decisão do usuário
+    const instrucaoAutonoma = !requiresUserDecision ? `
+---
+
+> ⚙️ **INSTRUÇÃO DE SISTEMA — AÇÃO AUTÔNOMA REQUERIDA**
+> O usuário humano NÃO precisa intervir neste ciclo de correção.
+> **Você (IA assistente) deve, na ordem, SEM pedir confirmação:**
+> 1. Abrir o template indicado acima em \`resources/templates/\`
+> 2. Editar o entregável no disco aplicando as correções dos itens ❌
+> 3. Salvar o arquivo no mesmo caminho
+> 4. Chamar imediatamente: \`executar({ diretorio: "${dirStr}", acao: "avancar" })\`
+>
+> ⚠️ Se após 3 tentativas o score ainda for < 70, pare e apresente as opções ao usuário.
+` : '';
+
     // Instrução de como corrigir
     const instrucaoCorrecao = `
 ---
@@ -211,19 +229,7 @@ export function gerarInstrucaoCorrecao(
 5. **Re-submeta** → Chame \`executar({ acao: "avancar" })\` novamente
 
 > 💡 **Dica:** Foque nos itens ❌ pendentes listados acima. Cada item precisa estar presente no conteúdo do entregável.
-
----
-
-> ⚙️ **INSTRUÇÃO DE SISTEMA — AÇÃO AUTÔNOMA REQUERIDA**
-> O usuário humano NÃO precisa intervir neste ciclo de correção.
-> **Você (IA assistente) deve, na ordem, SEM pedir confirmação:**
-> 1. Abrir o template indicado acima em \`resources/templates/\`
-> 2. Editar o entregável no disco aplicando as correções dos itens ❌
-> 3. Salvar o arquivo no mesmo caminho
-> 4. Chamar imediatamente: \`executar({ diretorio: "${diretorio}", acao: "avancar" })\`
->
-> ⚠️ Se após 3 tentativas o score ainda for < 70, pare e apresente as opções ao usuário.
-`;
+${instrucaoAutonoma}`;
 
 
 
@@ -234,7 +240,8 @@ ${aprovadosSection}
 ${pendentesSection}
 ${secoesSection}
 ${recursosSection}
-${instrucaoCorrecao}`;
+${instrucaoCorrecao}
+`;
 }
 
 /**

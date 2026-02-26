@@ -47,7 +47,7 @@ const MAX_IDENTICAL_CALLS = 3;
 const loopStates = new Map<string, { hash: string; count: number }>();
 
 function computeCallHash(args: AvancarArgs, estado: EstadoProjeto): string {
-    const key = `${estado.fase_atual}|${estado.aguardando_classificacao}|${estado.status}|${estado.onboarding?.specialistPhase?.status || 'none'}|${!!args.entregavel}|${JSON.stringify(args.respostas || {})}`;
+    const key = `${estado.fase_atual}|${estado.aguardando_classificacao}|${estado.aguardando_aprovacao ?? false}|${estado.em_estado_compulsorio ?? false}|${estado.status}|${estado.onboarding?.specialistPhase?.status || 'none'}|${!!args.entregavel}|${JSON.stringify(args.respostas || {})}`;
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
         const chr = key.charCodeAt(i);

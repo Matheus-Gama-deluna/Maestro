@@ -23,7 +23,7 @@ import { SkillLoaderService } from "../services/skill-loader.service.js";
 import { saveFile, saveMultipleFiles, formatSavedFilesConfirmation } from "../utils/persistence.js";
 import { classificacaoProgressiva } from "../services/classificacao-progressiva.service.js"; // v6.0
 import { getSpecialistQuestions } from "../handlers/specialist-phase-handler.js"; // v7.0
-import { resolverPathEntregavel, listarPathsEsperados } from "../utils/entregavel-path.js"; // v5.5.0
+import { resolverPathEntregavel, listarPathsEsperados, getFaseDirName } from "../utils/entregavel-path.js"; // v5.5.0
 import { readFile } from "fs/promises";
 import { isPrototypePhase } from "../handlers/prototype-phase-handler.js"; // v9.0
 // v6.3 S5.1: Autonomia calibrada
@@ -422,11 +422,13 @@ ${instrucoesSkill}
             ? gerarInstrucaoCorrecao(
                 faseAtualInfo.nome,
                 estado.score_bloqueado || 0,
-                [], // Itens aprovados não estão salvos no estado
-                [], // Itens pendentes não estão salvos no estado
+                (estado as any).itens_aprovados_bloqueio || [],
+                (estado as any).itens_pendentes_bloqueio || [],
                 [],
                 [],
-                ideParaInstrucao
+                ideParaInstrucao,
+                diretorio,
+                true  // requiresUserDecision: score 50-69, aguarda usuário
             )
             : "";
 
@@ -742,6 +744,9 @@ ${feedbackBloqueio}
         estado.score_bloqueado = qualityScore;
         // V6 Sprint 2: Ativar modo compulsório — bloqueia divagação da IA
         estado.em_estado_compulsorio = true;
+        // Salvar itens de validação para exibição correta na retomada
+        estado.itens_aprovados_bloqueio = gateResultado.itens_validados || [];
+        estado.itens_pendentes_bloqueio = gateResultado.itens_pendentes || [];
 
         // Serializar estado bloqueado
         const estadoBloqueado = serializarEstado(estado);
@@ -763,7 +768,8 @@ ${feedbackBloqueio}
             gateResultado.sugestoes || [],
             estruturaResult.secoes_faltando || [],
             ideParaAprovacao,
-            diretorio  // V6 Sprint 1: para payload de auto-correção
+            diretorio,
+            true  // requiresUserDecision: aguarda decisão explícita do usuário
         );
 
         // Feedback de leitura do disco
@@ -808,7 +814,7 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
 
     // Arquivo do entregável
     const nomeArquivo = args.nome_arquivo || faseAtual.entregavel_esperado;
-    const faseDirName = `fase-${estado.fase_atual.toString().padStart(2, "0")}-${faseAtual.nome.toLowerCase().replace(/\s/g, "-")}`;
+    const faseDirName = getFaseDirName(estado.fase_atual, faseAtual.nome); // padrão canônico com normalização de acentos
     const caminhoArquivo = `${diretorio}/docs/${faseDirName}/${nomeArquivo}`;
 
     filesToSave.push({

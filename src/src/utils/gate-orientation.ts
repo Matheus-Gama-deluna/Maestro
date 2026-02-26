@@ -4,6 +4,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { getSkillParaFase } from './prompt-mapper.js';
 import { getSkillFilePath, detectIDE } from './ide-paths.js';
+import { getFaseDirName } from './entregavel-path.js';
 
 /**
  * V6 Sprint 4: TDD Invertido — Gera documento de orientação de Gate ANTES do entregável.
@@ -62,7 +63,7 @@ export async function generateGateOrientationDoc(
         const outputPath = join(
             diretorio,
             'docs',
-            `fase-${String(faseNumero).padStart(2, '0')}`,
+            getFaseDirName(faseNumero, faseNome),
             '.orientacoes-gate.md'
         );
 
