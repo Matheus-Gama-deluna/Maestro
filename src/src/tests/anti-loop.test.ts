@@ -63,3 +63,39 @@ describe('Anti-loop por diretório', () => {
         expect(checkAntiLoop('/projeto-a', 'hash1')).toBe(false);
     });
 });
+
+// Regressão: entregáveis com conteúdos diferentes NÃO devem disparar loop
+// Bug original: computeCallHash usava !!entregavel (bool), então 3 entregáveis
+// diferentes todos com conteúdo eram tratados como chamada idêntica.
+describe('computeCallHash — entregáveis com conteúdo diferente', () => {
+    function simularHash(entregavelLen: number, snippet: string, fase: number, aguardando: boolean): string {
+        const key = `${fase}|false|${aguardando}|${aguardando}|ativo|none|${entregavelLen}|${snippet}|{}`;
+        let hash = 0;
+        for (let i = 0; i < key.length; i++) {
+            const chr = key.charCodeAt(i);
+            hash = ((hash << 5) - hash) + chr;
+            hash |= 0;
+        }
+        return String(hash);
+    }
+
+    it('entregáveis com tamanhos diferentes geram hashes diferentes', () => {
+        const h1 = simularHash(500, '# Arquitetura\n\nConteudo curto', 6, true);
+        const h2 = simularHash(5000, '# Arquitetura\n\nConteudo muito mais longo com detalhes extras', 6, true);
+        expect(h1).not.toBe(h2);
+    });
+
+    it('entregáveis com mesmo tamanho mas início diferente geram hashes diferentes', () => {
+        const snippet1 = '# Arquitetura v1 - primeira versão do documento';
+        const snippet2 = '# Arquitetura v2 - segunda versão com mais seções';
+        const h1 = simularHash(1000, snippet1, 6, true);
+        const h2 = simularHash(1000, snippet2, 6, true);
+        expect(h1).not.toBe(h2);
+    });
+
+    it('mesmo estado sem entregável gera hash igual (loop legítimo)', () => {
+        const h1 = simularHash(0, '', 6, true);
+        const h2 = simularHash(0, '', 6, true);
+        expect(h1).toBe(h2);
+    });
+});

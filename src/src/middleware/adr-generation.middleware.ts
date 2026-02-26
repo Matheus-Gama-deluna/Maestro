@@ -18,15 +18,15 @@ const FASES_ARQUITETURAIS = new Set([
     'Modelo de Domínio',
 ]);
 
-// Padrões regex para detectar decisões arquiteturais no texto
+// Padrões regex para detectar decisões arquiteturais no texto.
+// NOTA: Só captura frases iniciadas no começo de linhas comuns — evita fragmentar
+// títulos de seções markdown (###) ou linhas de checklist (- [x]).
 const PADROES_DECISAO = [
-    /decidimos?\s+(?:usar?|utilizar?|adotar?)\s+([^.\n]+)/gi,
-    /escolhemos?\s+([^.\n]+?)(?:\s+por\s+[^.\n]+)?/gi,
-    /adotamos?\s+([^.\n]+)/gi,
-    /stack[:\s]+([^.\n]+)/gi,
-    /adr[-\s]?\d+[:\s]+([^.\n]+)/gi,
-    /usaremos?\s+([^.\n]+)/gi,
-    /optamos?\s+por\s+([^.\n]+)/gi,
+    /^(?![-#*\[\|>])\w.*?\b(?:decidimos?\s+(?:usar?|utilizar?|adotar?)\s+)([^.\n]{15,120})/gim,
+    /^(?![-#*\[\|>])\w.*?\b(?:escolhemos?\s+)([^.\n]{15,120})(?:\s+por\s+[^.\n]+)?/gim,
+    /^(?![-#*\[\|>])\w.*?\b(?:adotamos?\s+)([^.\n]{15,120})/gim,
+    /^(?![-#*\[\|>])\w.*?\b(?:usaremos?\s+)([^.\n]{15,120})/gim,
+    /^(?![-#*\[\|>])\w.*?\b(?:optamos?\s+por\s+)([^.\n]{15,120})/gim,
 ];
 
 interface ADR {
@@ -69,6 +69,18 @@ export function withADRGeneration(handler: ToolHandler): ToolHandler {
                 inferirNomeFase(estado, faseConcluidaNum);
 
             if (!nomeFaseConcluida || !FASES_ARQUITETURAIS.has(nomeFaseConcluida)) return result;
+
+            // P4: Evitar re-gerar ADRs para a mesma fase (cada re-submissão gera duplicatas)
+            const adrsDir = path.join(diretorio, '.maestro', 'adrs');
+            const indiceArquivo = path.join(adrsDir, 'INDEX.md');
+            try {
+                const indice = await fs.readFile(indiceArquivo, 'utf-8');
+                const faseSlug = nomeFaseConcluida.toLowerCase().replace(/\s+/g, '-');
+                if (indice.includes(`fase: ${nomeFaseConcluida}`) || indice.includes(faseSlug)) {
+                    console.log(`[ADRGeneration] Fase "${nomeFaseConcluida}" já processada — ignorando.`);
+                    return result;
+                }
+            } catch { /* INDEX.md ainda não existe — pode gerar */ }
 
             // Extrair entregável dos args (guard: deve ser string com conteúdo)
             const entregavel = args.entregavel;

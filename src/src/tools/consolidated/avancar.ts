@@ -47,7 +47,11 @@ const MAX_IDENTICAL_CALLS = 3;
 const loopStates = new Map<string, { hash: string; count: number }>();
 
 function computeCallHash(args: AvancarArgs, estado: EstadoProjeto): string {
-    const key = `${estado.fase_atual}|${estado.aguardando_classificacao}|${estado.aguardando_aprovacao ?? false}|${estado.em_estado_compulsorio ?? false}|${estado.status}|${estado.onboarding?.specialistPhase?.status || 'none'}|${!!args.entregavel}|${JSON.stringify(args.respostas || {})}`;
+    // Inclui checksum do conteúdo do entregável: entregáveis diferentes não devem ser
+    // contados como chamada idêntica, mesmo que todos os flags de estado sejam iguais.
+    const entregavelLen = args.entregavel ? args.entregavel.length : 0;
+    const entregavelSnippet = args.entregavel ? args.entregavel.slice(0, 120) : '';
+    const key = `${estado.fase_atual}|${estado.aguardando_classificacao}|${estado.aguardando_aprovacao ?? false}|${estado.em_estado_compulsorio ?? false}|${estado.status}|${estado.onboarding?.specialistPhase?.status || 'none'}|${entregavelLen}|${entregavelSnippet}|${JSON.stringify(args.respostas || {})}`;
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
         const chr = key.charCodeAt(i);
@@ -122,11 +126,33 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
     // v5.6: Anti-loop protection por diretório
     const callHash = computeCallHash(args, estado);
     if (checkAntiLoop(diretorio, callHash)) {
+        // Diagnóstico contextual: instrução específica para cada estado de bloqueio
+        let instrucaoEspecifica: string;
+        if (estado.aguardando_aprovacao) {
+            instrucaoEspecifica = [
+                `O projeto está bloqueado aguardando decisão do usuário (score ${estado.score_bloqueado}/100).`,
+                ``,
+                `**NÃO chame executar() novamente sem alteração.** As opções são:`,
+                `- **Para aprovar** (avançar mesmo com score baixo): use a tool \`aprovar_gate\` com \`{"acao":"aprovar","diretorio":"${diretorio}"}\``,
+                `- **Para corrigir**: edite o arquivo no disco, salve, depois chame \`executar({diretorio:"${diretorio}",acao:"avancar"})\``,
+                `- **Para ver os itens ❌**: use \`contexto({diretorio:"${diretorio}",estado_json:"..."})\` para ver o que está pendente`,
+            ].join('\n');
+        } else if (estado.aguardando_classificacao) {
+            instrucaoEspecifica = `Aguardando classificação do projeto. Responda com: \`executar({diretorio: "${diretorio}", acao: "avancar", respostas: {nivel: "simples"}})\``;
+        } else {
+            instrucaoEspecifica = [
+                `Diagnóstico: fase_atual=${estado.fase_atual}, status=${estado.status}, specialistPhase=${estado.onboarding?.specialistPhase?.status || 'none'}.`,
+                ``,
+                `Tente uma abordagem diferente:`,
+                `- Se precisa de entregável: gere o conteúdo primeiro e passe via \`entregavel\``,
+                `- Se travado: use \`maestro({diretorio: "${diretorio}"})\` para ver o status atual`,
+            ].join('\n');
+        }
         return {
             content: formatError(
                 "avancar",
                 `Loop detectado: ${MAX_IDENTICAL_CALLS} chamadas idênticas sem progresso.`,
-                `Diagnóstico: fase_atual=${estado.fase_atual}, aguardando_classificacao=${estado.aguardando_classificacao}, status=${estado.status}, specialistPhase=${estado.onboarding?.specialistPhase?.status || 'none'}.\n\nTente uma abordagem diferente:\n- Se aguardando classificação: \`executar({diretorio: "${diretorio}", acao: "avancar", respostas: {nivel: "simples"}})\`\n- Se precisa de entregável: gere o conteúdo primeiro e passe via \`entregavel\`\n- Se travado: use \`maestro({diretorio: "${diretorio}"})\` para ver o status atual`
+                instrucaoEspecifica
             ),
             isError: true,
         };

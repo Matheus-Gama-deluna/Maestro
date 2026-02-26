@@ -107,11 +107,16 @@ export function serializarEstado(estado: EstadoProjeto): {
 }
 
 /**
- * Parseia estado de JSON string
+ * Parseia estado de JSON string.
+ * Sanitiza caracteres de controle (U+0000–U+001F, exceto tabs/newlines)
+ * que podem surgir quando a IA interpola conteúdo corrompido no estado_json.
  */
 export function parsearEstado(json: string): EstadoProjeto | null {
     try {
-        return JSON.parse(json) as EstadoProjeto;
+        // Remove caracteres de controle que invalidam o JSON sem alterar conteúdo legítimo
+        // eslint-disable-next-line no-control-regex
+        const sanitized = json.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+        return JSON.parse(sanitized) as EstadoProjeto;
     } catch {
         return null;
     }
