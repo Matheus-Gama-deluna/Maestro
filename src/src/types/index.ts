@@ -122,7 +122,7 @@ export interface EstadoProjeto {
     }>;
 
     // v3.0: Onboarding otimizado
-    onboarding?: any; // OnboardingState (importado de onboarding.ts)
+    onboarding?: import("./onboarding.js").OnboardingState;
 
     criado_em: string;
     atualizado_em: string;

@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+/**
+ * ⚠️ DEPRECATED — Entry point HTTP/SSE legado
+ *
+ * Este arquivo reimplementa JSON-RPC manualmente.
+ * Será substituído por StreamableHTTPServerTransport quando o SDK for atualizado.
+ * NÃO incluído no build de produção (npm run build). Use npm run build:all para incluir.
+ */
 import express, { Response } from "express";
 import cors from "cors";
 import { randomUUID } from "crypto";

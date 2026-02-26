@@ -43,7 +43,7 @@ export function criarEstadoOnboardingInicial(
  * Obtém estado de onboarding do estado do projeto
  */
 export function obterEstadoOnboarding(estado: EstadoProjeto): OnboardingState | null {
-    return (estado as any).onboarding || null;
+    return estado.onboarding || null;
 }
 
 /**

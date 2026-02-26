@@ -33,6 +33,9 @@ import { generateGateOrientationDoc } from "../utils/gate-orientation.js";
 import { startFileWatcher, stopFileWatcher } from "../services/watcher.service.js";
 import { RiskEvaluator } from "../core/risk/RiskEvaluator.js";
 import type { RiskLevel as DecisionRiskLevel } from "../core/decision/types.js";
+// v6.5: Sprint 3 — Code Generation
+import { decomposeArchitectureToTasks, getTaskProgress } from "../services/task-decomposer.service.js";
+import { calcularScoreContextual } from "../services/scoring-config.js";
 
 
 interface ProximoArgs {
@@ -126,12 +129,14 @@ ${decision.reasoning}
 }
 
 /**
- * Calcula score de qualidade
+ * Calcula score de qualidade usando pesos contextuais por tipo de fase (v6.5).
+ * Fases de código têm threshold e pesos diferentes de fases de documento.
  */
 function calcularQualityScore(
     estruturaResult: ReturnType<typeof validarEstrutura>,
-    gateResult: ReturnType<typeof validarGate>
-): number {
+    gateResult: ReturnType<typeof validarGate>,
+    faseName: string = 'documento'
+): { score: number; approved: boolean } {
     const totalChecklist = gateResult.itens_validados.length + gateResult.itens_pendentes.length;
     const checklistScore = totalChecklist > 0
         ? (gateResult.itens_validados.length / totalChecklist) * 100
@@ -139,10 +144,11 @@ function calcularQualityScore(
 
     const tamanhoScore = estruturaResult.tamanho_ok ? 100 : 50;
 
-    return Math.round(
-        (estruturaResult.score * 0.30) +
-        (checklistScore * 0.50) +
-        (tamanhoScore * 0.20)
+    return calcularScoreContextual(
+        estruturaResult.score,
+        checklistScore,
+        tamanhoScore,
+        faseName
     );
 }
 
@@ -647,7 +653,13 @@ Se o erro persistir, contate o suporte técnico.`,
         };
     }
 
-    const qualityScore = validationResult.overallScore;
+    // v6.5: Usar scoring contextual por tipo de fase
+    const scoreContextual = calcularQualityScore(
+        { score: validationResult.overallScore, tamanho_ok: true, valido: validationResult.passed, secoes_encontradas: [], secoes_faltando: [], feedback: [] },
+        { valido: validationResult.passed, itens_validados: validationResult.results.filter(r => r.passed).map(r => r.layer), itens_pendentes: validationResult.results.filter(r => !r.passed).map(r => r.layer), sugestoes: validationResult.recommendations },
+        faseAtual.nome
+    );
+    const qualityScore = scoreContextual.score;
 
     // Converter resultado para formato compatível com mensagens de erro
     const gateResultado = {
@@ -1000,6 +1012,23 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
     if (faseAtual.nome.toLowerCase().includes("arquitetura")) {
         estado.classificacao_progressiva.nivel_provisorio = false;
         classificacaoInfo += `\n> ✅ **Classificação DEFINITIVA** confirmada na fase de Arquitetura.\n`;
+    }
+
+    // v6.5: Decompor arquitetura em tasks ao entrar em fase de código
+    const proximaFaseInfo2 = getFaseComStitch(estado.nivel, estado.fase_atual + 1, estado.usar_stitch);
+    const isCodePhase = proximaFaseInfo2?.nome &&
+        ['Backend', 'Frontend', 'Integração', 'Testes'].some(k => proximaFaseInfo2.nome.includes(k));
+
+    if (isCodePhase && entregavelValidado) {
+        try {
+            const newTasks = decomposeArchitectureToTasks(entregavelValidado, estado.fase_atual + 1);
+            if (newTasks.length > 0) {
+                estado.tasks = [...(estado.tasks || []), ...newTasks];
+                console.log(`[proximo] v6.5: ${newTasks.length} tasks geradas para fase ${estado.fase_atual + 1} (${proximaFaseInfo2?.nome})`);
+            }
+        } catch (err) {
+            console.warn('[proximo] v6.5: Falha ao decompor arquitetura em tasks (non-blocking):', err);
+        }
     }
 
     // Avançar para próxima fase

@@ -181,7 +181,7 @@ export async function discovery(args: DiscoveryArgs): Promise<ToolResult> {
     }
 
     // v3.0: ADAPTER - Usar onboarding como fonte de verdade se disponível
-    const onboarding = (estado as any).onboarding as OnboardingState | undefined;
+    const onboarding = estado.onboarding;
     
     let estadoAtualizado: EstadoProjeto;
     

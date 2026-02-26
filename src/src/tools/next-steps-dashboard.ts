@@ -241,7 +241,7 @@ export async function nextStepsDashboard(args: NextStepsDashboardArgs): Promise<
   setCurrentDirectory(diretorio);
 
   // Obter estado de onboarding
-  const onboarding = (estado as any).onboarding as OnboardingState | undefined;
+  const onboarding = estado.onboarding;
   if (!onboarding) {
     return {
       content: [{

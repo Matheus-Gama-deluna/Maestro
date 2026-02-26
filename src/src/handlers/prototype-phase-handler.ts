@@ -641,7 +641,7 @@ function savePrototypeData(collectedData: Record<string, any>, data: PrototypePh
  */
 export async function handlePrototypePhase(args: PrototypePhaseArgs): Promise<ToolResult> {
     const { estado, diretorio } = args;
-    const onboarding = (estado as any).onboarding as OnboardingState | undefined;
+    const onboarding = estado.onboarding;
     const sp = onboarding?.specialistPhase;
 
     if (!sp) {
@@ -1349,7 +1349,7 @@ async function handleApproved(
     data: PrototypePhaseData
 ): Promise<ToolResult> {
     const { estado, diretorio } = args;
-    const onboarding = (estado as any).onboarding as OnboardingState;
+    const onboarding = estado.onboarding!;
 
     const htmlFiles = data.htmlFiles || findHtmlFiles(diretorio);
     const protoDir = getPrototypeDir(diretorio);

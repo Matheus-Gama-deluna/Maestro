@@ -124,7 +124,6 @@ const ONBOARDING_FLOW: FlowTransition[] = [
         to: "specialist_approved",
         tool: "maestro",
         description: "PRD aprovado, preparar transição para próximo especialista",
-        condition: (s) => true,
         requires_user_input: true,
         user_prompt: "PRD validado! Revise o score e aprove para avançar.",
     },
@@ -231,7 +230,7 @@ const DEVELOPMENT_FLOW: FlowTransition[] = [
  * Extrai estado do fluxo a partir do estado do projeto
  */
 export function getFlowState(estado: EstadoProjeto, diretorio: string): FlowState {
-    const onboarding = (estado as any).onboarding;
+    const onboarding = estado.onboarding;
     return {
         hasGlobalConfig: !!estado.config?.setup?.completed,
         hasProject: !!estado.projeto_id,
@@ -263,7 +262,7 @@ function determineCurrentPhase(estado: EstadoProjeto): string {
     if (estado.aguardando_aprovacao) return "aguardando_aprovacao";
     if (estado.aguardando_classificacao) return "aguardando_classificacao";
 
-    const onboarding = (estado as any).onboarding;
+    const onboarding = estado.onboarding;
     if (onboarding) {
         // v8.0: Se onboarding está completo (phase='completed') e specialistPhase foi limpo,
         // NÃO retornar fases de onboarding — ir direto para fase_ativa
@@ -287,7 +286,7 @@ function determineCurrentPhase(estado: EstadoProjeto): string {
             if (onboarding.discoveryStatus === "completed" && onboarding.brainstormStatus === "pending") return "discovery_complete";
             if (onboarding.brainstormStatus === "in_progress") return "brainstorm_in_progress";
             if (onboarding.brainstormStatus === "completed" && onboarding.prdStatus === "pending") return "brainstorm_complete";
-            if (onboarding.prdStatus === "completed") return "prd_complete";
+            if (onboarding.prdStatus === "approved") return "prd_complete";
         }
     }
 
@@ -387,7 +386,7 @@ export function getFlowProgress(estado: EstadoProjeto): FlowProgress {
  */
 export function isInOnboarding(estado: EstadoProjeto): boolean {
     // v8.0: Se onboarding está completo e specialistPhase foi limpo, NÃO é onboarding
-    const onboarding = (estado as any).onboarding;
+    const onboarding = estado.onboarding;
     if (onboarding?.phase === 'completed' && !onboarding.specialistPhase) {
         return false;
     }

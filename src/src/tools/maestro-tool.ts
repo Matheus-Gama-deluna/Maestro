@@ -105,10 +105,15 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
         return await handleNoProject(diretorio);
     }
 
-    // v7.0: Delegação de avanços para unificar o fluxo no maestro
+    // v6.0: acao=avancar removida do maestro. Use executar() diretamente.
     if (args.acao === "avancar") {
-        const { executar } = await import("./consolidated/executar.js");
-        return executar({ ...args, acao: "avancar" });
+        return {
+            content: [{
+                type: "text",
+                text: `# ❌ Ação Incorreta\n\n\`maestro\` não aceita mais \`acao: "avancar"\`.\n\nUse \`executar\` diretamente:\n\`\`\`json\nexecutar({ "diretorio": "${diretorio}", "acao": "avancar" })\n\`\`\`\n`,
+            }],
+            isError: true,
+        };
     }
 
     // Com projeto: analisar estado e recomendar
@@ -171,6 +176,20 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
             conteudo: generateProgressBar(estado),
         }],
     });
+
+    // v6.5: Progresso de tasks (async — requer import dinâmico)
+    if (estado.tasks && estado.tasks.length > 0) {
+        try {
+            const { getTaskProgress } = await import("../services/task-decomposer.service.js");
+            const prog = getTaskProgress(estado.tasks, estado.fase_atual);
+            content.push({
+                type: "text",
+                text: `\n## ✅ Tasks de Código (Fase ${estado.fase_atual})\n\nTasks: **${prog.done}/${prog.total}** (${prog.percentage}%) | Em progresso: ${prog.inProgress} | Bloqueadas: ${prog.blocked}\n`,
+            });
+        } catch {
+            // Fallback silencioso
+        }
+    }
 
     // v5.2: Resource links para especialista/skill referenciado
     if (faseInfo) {
@@ -452,16 +471,6 @@ function parseSetupInput(input: string): Record<string, unknown> | null {
         return null;
     }
 }
-function formatArgsPreview(args: Record<string, unknown>): string {
-    return Object.entries(args)
-        .map(([key, value]) => {
-            if (typeof value === "string" && value.startsWith("{{")) {
-                return `${key}: "..."`;
-            }
-            return `${key}: ${JSON.stringify(value)}`;
-        })
-        .join(", ");
-}
 
 /**
  * Input schema para maestro
@@ -480,7 +489,7 @@ export const maestroToolSchema = {
         acao: {
             type: "string",
             description: "Ação específica a executar (opcional)",
-            enum: ["setup_inicial", "criar_projeto", "avancar"],
+            enum: ["setup_inicial", "criar_projeto"],
         },
         estado_json: {
             type: "string",

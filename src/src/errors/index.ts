@@ -205,9 +205,9 @@ export function withErrorHandling<T extends Record<string, unknown>>(
                 "UNEXPECTED_ERROR",
                 {
                     recovery: {
-                        tool: "status",
+                        tool: "maestro",
                         description: "Verificar status do projeto após erro",
-                        args_template: { estado_json: "{{estado_json}}", diretorio: "{{diretorio}}" },
+                        args_template: { diretorio: "{{diretorio}}" },
                         requires_user_input: false,
                     },
                     cause: error instanceof Error ? error : undefined,

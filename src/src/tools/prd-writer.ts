@@ -189,7 +189,7 @@ export async function prdWriter(args: PRDWriterArgs): Promise<ToolResult> {
   const acao = args.acao || 'gerar';
 
   // Obter estado de onboarding
-  const onboarding = (estado as any).onboarding as OnboardingState | undefined;
+  const onboarding = estado.onboarding;
   if (!onboarding) {
     return {
       content: [{

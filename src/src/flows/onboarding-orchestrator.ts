@@ -69,7 +69,7 @@ function formatarBlocoDiscovery(bloco: DiscoveryBlock): string {
  * Orquestra o fluxo de onboarding (discovery → brainstorm → PRD)
  */
 export async function onboardingOrchestrator(args: OnboardingOrchestratorArgs): Promise<ToolResult> {
-  if (!args.estado_json) {
+  if (!args.estado_json || args.estado_json.trim().length === 0) {
     return {
       content: [{
         type: "text",

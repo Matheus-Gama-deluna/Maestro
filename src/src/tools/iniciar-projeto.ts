@@ -403,7 +403,7 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
     // v6.0: Criar estado de onboarding com especialista (novo fluxo)
     // NÃO cria discoveryBlocks — o especialista conduz a coleta conversacional
     const onboardingState = criarEstadoOnboardingComEspecialista(projetoId, args.modo);
-    (estado as any).onboarding = onboardingState;
+    estado.onboarding = onboardingState;
 
     // Cria resumo
     const resumo = criarResumoInicial(projetoId, args.nome, nivelFinal, 1, 10);

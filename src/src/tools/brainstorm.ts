@@ -209,7 +209,7 @@ export async function brainstorm(args: BrainstormArgs): Promise<ToolResult> {
   const acao = args.acao || 'iniciar';
 
   // Obter estado de onboarding
-  const onboarding = (estado as any).onboarding as OnboardingState | undefined;
+  const onboarding = estado.onboarding;
   if (!onboarding) {
     return {
       content: [{
@@ -364,7 +364,7 @@ async function handleProximaSecao(
   const total = onboarding.brainstormSections.length;
 
   // Persistir estado atualizado
-  (estado as any).onboarding = onboarding;
+  estado.onboarding = onboarding;
   estado.atualizado_em = new Date().toISOString();
   const estadoFile = serializarEstado(estado);
 
@@ -375,7 +375,7 @@ async function handleProximaSecao(
     onboarding.phase = 'prd_draft';
 
     // Re-serializar com status final
-    (estado as any).onboarding = onboarding;
+    estado.onboarding = onboarding;
     const estadoFileFinal = serializarEstado(estado);
 
     const resposta = `# ✅ Brainstorm Concluído!

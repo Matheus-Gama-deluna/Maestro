@@ -97,7 +97,7 @@ describe('Flow Engine', () => {
                 }
             };
             expect(isInOnboarding(estadoDesenvolvimento as any)).toBe(false);
-            const fs = getFlowState(estadoDesenvolvimento as EstadoProjeto, '/test');
+            const fs = getFlowState(estadoDesenvolvimento as unknown as EstadoProjeto, '/test');
             expect(fs.currentPhase).toBe('fase_ativa');
         });
     });

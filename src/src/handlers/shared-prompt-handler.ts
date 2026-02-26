@@ -132,7 +132,7 @@ async function buildSpecialistPrompt(diretorio: string): Promise<PromptResult> {
     if (!estado) return noProjectResult();
 
     // v6.0: Detectar novo fluxo com specialistPhase
-    const onboarding = (estado as any).onboarding;
+    const onboarding = estado.onboarding;
     if (onboarding?.specialistPhase) {
         return buildSpecialistPhasePrompt(diretorio, estado, onboarding);
     }

@@ -42,14 +42,12 @@ interface AvancarArgs {
     acao?: string;
 }
 
-// v8.0: Anti-loop protection — tracks consecutive identical calls
+// v5.6: Anti-loop protection — tracks consecutive identical calls PER DIRECTORY
 const MAX_IDENTICAL_CALLS = 3;
-let _lastCallHash = '';
-let _identicalCallCount = 0;
+const loopStates = new Map<string, { hash: string; count: number }>();
 
 function computeCallHash(args: AvancarArgs, estado: EstadoProjeto): string {
-    const key = `${estado.fase_atual}|${estado.aguardando_classificacao}|${estado.status}|${(estado as any).onboarding?.specialistPhase?.status || 'none'}|${!!args.entregavel}|${JSON.stringify(args.respostas || {})}`;
-    // Simple hash
+    const key = `${estado.fase_atual}|${estado.aguardando_classificacao}|${estado.status}|${estado.onboarding?.specialistPhase?.status || 'none'}|${!!args.entregavel}|${JSON.stringify(args.respostas || {})}`;
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
         const chr = key.charCodeAt(i);
@@ -57,6 +55,25 @@ function computeCallHash(args: AvancarArgs, estado: EstadoProjeto): string {
         hash |= 0;
     }
     return String(hash);
+}
+
+/**
+ * Verifica anti-loop por diretório. Retorna true se loop detectado.
+ */
+function checkAntiLoop(diretorio: string, hash: string): boolean {
+    const state = loopStates.get(diretorio) || { hash: '', count: 0 };
+    if (state.hash === hash) {
+        state.count++;
+        if (state.count >= MAX_IDENTICAL_CALLS) {
+            loopStates.delete(diretorio);
+            return true;
+        }
+    } else {
+        state.hash = hash;
+        state.count = 1;
+    }
+    loopStates.set(diretorio, state);
+    return false;
 }
 
 /**
@@ -102,25 +119,17 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
         };
     }
 
-    // v8.0 Sprint 4: Anti-loop protection
+    // v5.6: Anti-loop protection por diretório
     const callHash = computeCallHash(args, estado);
-    if (callHash === _lastCallHash) {
-        _identicalCallCount++;
-        if (_identicalCallCount >= MAX_IDENTICAL_CALLS) {
-            _identicalCallCount = 0;
-            _lastCallHash = '';
-            return {
-                content: formatError(
-                    "avancar",
-                    `Loop detectado: ${MAX_IDENTICAL_CALLS} chamadas idênticas sem progresso.`,
-                    `Diagnóstico: fase_atual=${estado.fase_atual}, aguardando_classificacao=${estado.aguardando_classificacao}, status=${estado.status}, specialistPhase=${(estado as any).onboarding?.specialistPhase?.status || 'none'}.\n\nTente uma abordagem diferente:\n- Se aguardando classificação: \`executar({diretorio: "${diretorio}", acao: "avancar", respostas: {nivel: "simples"}})\`\n- Se precisa de entregável: gere o conteúdo primeiro e passe via \`entregavel\`\n- Se travado: use \`maestro({diretorio: "${diretorio}"})\` para ver o status atual`
-                ),
-                isError: true,
-            };
-        }
-    } else {
-        _lastCallHash = callHash;
-        _identicalCallCount = 1;
+    if (checkAntiLoop(diretorio, callHash)) {
+        return {
+            content: formatError(
+                "avancar",
+                `Loop detectado: ${MAX_IDENTICAL_CALLS} chamadas idênticas sem progresso.`,
+                `Diagnóstico: fase_atual=${estado.fase_atual}, aguardando_classificacao=${estado.aguardando_classificacao}, status=${estado.status}, specialistPhase=${estado.onboarding?.specialistPhase?.status || 'none'}.\n\nTente uma abordagem diferente:\n- Se aguardando classificação: \`executar({diretorio: "${diretorio}", acao: "avancar", respostas: {nivel: "simples"}})\`\n- Se precisa de entregável: gere o conteúdo primeiro e passe via \`entregavel\`\n- Se travado: use \`maestro({diretorio: "${diretorio}"})\` para ver o status atual`
+            ),
+            isError: true,
+        };
     }
 
     // v8.0 FIX (Bug B): PRIORIZAR aguardando_classificacao ANTES de qualquer check de onboarding
@@ -131,7 +140,7 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
 
     // Verificar se está em onboarding
     const inOnboarding = isInOnboarding(estado);
-    const onboarding = (estado as any).onboarding;
+    const onboarding = estado.onboarding;
 
     if (inOnboarding) {
         // v6.0: Novo fluxo com specialistPhase
