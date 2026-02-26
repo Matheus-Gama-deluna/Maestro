@@ -219,16 +219,18 @@ proximo(
     // v9.0: Fase de prototipagem — entregável é prototipos.md + verificação de HTML na pasta
     const isProtoPhase = isPrototypePhase(faseAtualInfo?.nome, estado.usar_stitch);
 
-    // v5.5.0: Leitura automática do disco
+    // v6.6 FIX #4: SEMPRE tentar ler do disco primeiro, mesmo quando entregável é passado como argumento.
+    // Antes, se a IA passava conteúdo como argumento (>100 chars), o disco era ignorado.
+    // Isso causava: 1) Gasto de tokens (15K+ chars na chamada), 2) Inconsistência disco vs argumento.
+    // Agora: disco tem prioridade. Argumento é fallback.
     let entregavel = args.entregavel;
     let entregavelLidoDoDisco = false;
     let caminhoResolvido: string | null = null;
 
-    // Heurística: se entregável está vazio OU muito curto (< 100 chars), provavelmente é uma descrição
-    // Tentamos ler do disco como fallback
     const TAMANHO_MINIMO_CONTEUDO_REAL = 100;
 
-    if (!entregavel || entregavel.trim().length < TAMANHO_MINIMO_CONTEUDO_REAL) {
+    // Sempre tentar ler do disco primeiro (independente do argumento)
+    {
         if (faseAtualInfo) {
             // v9.0: Para fase de prototipagem, tentar ler prototipos/prototipos.md
             if (isProtoPhase) {
@@ -242,21 +244,29 @@ proximo(
                 }
             }
 
-            if (!entregavel || entregavel.trim().length < TAMANHO_MINIMO_CONTEUDO_REAL) {
-                // Tentar resolver path do entregável
-                caminhoResolvido = resolverPathEntregavel(
+            // v6.6 FIX #4: SEMPRE tentar resolver o path do disco, mesmo se args.entregavel existe.
+            // Disco tem prioridade sobre argumento para: (a) economizar tokens, (b) evitar inconsistência.
+            // Se o arquivo no disco existir e tiver conteúdo válido, usamos ele.
+            // Se não existir, caímos de volta para args.entregavel.
+            if (!entregavelLidoDoDisco) {
+                const pathDoDisco = resolverPathEntregavel(
                     diretorio,
                     estado.fase_atual,
                     faseAtualInfo,
                     estado
                 );
 
-                if (caminhoResolvido) {
+                if (pathDoDisco) {
                     try {
-                        entregavel = await readFile(caminhoResolvido, 'utf-8');
-                        entregavelLidoDoDisco = true;
+                        const conteudoDisco = await readFile(pathDoDisco, 'utf-8');
+                        if (conteudoDisco && conteudoDisco.trim().length >= TAMANHO_MINIMO_CONTEUDO_REAL) {
+                            entregavel = conteudoDisco;
+                            entregavelLidoDoDisco = true;
+                            caminhoResolvido = pathDoDisco;
+                            console.log(`[proximo] v6.6 FIX #4: Entregável lido do disco (${conteudoDisco.length} chars): ${pathDoDisco}`);
+                        }
                     } catch (err) {
-                        // Erro ao ler arquivo, continua com validação abaixo
+                        // Arquivo não encontrado ou erro de leitura — usar args.entregavel como fallback
                     }
                 }
             }
@@ -414,28 +424,42 @@ ${instrucoesSkill}
     if (autonomiaBlock) return autonomiaBlock;
 
     // Verificar se há bloqueio de aprovação pendente (Gate)
+    // v6.6 FIX #1: Se um novo entregável foi fornecido (argumento ou disco), RESETAR o bloqueio
+    // e re-validar. Antes deste fix, o sistema retornava imediatamente sem re-avaliar,
+    // fazendo o score ficar fixo mesmo com conteúdo melhorado.
     if (estado.aguardando_aprovacao) {
+        const temNovoEntregavel = entregavelValidado && entregavelValidado.trim().length >= TAMANHO_MINIMO_ENTREGAVEL;
 
-        // v5.5.0: Incluir instruções de correção no bloqueio
-        const ideParaInstrucao = detectIDE(diretorio) || 'windsurf';
-        const instrucaoCorrecao = faseAtualInfo
-            ? gerarInstrucaoCorrecao(
-                faseAtualInfo.nome,
-                estado.score_bloqueado || 0,
-                (estado as any).itens_aprovados_bloqueio || [],
-                (estado as any).itens_pendentes_bloqueio || [],
-                [],
-                [],
-                ideParaInstrucao,
-                diretorio,
-                true  // requiresUserDecision: score 50-69, aguarda usuário
-            )
-            : "";
+        if (temNovoEntregavel) {
+            // Resetar flags de bloqueio — permitir re-validação com o novo conteúdo
+            const scoreAnterior = estado.score_bloqueado;
+            estado.aguardando_aprovacao = false;
+            estado.em_estado_compulsorio = false;
+            estado.motivo_bloqueio = undefined;
+            // Manter score_bloqueado para calcular delta depois
+            console.log(`[proximo] v6.6 FIX #1: Re-validando entregável (score anterior: ${scoreAnterior}). Flag aguardando_aprovacao resetado.`);
+            // Continua para o fluxo de validação abaixo ↓
+        } else {
+            // Sem novo entregável — manter bloqueio e mostrar instruções
+            const ideParaInstrucao = detectIDE(diretorio) || 'windsurf';
+            const instrucaoCorrecao = faseAtualInfo
+                ? gerarInstrucaoCorrecao(
+                    faseAtualInfo.nome,
+                    estado.score_bloqueado || 0,
+                    (estado as any).itens_aprovados_bloqueio || [],
+                    (estado as any).itens_pendentes_bloqueio || [],
+                    [],
+                    [],
+                    ideParaInstrucao,
+                    diretorio,
+                    true  // requiresUserDecision: score 50-69, aguarda usuário
+                )
+                : "";
 
-        return {
-            content: [{
-                type: "text",
-                text: `# ⛔ Projeto Aguardando Aprovação
+            return {
+                content: [{
+                    type: "text",
+                    text: `# ⛔ Projeto Aguardando Aprovação
 
 O projeto está bloqueado aguardando aprovação do usuário.
 
@@ -451,12 +475,14 @@ ${instrucaoCorrecao}
 O **usuário humano** deve decidir:
 
 - **Para aprovar e avançar**: Diga "aprovar o gate"
-- **Para corrigir primeiro**: Siga as instruções acima e re-submeta
+- **Para corrigir primeiro**: Edite o arquivo no disco e re-submeta com \`executar({ acao: "avancar" })\`
 
 > ⚠️ A IA NÃO pode aprovar automaticamente. Aguarde a decisão do usuário.
+> 💡 Se o entregável foi melhorado, salve no disco e chame \`executar\` novamente — o sistema irá re-avaliar.
 `,
-            }],
-        };
+                }],
+            };
+        }
     }
 
     // Fluxo PRD-first: se ainda aguardando PRD, analisar e AUTO-CONFIRMAR se auto_flow
@@ -655,40 +681,91 @@ Se o erro persistir, contate o suporte técnico.`,
         };
     }
 
-    // v6.5: Usar scoring contextual por tipo de fase
-    const scoreContextual = calcularQualityScore(
-        { score: validationResult.overallScore, tamanho_ok: true, valido: validationResult.passed, secoes_encontradas: [], secoes_faltando: [], feedback: [] },
-        { valido: validationResult.passed, itens_validados: validationResult.results.filter(r => r.passed).map(r => r.layer), itens_pendentes: validationResult.results.filter(r => !r.passed).map(r => r.layer), sugestoes: validationResult.recommendations },
+    // v6.6 FIX #2: Extrair issues INDIVIDUAIS do DeliverableValidator para scoring granular.
+    // Antes, validationResult.results (1 elemento) era mapeado como itens_validados/pendentes,
+    // resultando em checklistScore = 0% ou 100% (binário), fixando o score em ~58.
+    // Agora extraímos cada issue individual e o gate_checklist da fase para scoring justo.
+    const allIssues = validationResult.results.flatMap(r => r.issues || []);
+    const allSuggestions = validationResult.results.flatMap(r => r.suggestions || []);
+
+    // Construir itens de checklist granulares a partir dos issues do validator
+    const itensValidadosGranular: string[] = [];
+    const itensPendentesGranular: string[] = [];
+
+    // Usar gate_checklist da fase como base para itens aprovados/pendentes
+    const gateChecklistItems = faseAtual.gate_checklist || [];
+    const contentLowerForCheck = entregavelValidado.toLowerCase();
+
+    for (const item of gateChecklistItems) {
+        // Extrair palavras-chave > 3 chars do item
+        const keywords = item.toLowerCase()
+            .replace(/[^a-záàâãéèêíïóôõöúüçñ\s]/gi, '')
+            .split(/\s+/)
+            .filter((w: string) => w.length > 3);
+
+        const matched = keywords.filter((kw: string) => contentLowerForCheck.includes(kw));
+        const matchRatio = keywords.length > 0 ? matched.length / keywords.length : 1;
+
+        if (matchRatio >= 0.5) {
+            itensValidadosGranular.push(`✅ ${item}`);
+        } else {
+            itensPendentesGranular.push(`❌ ${item}`);
+        }
+    }
+
+    // Adicionar issues do validator como pendentes se não já cobertos pelo checklist
+    for (const issue of allIssues) {
+        if (issue.severity === 'critical' || issue.severity === 'high') {
+            const jaListado = itensPendentesGranular.some(p => p.toLowerCase().includes(issue.type));
+            if (!jaListado) {
+                itensPendentesGranular.push(`❌ ${issue.message}`);
+            }
+        }
+    }
+
+    // Calcular checklistScore granular
+    const totalItensGranular = itensValidadosGranular.length + itensPendentesGranular.length;
+    const checklistScoreGranular = totalItensGranular > 0
+        ? (itensValidadosGranular.length / totalItensGranular) * 100
+        : 100;
+
+    // Calcular score contextual com dados granulares
+    const tamanhoScoreCalc = entregavelValidado.trim().length >= 600 ? 100 : 50;
+    const scoreContextual = calcularScoreContextual(
+        validationResult.overallScore,
+        checklistScoreGranular,
+        tamanhoScoreCalc,
         faseAtual.nome
     );
     const qualityScore = scoreContextual.score;
 
-    // Converter resultado para formato compatível com mensagens de erro
+    // v6.6 FIX #3: Construir gateResultado com itens GRANULARES para feedback específico
     const gateResultado = {
-        valido: validationResult.passed,
-        itens_validados: validationResult.results
-            .filter(r => r.passed)
-            .map(r => `${r.layer}: ${r.score.toFixed(0)}%`),
-        itens_pendentes: validationResult.results
-            .filter(r => !r.passed)
-            .flatMap(r => r.issues.map(i => `[${r.layer}] ${i.message}`)),
-        sugestoes: validationResult.recommendations
+        valido: validationResult.passed && itensPendentesGranular.length === 0,
+        itens_validados: itensValidadosGranular,
+        itens_pendentes: itensPendentesGranular,
+        sugestoes: [...allSuggestions, ...validationResult.recommendations]
     };
 
     const estruturaResult = {
         valido: validationResult.passed,
         score: qualityScore,
-        secoes_encontradas: validationResult.results
-            .filter(r => r.passed)
-            .map(r => r.layer),
-        secoes_faltando: validationResult.results
-            .filter(r => !r.passed)
-            .map(r => r.layer),
-        tamanho_ok: true,
-        feedback: validationResult.recommendations
+        secoes_encontradas: itensValidadosGranular,
+        secoes_faltando: itensPendentesGranular.map(p => p.replace(/^❌\s*/, '')),
+        tamanho_ok: tamanhoScoreCalc === 100,
+        feedback: [...validationResult.recommendations, ...allSuggestions]
     };
 
+    // v6.6: Log detalhado para debug
+    console.log(`[proximo] v6.6 FIX #2: Score granular — overallScore=${validationResult.overallScore}, checklistScore=${checklistScoreGranular.toFixed(0)}%, tamanhoScore=${tamanhoScoreCalc}, qualityScore=${qualityScore}, itens=${itensValidadosGranular.length}✅/${itensPendentesGranular.length}❌`);
+
     console.log(`[proximo] validateDeliverable completo — Score: ${qualityScore}/100, Passou: ${validationResult.passed}`);
+
+    // v6.6 MELHORIA #6: Calcular delta de score para feedback incremental
+    const scoreAnteriorDelta = estado.score_bloqueado;
+    const deltaInfo = (scoreAnteriorDelta != null && scoreAnteriorDelta !== qualityScore)
+        ? `\n> 📊 **Score anterior:** ${scoreAnteriorDelta}/100 → **Atual:** ${qualityScore}/100 (${qualityScore > scoreAnteriorDelta ? '📈 +' : '📉 '}${qualityScore - scoreAnteriorDelta})\n`
+        : '';
 
     // Score < 50: BLOQUEAR com instruções detalhadas de correção
     if (qualityScore < 50) {
@@ -724,7 +801,7 @@ Se o erro persistir, contate o suporte técnico.`,
                 text: `# ❌ Entregável Bloqueado
 
 ${feedbackLeituraBloqueio}## Score: ${qualityScore}/100 - Abaixo do mínimo (50)
-
+${deltaInfo}
 O entregável não atende aos requisitos mínimos de qualidade.
 
 ${feedbackBloqueio}
@@ -785,7 +862,7 @@ ${feedbackBloqueio}
                 text: `# ⚠️ Aprovação do Usuário Necessária
 
 ${feedbackLeituraAprovacao}## Score: ${qualityScore}/100 - Abaixo do mínimo recomendado (70)
-
+${deltaInfo}
 O entregável tem qualidade abaixo do ideal mas pode ser melhorado.
 
 ${feedbackAprovacao}
