@@ -248,9 +248,28 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
         } as any);
     }
 
-    // Desenvolvimento: delegar para proximo
+    // v8.0: Detectar fase de código e delegar para code-phase-handler
+    const faseAtualInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
+    const isCodePhaseName = faseAtualInfo?.nome &&
+        ['Frontend', 'Backend', 'Integração', 'Deploy Final'].some(k => faseAtualInfo.nome.includes(k));
+
+    if (isCodePhaseName) {
+        try {
+            const { handleCodePhase } = await import("../../handlers/code-phase-handler.js");
+            return handleCodePhase({
+                estado,
+                diretorio,
+                respostas: args.respostas,
+                entregavel: args.entregavel,
+            });
+        } catch (err) {
+            // Fallback: se code-phase-handler falhar, delegar para proximo.ts
+            console.warn('[avancar] v8.0: Fallback para proximo.ts —', err);
+        }
+    }
+
+    // Desenvolvimento (fases não-código): delegar para proximo
     // v5.5.0: proximo.ts agora é autossuficiente - lê do disco automaticamente
-    // Removida lógica duplicada de leitura de arquivo (linhas 193-254)
     const estadoJson = args.estado_json || serializarEstado(estado).content;
 
     return proximo({

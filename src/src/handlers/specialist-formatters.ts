@@ -244,6 +244,110 @@ Como Especialista de Arquitetura, preciso entender suas preferências e restriç
 `;
     }
 
+    // v8.0: Perguntas OPERACIONAIS para fases de código (não de stack — já definida na Arquitetura)
+    if (nome === 'frontend' || nome.includes('frontend')) {
+        return `
+## 🎨 Desenvolvimento Frontend — Setup Operacional
+
+A stack já está definida na Arquitetura. Preciso confirmar pontos **operacionais**:
+
+### 1. Estado do Projeto
+- O projeto Frontend já foi inicializado? (ex: pasta \`frontend/\` existe?)
+- Se não, posso criar com a stack da Arquitetura?
+
+### 2. Prioridade de Implementação
+- Qual User Story quer priorizar? (Recomendo começar pelo fluxo principal do Backlog)
+- Prefere seguir a ordem dos Sprints planejados no Backlog?
+
+### 3. Mock Server
+- MSW já configurado? Precisa de setup com tipos do OpenAPI?
+- Ou quer desenvolver direto contra o backend (se já existir)?
+
+### 4. Estrutura
+- Monorepo ou repos separados (frontend/backend)?
+- Tem design system ou component library já configurado?
+
+> 💡 Após suas respostas, vou gerar o setup e começar pela primeira User Story.
+> Se preferir, posso prosseguir com defaults razoáveis baseados na Arquitetura.
+`;
+    }
+
+    if (nome === 'backend' || nome.includes('backend')) {
+        return `
+## ⚙️ Desenvolvimento Backend — Setup Operacional
+
+A stack já está definida na Arquitetura. Preciso confirmar pontos **operacionais**:
+
+### 1. Banco de Dados
+- O banco PostgreSQL está rodando? (local, Docker, ou cloud?)
+- O Prisma schema já existe ou devo criar a partir do \`design-banco.md\`?
+- Seeds iniciais necessários? (dados de teste)
+
+### 2. Prioridade de Implementação
+- Seguir a ordem dos Sprints do Backlog?
+- Qual módulo implementar primeiro? (Recomendo: Auth → CRUD principal)
+
+### 3. Estrutura
+- Onde fica o código backend? (pasta \`backend/\`, \`server/\`, raiz?)
+- Clean Architecture conforme definido na Arquitetura?
+
+### 4. Ambiente
+- Variáveis de ambiente (.env) já configuradas?
+- Redis disponível para cache/filas?
+
+> 💡 Após suas respostas, vou criar a estrutura e começar pela primeira User Story.
+`;
+    }
+
+    if (nome.includes('integra')) {
+        return `
+## 🔗 Integração — Setup Operacional
+
+### 1. Conexão Frontend ↔ Backend
+- Frontend em qual porta? Backend em qual porta?
+- CORS já configurado?
+- Proxy ou chamada direta?
+
+### 2. Variáveis de Ambiente
+- \`.env\` do frontend com URL do backend?
+- \`.env\` do backend com credenciais de serviços externos?
+
+### 3. Mocks
+- Quer manter mock como fallback ou remover totalmente?
+- MSW configurado para desativar em produção?
+
+### 4. Testes E2E
+- Playwright ou Cypress configurado?
+- Precisa de Docker Compose para ambiente completo?
+
+> 💡 O objetivo é substituir todos os mocks por conexões reais e validar E2E.
+`;
+    }
+
+    if (nome.includes('deploy')) {
+        return `
+## 🚀 Deploy Final — Setup Operacional
+
+### 1. Infraestrutura
+- Ambiente de deploy definido? (AWS, Vercel, Docker, VPS?)
+- CI/CD pipeline já existe? (GitHub Actions, etc.)
+
+### 2. Configuração
+- Variáveis de ambiente de produção definidas?
+- Domínio e SSL configurados?
+
+### 3. Monitoramento
+- Observabilidade configurada? (logs, métricas, traces)
+- Health checks implementados?
+
+### 4. Estratégia
+- Deploy blue/green, canary, ou direto?
+- Rollback automático configurado?
+
+> 💡 O objetivo é colocar o sistema em produção com monitoramento ativo.
+`;
+    }
+
     if (nome === 'prototipagem') {
         return `
 ## 🎨 Prototipagem Rápida com Google Stitch

@@ -1166,20 +1166,54 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
         classificacaoInfo += `\n> ✅ **Classificação DEFINITIVA** confirmada na fase de Arquitetura.\n`;
     }
 
-    // v6.5: Decompor arquitetura em tasks ao entrar em fase de código
+    // v8.0: Decompor em tasks ao entrar em fase de código — usa Backlog como fonte primária
     const proximaFaseInfo2 = getFaseComStitch(estado.nivel, estado.fase_atual + 1, estado.usar_stitch);
-    const isCodePhase = proximaFaseInfo2?.nome &&
+    const isCodePhaseNext = proximaFaseInfo2?.nome &&
         ['Backend', 'Frontend', 'Integração', 'Testes'].some(k => proximaFaseInfo2.nome.includes(k));
 
-    if (isCodePhase && entregavelValidado) {
+    if (isCodePhaseNext) {
         try {
-            const newTasks = decomposeArchitectureToTasks(entregavelValidado, estado.fase_atual + 1);
-            if (newTasks.length > 0) {
-                estado.tasks = [...(estado.tasks || []), ...newTasks];
-                console.log(`[proximo] v6.5: ${newTasks.length} tasks geradas para fase ${estado.fase_atual + 1} (${proximaFaseInfo2?.nome})`);
+            // v8.0: Tentar ler backlog e OpenAPI do disco para gerar tasks baseadas no Backlog
+            const { decomposeBacklogToTasks } = await import("../services/task-decomposer.service.js");
+            let backlogContent: string | null = null;
+            let openApiContent: string | null = null;
+
+            // Buscar backlog nos entregáveis
+            for (const [key, path] of Object.entries(estado.entregaveis || {})) {
+                const pl = (path as string).toLowerCase();
+                if (pl.includes('backlog') && !backlogContent) {
+                    try { backlogContent = await readFile(path as string, 'utf-8'); } catch { /* ignore */ }
+                }
+                if ((pl.includes('openapi') || pl.includes('.yaml')) && !openApiContent) {
+                    try { openApiContent = await readFile(path as string, 'utf-8'); } catch { /* ignore */ }
+                }
+            }
+
+            if (backlogContent) {
+                const newTasks = decomposeBacklogToTasks(
+                    backlogContent,
+                    openApiContent,
+                    estado.fase_atual + 1,
+                    proximaFaseInfo2!.nome
+                );
+                if (newTasks.length > 0) {
+                    // Limpar tasks antigas da mesma fase antes de adicionar novas
+                    estado.tasks = [
+                        ...(estado.tasks || []).filter(t => t.phase !== estado.fase_atual + 1),
+                        ...newTasks,
+                    ];
+                    console.log(`[proximo] v8.0: ${newTasks.length} tasks geradas do BACKLOG para fase ${estado.fase_atual + 1} (${proximaFaseInfo2?.nome})`);
+                }
+            } else if (entregavelValidado) {
+                // Fallback: usar decomposição por H2/H3 do entregável anterior
+                const newTasks = decomposeArchitectureToTasks(entregavelValidado, estado.fase_atual + 1);
+                if (newTasks.length > 0) {
+                    estado.tasks = [...(estado.tasks || []), ...newTasks];
+                    console.log(`[proximo] v6.5 fallback: ${newTasks.length} tasks geradas da arquitetura para fase ${estado.fase_atual + 1}`);
+                }
             }
         } catch (err) {
-            console.warn('[proximo] v6.5: Falha ao decompor arquitetura em tasks (non-blocking):', err);
+            console.warn('[proximo] v8.0: Falha ao gerar tasks (non-blocking):', err);
         }
     }
 
