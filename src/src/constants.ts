@@ -6,7 +6,7 @@
  */
 
 export const MAESTRO_NAME = "mcp-maestro";
-export const MAESTRO_VERSION = "5.5.3";
+export const MAESTRO_VERSION = "7.2.0";
 export const MAESTRO_DESCRIPTION = "Maestro — Orquestrador de desenvolvimento assistido por IA";
 
 /**

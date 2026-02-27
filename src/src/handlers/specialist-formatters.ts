@@ -76,8 +76,8 @@ export function formatMissingFieldsByBlock(missing: RequiredField[], _mode: stri
  * Sprint 2 (NP6, NP8): Carrega contexto resumido do especialista para injeção na fase collecting.
  * v7.0: Substituído injeção ativa por menção dinâmica da IDE
  */
-export function loadCollectingContext(skillName: string, ide: IDEType): string {
-    return formatSkillHydrationCommand(skillName, ide);
+export function loadCollectingContext(skillName: string, ide: IDEType, projectDir?: string): string {
+    return formatSkillHydrationCommand(skillName, ide, projectDir);
 }
 
 /**
@@ -111,7 +111,7 @@ export async function buildCollectionPrompt(
         ? `\n\nCampos já coletados:\n${collected.map(f => `✅ **${f.label}**: ${truncateValue(sp.collectedData[f.id])}`).join('\n')}`
         : '';
 
-    const collectingContext = loadCollectingContext(sp.skillName, resolveIDE(estado, diretorio));
+    const collectingContext = loadCollectingContext(sp.skillName, resolveIDE(estado, diretorio), diretorio);
 
     return {
         content: formatResponse({

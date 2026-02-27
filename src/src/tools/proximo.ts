@@ -15,7 +15,7 @@ import { gerarSystemMd } from "../utils/system-md.js";
 import { gerarSecaoPrompts, getSkillParaFase, getSkillPath, getSkillResourcePath } from "../utils/prompt-mapper.js";
 import { validarEstrutura } from "../gates/estrutura.js";
 import { normalizeProjectPath, resolveProjectPath, joinProjectPath, getServerContentRoot } from "../utils/files.js";
-import { formatSkillMessage, formatSkillHydrationCommand, detectIDE, getSkillResourcePath as getIDESkillResourcePath } from "../utils/ide-paths.js";
+import { formatSkillMessage, formatSkillHydrationCommand, formatMention, detectIDE, getSkillResourcePath as getIDESkillResourcePath } from "../utils/ide-paths.js";
 import { inferirContextoBalanceado } from "../utils/inferencia-contextual.js";
 import { verificarSkillCarregada } from "../utils/content-injector.js";
 import { ContentResolverService } from "../services/content-resolver.service.js";
@@ -36,6 +36,7 @@ import type { RiskLevel as DecisionRiskLevel } from "../core/decision/types.js";
 // v6.5: Sprint 3 — Code Generation
 import { decomposeArchitectureToTasks, getTaskProgress } from "../services/task-decomposer.service.js";
 import { calcularScoreContextual } from "../services/scoring-config.js";
+import { expandKeywordsWithSynonyms } from "../utils/gate-synonyms.js";
 
 
 interface ProximoArgs {
@@ -45,6 +46,49 @@ interface ProximoArgs {
     nome_arquivo?: string;
     diretorio: string;           // Diretório do projeto (obrigatório)
     auto_flow?: boolean;         // Modo fluxo automático: auto-confirma classificação e avança sem bloqueios
+}
+
+/**
+ * v7.2 FIX C: Gera menções de arquivo para entregáveis anteriores + gate orientation.
+ * Em vez de injetar conteúdo inline (gasto de tokens), gera menções nativas da IDE
+ * (#path no Windsurf) para que a IA LEIA os arquivos sob demanda.
+ */
+function formatarContextoComoMencoes(
+    estado: EstadoProjeto,
+    diretorio: string,
+    ide: string,
+    gateOrientationDirName?: string
+): string {
+    const entregaveis = estado.entregaveis || {};
+    const keys = Object.keys(entregaveis);
+    if (keys.length === 0 && !gateOrientationDirName) return '';
+
+    const linhas: string[] = [];
+    linhas.push(`## 📋 Contexto do Projeto — Leia os Entregáveis Anteriores`);
+    linhas.push('');
+    linhas.push(`> ⚠️ Leia os documentos abaixo para entender decisões já tomadas. **NÃO contradiga** o que foi definido.`);
+    linhas.push('');
+
+    // Menções para entregáveis anteriores (paths relativos ao projeto)
+    let idx = 1;
+    for (const key of keys) {
+        const absPath = entregaveis[key];
+        // Converter path absoluto para relativo ao projeto
+        const relPath = absPath
+            .replace(diretorio.replace(/\\/g, '/'), '')
+            .replace(diretorio, '')
+            .replace(/^[\\/]+/, '');
+        linhas.push(`> ${idx}. ${formatMention(relPath.replace(/\\/g, '/'), ide as any)}`);
+        idx++;
+    }
+
+    // Menção para .orientacoes-gate.md da próxima fase
+    if (gateOrientationDirName) {
+        linhas.push(`> ${idx}. ${formatMention(`docs/${gateOrientationDirName}/.orientacoes-gate.md`, ide as any)}`);
+    }
+
+    linhas.push('');
+    return linhas.join('\n');
 }
 
 /**
@@ -410,6 +454,14 @@ ${instrucoesSkill}
         };
     }
 
+    // v7.1 FIX 6: Deprecation warning quando entregável veio do argumento (não do disco)
+    // Incentiva a IA a salvar no disco primeiro e chamar executar({acao: "avancar"})
+    let deprecationWarning = '';
+    if (!entregavelLidoDoDisco && entregavel && entregavel.trim().length > 500) {
+        console.warn(`[proximo] v7.1 DEPRECATION: entregável passado como argumento (${entregavel.length} chars). Salve no disco primeiro.`);
+        deprecationWarning = `> ⚠️ **AVISO:** O entregável foi recebido via argumento (${entregavel.length} chars), não do disco.\n> Para melhor performance, **salve o arquivo no disco primeiro** e depois chame \`executar({ acao: "avancar" })\`.\n> O sistema lê automaticamente do path canônico: \`docs/fase-XX-nome/entregavel\`\n\n`;
+    }
+
     // v5.5.0: Após validação, entregavel é garantidamente string não-vazia
     // TypeScript assertion para evitar erros de tipo
     const entregavelValidado: string = entregavel!;
@@ -699,14 +751,31 @@ Se o erro persistir, contate o suporte técnico.`,
     for (const item of gateChecklistItems) {
         // Extrair palavras-chave > 3 chars do item
         const keywords = item.toLowerCase()
-            .replace(/[^a-záàâãéèêíïóôõöúüçñ\s]/gi, '')
+            .replace(/[^a-záàâãéèêíïóôõöúüçñ\s0-9/\-]/gi, '')
             .split(/\s+/)
             .filter((w: string) => w.length > 3);
 
-        const matched = keywords.filter((kw: string) => contentLowerForCheck.includes(kw));
-        const matchRatio = keywords.length > 0 ? matched.length / keywords.length : 1;
+        // v7.1 FIX 4: Expandir keywords com sinônimos pt↔en
+        // Antes: "versionamento" não matchava YAML com "version: 1.0.0"
+        // Agora: "versionamento" expande para ["version", "versioning", "semver", ...]
+        const expandedKeywords = expandKeywordsWithSynonyms(keywords);
 
-        if (matchRatio >= 0.5) {
+        // Verificar se ALGUM dos sinônimos está presente no conteúdo
+        const matchedOriginal = keywords.filter((kw: string) => {
+            // Checar a keyword original
+            if (contentLowerForCheck.includes(kw)) return true;
+            // Checar sinônimos da keyword
+            const syns = expandedKeywords.filter(s => s !== kw);
+            return syns.some(syn => contentLowerForCheck.includes(syn));
+        });
+
+        const matchRatio = keywords.length > 0 ? matchedOriginal.length / keywords.length : 1;
+
+        // v7.1 FIX 4: Threshold ajustado — itens com poucas keywords (1-2) precisam de match exato,
+        // itens com mais keywords (3+) usam threshold 0.4
+        const threshold = keywords.length <= 2 ? 0.5 : 0.4;
+
+        if (matchRatio >= threshold) {
             itensValidadosGranular.push(`✅ ${item}`);
         } else {
             itensPendentesGranular.push(`❌ ${item}`);
@@ -1239,9 +1308,20 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
 
 ## 🤖 Próximo Especialista
 
-${formatSkillHydrationCommand(proximaSkill, ide)}
+${formatSkillHydrationCommand(proximaSkill, ide, diretorio)}
 `;
     })();
+
+    // v7.2 FIX C: Gerar menções de arquivo para entregáveis anteriores + gate orientation
+    const ideParaMencoes = estado.ide || detectIDE(diretorio) || 'windsurf';
+    const gateOrientationDir = proximaFase ? getFaseDirName(estado.fase_atual, proximaFase.nome) : undefined;
+    const contextoAcumulado = formatarContextoComoMencoes(estado, diretorio, ideParaMencoes, gateOrientationDir);
+
+    // v7.1 FIX 5: Path canônico para a próxima fase
+    const pathInfoProximaFase = proximaFase ? (() => {
+        const dirName = getFaseDirName(estado.fase_atual, proximaFase.nome);
+        return `\n### 📁 Onde Salvar o Entregável\n\n| Tipo | Path |\n|------|------|\n| **Entregável** | \`docs/${dirName}/${proximaFase.entregavel_esperado}\` |\n| **Orientações de Gate** | \`docs/${dirName}/.orientacoes-gate.md\` |\n\n> ⚠️ **SALVE o entregável EXATAMENTE no path indicado.** O sistema lê automaticamente do disco.\n> Após salvar, chame: \`executar({ acao: "avancar" })\`\n`;
+    })() : '';
 
     const resposta = `# ✅ Fase ${faseAnterior} Concluída!
 
@@ -1264,6 +1344,8 @@ ${getSpecialistQuestions(estado.fase_atual, proximaFase?.nome)}
 
 ## Gate de Saída
 ${proximaFase?.gate_checklist.map(item => `- [ ] ${item}`).join("\n") || "Nenhum"}
+${pathInfoProximaFase}
+${contextoAcumulado}
 ${proximaSkillInfo}
 ---
 
@@ -1292,7 +1374,7 @@ ${proximaSkillInfo}
     // v5: next_action e progress são calculados automaticamente pelo middleware flow-engine.middleware.ts
     // Mantemos apenas specialist_persona e estado_atualizado para o middleware processar
     return {
-        content: [{ type: "text", text: feedbackLeitura + resposta + confirmacao + continuidade }],
+        content: [{ type: "text", text: deprecationWarning + feedbackLeitura + resposta + confirmacao + continuidade }],
         estado_atualizado: estadoFile.content,
         specialist_persona: specialist || undefined,
         // next_action e progress serão adicionados pelo middleware withFlowEngine

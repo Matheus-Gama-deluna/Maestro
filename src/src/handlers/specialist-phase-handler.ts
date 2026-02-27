@@ -202,7 +202,7 @@ async function handleCollecting(
             },
             instrucoes: `⚠️ OBRIGATÓRIO: Pergunte ao usuário os campos que ainda faltam. NÃO invente dados.
 
-${loadCollectingContext(sp.skillName, resolveIDEForProject(estado, diretorio))}
+${loadCollectingContext(sp.skillName, resolveIDEForProject(estado, diretorio), diretorio)}
 
 Campos já coletados:
 ${collected.map(f => `✅ **${f.label}**: ${truncateValue(sp.collectedData[f.id])}`).join('\n')}
@@ -287,7 +287,7 @@ Você DEVE gerar o PRD e salvá-lo no disco IMEDIATAMENTE, sem esperar comando d
 
 ${collectedSummary}
 
-${formatSkillHydrationCommand(sp.skillName, resolveIDEForProject(estado, diretorio))}
+${formatSkillHydrationCommand(sp.skillName, resolveIDEForProject(estado, diretorio), diretorio)}
 
 ---
 

@@ -469,7 +469,7 @@ export async function confirmarProjeto(args: ConfirmarProjetoArgs): Promise<Tool
 
 ## 🧠 ESPECIALISTA ATIVADO: Gestão de Produto
 
-${formatSkillHydrationCommand("specialist-gestao-produto", args.ide || 'antigravity')}
+${formatSkillHydrationCommand("specialist-gestao-produto", args.ide || 'antigravity', diretorio)}
 
 ---
 

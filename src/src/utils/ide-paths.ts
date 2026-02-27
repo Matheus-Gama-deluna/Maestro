@@ -154,24 +154,35 @@ function getAllMdFiles(dirPath: string, relativeBase: string): string[] {
  * - Cursor:      @.cursor/skills/{skill}/SKILL.md
  * - Windsurf:    #.windsurf/skills/{skill}/SKILL.md
  */
-export function formatSkillHydrationCommand(skillName: string, ide: IDEType): string {
-    const skillPath = getSkillFilePath(skillName, ide);
-    
-    const formatMention = (path: string) => {
-        return ide === 'cursor' ? `@${path}`
-             : ide === 'windsurf' ? `#${path}`
-             : `@[${path}]`; // antigravity (default)
-    };
+/**
+ * Formata menção de arquivo no formato nativo da IDE.
+ * Exportada para uso em outros módulos que precisem gerar menções avulsas.
+ */
+export function formatMention(path: string, ide: IDEType): string {
+    return ide === 'cursor' ? `@${path}`
+         : ide === 'windsurf' ? `#${path}`
+         : `@[${path}]`; // antigravity (default)
+}
 
-    const mentions = [formatMention(skillPath)];
+/**
+ * v7.2 FIX A: Aceita projectDir para resolver resources no diretório REAL do projeto.
+ * Antes usava process.cwd() que é o diretório do MCP server, não do projeto.
+ *
+ * Gera menções para: SKILL.md + todos os .md em resources/ (templates, checklists, examples)
+ */
+export function formatSkillHydrationCommand(skillName: string, ide: IDEType, projectDir?: string): string {
+    const skillPath = getSkillFilePath(skillName, ide);
+    const mentions = [formatMention(skillPath, ide)];
 
     try {
         const resourcesRelDir = `${IDE_CONFIGS[ide].skillsDir}/${skillName}/resources`;
-        const resourcesAbsDir = join(process.cwd(), resourcesRelDir);
+        // v7.2: Usar projectDir se fornecido, senão tentar process.cwd() como fallback
+        const baseDir = projectDir || process.cwd();
+        const resourcesAbsDir = join(baseDir, resourcesRelDir);
         
         const mdFiles = getAllMdFiles(resourcesAbsDir, resourcesRelDir);
         for (const file of mdFiles) {
-            mentions.push(formatMention(file));
+            mentions.push(formatMention(file, ide));
         }
     } catch (e) {
         // Fallback seguro caso path reading falhe

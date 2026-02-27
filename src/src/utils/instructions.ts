@@ -245,8 +245,17 @@ ${instrucaoCorrecao}
 }
 
 /**
- * V6 Sprint 6: Gera instrução de continuidade autônoma.
- * Para fases do tipo 'input_required', retorna vazio — especialista fará as perguntas.
+ * V6 Sprint 6 / v7.1 FIX 3: Gera instrução de continuidade autônoma.
+ * 
+ * - 'input_required': retorna vazio — especialista fará perguntas ao usuário.
+ * - 'derived': instrução de GERAÇÃO AUTÔNOMA — IA deve gerar entregável completo
+ *   usando template, checklist e contexto acumulado já injetados na resposta.
+ * - 'technical': mesma instrução de geração autônoma.
+ * - 'correction_loop': instrução de correção (mantida).
+ * 
+ * v7.1 FIX 3: Antes, fases derived/technical diziam "NÃO gere o entregável completo".
+ * Isso causava loops de "perguntas → continue → gera tudo sem input real".
+ * Agora, para fases que NÃO precisam de input do usuário, a instrução é GERAR DIRETAMENTE.
  */
 export function gerarInstrucaoContinuidade(
     diretorio: string,
@@ -256,15 +265,35 @@ export function gerarInstrucaoContinuidade(
 ): string {
     if (phaseType === 'input_required') return '';
 
+    // v7.1 FIX 3: Para fases derived e technical, instruir geração autônoma
+    if (phaseType === 'derived' || phaseType === 'technical') {
+        return [
+            ``,
+            `---`,
+            ``,
+            `> ✅ **Gate aprovado — Fase ${faseAtual} concluída.**`,
+            `> **AÇÃO DO SISTEMA:** Nova fase "${proximaFase}" iniciada.`,
+            `>`,
+            `> **GERAÇÃO AUTÔNOMA:** Esta fase é do tipo \`${phaseType}\` — NÃO requer perguntas ao usuário.`,
+            `> Gere o entregável COMPLETO usando:`,
+            `> 1. O **template e checklist** injetados na seção "Contexto do Especialista" acima`,
+            `> 2. O **contexto acumulado** das fases anteriores (tabela acima)`,
+            `> 3. As **decisões** já tomadas no projeto (stack, requisitos, arquitetura, etc.)`,
+            `>`,
+            `> Após gerar, **salve no path indicado** e chame: \`executar({ acao: "avancar" })\``,
+            `> ⚠️ **NÃO faça perguntas de alinhamento** — você já tem todo o contexto necessário.`,
+            ``,
+        ].join('\n');
+    }
+
+    // correction_loop: manter instrução original
     return [
         ``,
         `---`,
         ``,
         `> ✅ **Gate aprovado — Fase ${faseAtual} concluída.**`,
         `> **AÇÃO DO SISTEMA:** Nova fase "${proximaFase}" iniciada.`,
-        `> Leia o SKILL.md do especialista indicado acima.`,
-        `> ✋ **NÃO GERE O ENTREGÁVEL COMPLETO AINDA.** Em vez disso, apresente ao usuário uma sugestão de esqueleto ou faça perguntas de alinhamento para garantir que a direção está correta.`,
-        `> Só avance gerando os artefatos completos após a resposta ou aprovação do usuário.`,
+        `> Corrija os itens pendentes usando o feedback acima e re-submeta.`,
         ``,
     ].join('\n');
 }

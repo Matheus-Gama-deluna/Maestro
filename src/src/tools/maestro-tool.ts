@@ -135,7 +135,7 @@ O Maestro detecta automaticamente o estado do projeto e guia o próximo passo.
             const skillName = getSkillParaFase(faseInfo.nome);
             if (skillName) {
                 const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
-                specialistContext = formatSkillHydrationCommand(skillName, ide);
+                specialistContext = formatSkillHydrationCommand(skillName, ide, diretorio);
             }
         } catch {
             // Fallback silencioso

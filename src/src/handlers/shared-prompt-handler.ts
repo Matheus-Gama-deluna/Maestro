@@ -152,7 +152,7 @@ async function buildSpecialistPrompt(diretorio: string): Promise<PromptResult> {
         const skillName = getSkillParaFase(faseInfo.nome);
         if (skillName) {
             const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
-            const hydrationCommand = formatSkillHydrationCommand(skillName, ide);
+            const hydrationCommand = formatSkillHydrationCommand(skillName, ide, diretorio);
             const specialist = getSpecialistPersona(faseInfo.nome);
             
             return {
@@ -431,7 +431,7 @@ ${toolsList}`,
             const skillName = getSkillParaFase(faseInfo.nome);
             if (skillName) {
                 const ide = estado.ide || detectIDE(diretorio) || 'windsurf';
-                const hydrationCommand = formatSkillHydrationCommand(skillName, ide);
+                const hydrationCommand = formatSkillHydrationCommand(skillName, ide, diretorio);
                 sessionContent += `## 📚 Skill da Fase\n\n${hydrationCommand}\n\n`;
             }
         } catch {
