@@ -24,7 +24,8 @@ import type { CodePhaseState, CodeManifest } from "../types/code-manifest.js";
 import { serializarEstado } from "../state/storage.js";
 import { saveFile } from "../utils/persistence.js";
 import { resolveProjectPath } from "../utils/files.js";
-import { getFaseComStitch } from "../flows/types.js";
+import { getFaseComStitch, CODE_PHASE_NAMES, isCodePhaseName } from "../flows/types.js";
+import { validateCodePhase, formatCodeValidationResult } from "../gates/code-validator.js";
 import { decomposeBacklogToTasks, getNextTask, getTaskProgress } from "../services/task-decomposer.service.js";
 import { formatMention, detectIDE } from "../utils/ide-paths.js";
 import { getFaseDirName } from "../utils/entregavel-path.js";
@@ -36,15 +37,12 @@ interface CodePhaseArgs {
     entregavel?: string;
 }
 
-/** Nomes de fases que são de código */
-const CODE_PHASE_NAMES = ['Frontend', 'Backend', 'Integração', 'Deploy Final'];
-
 /**
  * Verifica se uma fase é de código.
+ * v9.0: Delega para isCodePhaseName de flows/types.ts (fonte única de verdade).
  */
 export function isCodePhase(faseNome: string | undefined): boolean {
-    if (!faseNome) return false;
-    return CODE_PHASE_NAMES.some(k => faseNome.includes(k));
+    return isCodePhaseName(faseNome);
 }
 
 /**
@@ -127,6 +125,12 @@ async function handleSetup(
 
     // Extrair stack da arquitetura (parsing simplificado)
     const stackInfo = extractStackInfo(arquiteturaContent, faseInfo.nome);
+
+    // v9.0 Sprint 4: Inicializar manifest com stack da arquitetura
+    if (!codeState.manifest) {
+        codeState.manifest = createEmptyManifest(estado.fase_atual, faseInfo.nome);
+    }
+    codeState.manifest.stack = extractStackForManifest(arquiteturaContent, faseInfo.nome);
 
     // Extrair user stories relevantes do backlog
     const relevantStories = extractRelevantStoriesSummary(backlogContent, faseInfo.nome);
@@ -326,6 +330,10 @@ executar({
 
 /**
  * Handler: GATE — Todas tasks done. Gerar manifest e validar.
+ * v9.0: Usa CodeValidator (validação por artefatos) em vez de delegar para proximo.ts textual.
+ * Se score >= 70, avança automaticamente via proximo.ts.
+ * Se score 50-69, aguarda aprovação manual.
+ * Se score < 50, bloqueia com instruções.
  */
 async function handleGate(
     args: CodePhaseArgs,
@@ -345,6 +353,9 @@ async function handleGate(
     const scannedFiles = scanProjectFiles(diretorio, faseInfo.nome);
     manifest.arquivos_criados = [...new Set([...manifest.arquivos_criados, ...scannedFiles])];
 
+    // v9.0 Sprint 4: Popular user_stories a partir das tasks do estado
+    populateManifestUserStories(manifest, estado.tasks || [], estado.fase_atual);
+
     // Salvar manifest
     const faseDirName = getFaseDirName(estado.fase_atual, faseInfo.nome);
     const manifestPath = join(diretorio, 'docs', faseDirName, 'manifest.json');
@@ -363,13 +374,53 @@ async function handleGate(
         console.warn('[code-phase] Falha ao salvar manifest:', err);
     }
 
-    // Marcar como completed
+    // v9.0: Validação orientada a artefatos (em vez de keywords textuais)
+    const validationResult = validateCodePhase(
+        manifest,
+        diretorio,
+        estado.tasks || [],
+        estado.fase_atual
+    );
+
+    console.log(`[code-phase] v9.0: CodeValidator score=${validationResult.score}/100 approved=${validationResult.approved} (arquivos=${validationResult.breakdown.arquivos}, tasks=${validationResult.breakdown.tasks}, manifest=${validationResult.breakdown.manifest})`);
+
+    // Score < 50: BLOQUEAR
+    if (validationResult.score < 50) {
+        const feedbackMd = formatCodeValidationResult(validationResult, faseInfo.nome);
+        return {
+            content: [{
+                type: "text",
+                text: `# ❌ Gate de Código Bloqueado — ${faseInfo.nome}\n\n${feedbackMd}\n\n---\n\n**Não é possível avançar.** Complete as tasks pendentes, gere os arquivos e tente novamente com \`executar({ acao: "avancar" })\`.`,
+            }],
+            estado_atualizado: serializarEstado(estado).content,
+        };
+    }
+
+    // Score 50-69: Aguardar aprovação manual
+    if (validationResult.score < 70) {
+        estado.aguardando_aprovacao = true;
+        estado.motivo_bloqueio = `Gate de código: score ${validationResult.score}/100`;
+        estado.score_bloqueado = validationResult.score;
+        saveCodePhaseState(estado, codeState);
+        await persistState(estado, diretorio);
+
+        const feedbackMd = formatCodeValidationResult(validationResult, faseInfo.nome);
+        return {
+            content: [{
+                type: "text",
+                text: `# ⚠️ Aprovação Manual Necessária — ${faseInfo.nome}\n\n${feedbackMd}\n\n---\n\n## 🔐 Ação do Usuário\n\n- **Para corrigir** (recomendado): Complete as tasks pendentes e re-submeta\n- **Para aprovar mesmo assim**: Diga "aprovar o gate"\n\n> ⚠️ A IA NÃO pode aprovar automaticamente.`,
+            }],
+            estado_atualizado: serializarEstado(estado).content,
+        };
+    }
+
+    // Score >= 70: Aprovado — marcar como completed e delegar para proximo.ts para avançar fase
     codeState.status = 'completed';
     codeState.manifest = manifest;
     saveCodePhaseState(estado, codeState);
     await persistState(estado, diretorio);
 
-    // Delegar para proximo.ts para validar gate e avançar
+    // Delegar para proximo.ts para avançar fase (com summary como entregável textual)
     return delegateToProximo(args);
 }
 
@@ -626,26 +677,119 @@ function createEmptyManifest(fase: number, nome: string): CodeManifest {
     };
 }
 
+/**
+ * v9.0 Sprint 4: Extrai stack estruturada da arquitetura para o manifest.
+ */
+function extractStackForManifest(
+    arquiteturaContent: string | null,
+    faseNome: string
+): CodeManifest['stack'] {
+    if (!arquiteturaContent) return { framework: '', language: 'TypeScript' };
+
+    const fase = faseNome.toLowerCase();
+    const content = arquiteturaContent.toLowerCase();
+    const extras: string[] = [];
+    let framework = '';
+    let language = 'TypeScript';
+
+    if (fase.includes('frontend')) {
+        if (content.includes('next.js') || content.includes('nextjs')) framework = 'Next.js';
+        else if (content.includes('react')) framework = 'React';
+        else if (content.includes('vue')) framework = 'Vue.js';
+        else if (content.includes('angular')) framework = 'Angular';
+        if (content.includes('tailwind')) extras.push('Tailwind');
+        if (content.includes('shadcn')) extras.push('shadcn/ui');
+        if (content.includes('zustand')) extras.push('Zustand');
+        if (content.includes('react query') || content.includes('tanstack')) extras.push('React Query');
+    } else if (fase.includes('backend')) {
+        if (content.includes('express')) framework = 'Express';
+        else if (content.includes('fastify')) framework = 'Fastify';
+        else if (content.includes('nestjs') || content.includes('nest.js')) framework = 'NestJS';
+        if (content.includes('prisma')) extras.push('Prisma');
+        if (content.includes('postgresql') || content.includes('postgres')) extras.push('PostgreSQL');
+        if (content.includes('redis')) extras.push('Redis');
+        if (content.includes('jwt')) extras.push('JWT');
+    } else if (fase.includes('integra')) {
+        if (content.includes('playwright')) framework = 'Playwright';
+        else if (content.includes('cypress')) framework = 'Cypress';
+        if (content.includes('docker')) extras.push('Docker');
+    } else if (fase.includes('deploy')) {
+        if (content.includes('docker')) framework = 'Docker';
+        if (content.includes('github actions')) extras.push('GitHub Actions');
+        if (content.includes('aws')) extras.push('AWS');
+    }
+
+    if (content.includes('javascript') && !content.includes('typescript')) language = 'JavaScript';
+    if (content.includes('python')) language = 'Python';
+    if (content.includes('java') && !content.includes('javascript')) language = 'Java';
+
+    return { framework, language, extras: extras.length > 0 ? extras : undefined };
+}
+
+/**
+ * v9.0 Sprint 4: Popula manifest.user_stories a partir das tasks do estado.
+ * Mapeia tasks com parent_id (stories) para CodeManifestStory.
+ */
+function populateManifestUserStories(
+    manifest: CodeManifest,
+    tasks: import('../services/task-decomposer.service.js').TaskItem[],
+    faseNumero: number
+): void {
+    const phaseTasks = tasks.filter(t => t.phase === faseNumero);
+    const stories = phaseTasks.filter(t => t.type === 'story');
+
+    manifest.user_stories = stories.map(story => {
+        // Extrair ID da US do título (ex: "US-020: CRUD Produtos")
+        const idMatch = story.title.match(/US-\d+/i);
+        const id = idMatch ? idMatch[0] : story.id;
+
+        // Verificar status das sub-tasks
+        const childTasks = phaseTasks.filter(t => t.parent_id === story.id);
+        const allDone = childTasks.length > 0 && childTasks.every(t => t.status === 'done');
+        const anyInProgress = childTasks.some(t => t.status === 'in_progress');
+
+        // Coletar arquivos das sub-tasks
+        const arquivos = childTasks
+            .flatMap(t => t.metadata?.files || [])
+            .filter(Boolean);
+
+        return {
+            id,
+            titulo: story.title.replace(/^US-\d+:\s*/i, ''),
+            status: allDone ? 'done' as const : anyInProgress ? 'in_progress' as const : 'todo' as const,
+            arquivos,
+        };
+    });
+}
+
 function generateSummaryMarkdown(
     manifest: CodeManifest,
     faseInfo: { nome: string },
     progress: { total: number; done: number; percentage: number }
 ): string {
-    return `# ${faseInfo.nome} — Resumo de Implementação
+    // v9.0 Sprint 4: Stack info
+    const stackMd = manifest.stack?.framework
+        ? `## Stack\n- **Framework:** ${manifest.stack.framework}\n- **Language:** ${manifest.stack.language}${manifest.stack.extras ? `\n- **Extras:** ${manifest.stack.extras.join(', ')}` : ''}\n`
+        : '';
 
-## Progresso
-- **Tasks:** ${progress.done}/${progress.total} (${progress.percentage}%)
-- **Arquivos criados:** ${manifest.arquivos_criados.length}
+    // v9.0 Sprint 4: Tabela rastreável US → arquivos → status
+    let traceabilityMd = '';
+    if (manifest.user_stories.length > 0) {
+        traceabilityMd = `## Rastreabilidade US → Código\n\n| US | Título | Status | Arquivos |\n|----|--------|--------|----------|\n`;
+        for (const story of manifest.user_stories) {
+            const icon = story.status === 'done' ? '✅' : story.status === 'in_progress' ? '🔄' : '⏳';
+            const arquivos = story.arquivos.length > 0
+                ? story.arquivos.slice(0, 3).map(f => `\`${f}\``).join(', ') + (story.arquivos.length > 3 ? ` (+${story.arquivos.length - 3})` : '')
+                : '—';
+            traceabilityMd += `| ${story.id} | ${story.titulo.substring(0, 50)} | ${icon} ${story.status} | ${arquivos} |\n`;
+        }
+        const doneCount = manifest.user_stories.filter(s => s.status === 'done').length;
+        traceabilityMd += `\n> **US Concluídas:** ${doneCount}/${manifest.user_stories.length}\n`;
+    } else {
+        traceabilityMd = `## User Stories\n(geradas via TaskDecomposer)\n`;
+    }
 
-## User Stories
-${manifest.user_stories.map(s => `- ${s.status === 'done' ? '✅' : '⏳'} **${s.id}**: ${s.titulo}`).join('\n') || '(geradas via TaskDecomposer)'}
-
-## Arquivos Criados
-${manifest.arquivos_criados.map(f => `- \`${f}\``).join('\n') || '(nenhum registrado)'}
-
-## Timestamp
-${manifest.timestamp}
-`;
+    return `# ${faseInfo.nome} — Resumo de Implementação\n\n## Progresso\n- **Tasks:** ${progress.done}/${progress.total} (${progress.percentage}%)\n- **Arquivos criados:** ${manifest.arquivos_criados.length}\n\n${stackMd}\n${traceabilityMd}\n## Arquivos Criados\n${manifest.arquivos_criados.map(f => `- \`${f}\``).join('\n') || '(nenhum registrado)'}\n\n## Timestamp\n${manifest.timestamp}\n`;
 }
 
 function getExpertiseForPhase(faseNome: string): string[] {

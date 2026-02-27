@@ -2,7 +2,7 @@ import { join, resolve } from "path";
 import { existsSync, readdirSync } from "fs";
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import { parsearEstado, serializarEstado } from "../state/storage.js";
-import { getFase, getFluxo, getFaseComStitch, getFluxoComStitch } from "../flows/types.js";
+import { getFase, getFluxo, getFaseComStitch, getFluxoComStitch, isCodePhaseName, PHASE_TYPE_MAP } from "../flows/types.js";
 import { classificarPRD, descreverNivel } from "../flows/classifier.js"; // @deprecated v6.0 - usar ClassificacaoProgressivaService
 import { validarGate, formatarResultadoGate, validarGateComTemplate } from "../gates/validator.js";
 import { setCurrentDirectory } from "../state/context.js";
@@ -37,6 +37,7 @@ import type { RiskLevel as DecisionRiskLevel } from "../core/decision/types.js";
 import { decomposeArchitectureToTasks, getTaskProgress } from "../services/task-decomposer.service.js";
 import { calcularScoreContextual } from "../services/scoring-config.js";
 import { expandKeywordsWithSynonyms } from "../utils/gate-synonyms.js";
+import { validateDeliverableForGate } from "../services/deliverable-gate.service.js";
 
 
 interface ProximoArgs {
@@ -693,24 +694,18 @@ Carregue e leia a skill antes de gerar o entregável:
         }
     }
 
-    // v6.1 Correção 1: Usar validateDeliverable() ao invés de validate()
-    // O validate() aplicava regras de TypeScript em documentos Markdown — ineficaz.
-    // validateDeliverable() valida conteúdo semântico por fase: seções, gate checklist, tamanho.
+    // v9.0: Validação de gate delegada ao deliverable-gate.service.ts (extraído para modularização)
     const tier = estado.tier_gate || "base";
-
     console.log(`[proximo] Iniciando validateDeliverable (fase: ${faseAtual.nome}, tier: ${tier})`);
 
-    const { ValidationPipeline } = await import("../core/validation/ValidationPipeline.js");
-    const validationPipeline = new ValidationPipeline();
-
-    let validationResult;
+    let gateValidation;
     try {
-        validationResult = await validationPipeline.validateDeliverable(
-            entregavelValidado,
-            faseAtual.nome,
-            tier as 'essencial' | 'base' | 'avancado',
-            faseAtual.gate_checklist || []
-        );
+        gateValidation = await validateDeliverableForGate({
+            entregavel: entregavelValidado,
+            faseNome: faseAtual.nome,
+            tier,
+            gateChecklist: faseAtual.gate_checklist || [],
+        });
     } catch (error) {
         console.error('[proximo] Erro ao executar validateDeliverable:', error);
         return {
@@ -733,102 +728,8 @@ Se o erro persistir, contate o suporte técnico.`,
         };
     }
 
-    // v6.6 FIX #2: Extrair issues INDIVIDUAIS do DeliverableValidator para scoring granular.
-    // Antes, validationResult.results (1 elemento) era mapeado como itens_validados/pendentes,
-    // resultando em checklistScore = 0% ou 100% (binário), fixando o score em ~58.
-    // Agora extraímos cada issue individual e o gate_checklist da fase para scoring justo.
-    const allIssues = validationResult.results.flatMap(r => r.issues || []);
-    const allSuggestions = validationResult.results.flatMap(r => r.suggestions || []);
-
-    // Construir itens de checklist granulares a partir dos issues do validator
-    const itensValidadosGranular: string[] = [];
-    const itensPendentesGranular: string[] = [];
-
-    // Usar gate_checklist da fase como base para itens aprovados/pendentes
-    const gateChecklistItems = faseAtual.gate_checklist || [];
-    const contentLowerForCheck = entregavelValidado.toLowerCase();
-
-    for (const item of gateChecklistItems) {
-        // Extrair palavras-chave > 3 chars do item
-        const keywords = item.toLowerCase()
-            .replace(/[^a-záàâãéèêíïóôõöúüçñ\s0-9/\-]/gi, '')
-            .split(/\s+/)
-            .filter((w: string) => w.length > 3);
-
-        // v7.1 FIX 4: Expandir keywords com sinônimos pt↔en
-        // Antes: "versionamento" não matchava YAML com "version: 1.0.0"
-        // Agora: "versionamento" expande para ["version", "versioning", "semver", ...]
-        const expandedKeywords = expandKeywordsWithSynonyms(keywords);
-
-        // Verificar se ALGUM dos sinônimos está presente no conteúdo
-        const matchedOriginal = keywords.filter((kw: string) => {
-            // Checar a keyword original
-            if (contentLowerForCheck.includes(kw)) return true;
-            // Checar sinônimos da keyword
-            const syns = expandedKeywords.filter(s => s !== kw);
-            return syns.some(syn => contentLowerForCheck.includes(syn));
-        });
-
-        const matchRatio = keywords.length > 0 ? matchedOriginal.length / keywords.length : 1;
-
-        // v7.1 FIX 4: Threshold ajustado — itens com poucas keywords (1-2) precisam de match exato,
-        // itens com mais keywords (3+) usam threshold 0.4
-        const threshold = keywords.length <= 2 ? 0.5 : 0.4;
-
-        if (matchRatio >= threshold) {
-            itensValidadosGranular.push(`✅ ${item}`);
-        } else {
-            itensPendentesGranular.push(`❌ ${item}`);
-        }
-    }
-
-    // Adicionar issues do validator como pendentes se não já cobertos pelo checklist
-    for (const issue of allIssues) {
-        if (issue.severity === 'critical' || issue.severity === 'high') {
-            const jaListado = itensPendentesGranular.some(p => p.toLowerCase().includes(issue.type));
-            if (!jaListado) {
-                itensPendentesGranular.push(`❌ ${issue.message}`);
-            }
-        }
-    }
-
-    // Calcular checklistScore granular
-    const totalItensGranular = itensValidadosGranular.length + itensPendentesGranular.length;
-    const checklistScoreGranular = totalItensGranular > 0
-        ? (itensValidadosGranular.length / totalItensGranular) * 100
-        : 100;
-
-    // Calcular score contextual com dados granulares
-    const tamanhoScoreCalc = entregavelValidado.trim().length >= 600 ? 100 : 50;
-    const scoreContextual = calcularScoreContextual(
-        validationResult.overallScore,
-        checklistScoreGranular,
-        tamanhoScoreCalc,
-        faseAtual.nome
-    );
-    const qualityScore = scoreContextual.score;
-
-    // v6.6 FIX #3: Construir gateResultado com itens GRANULARES para feedback específico
-    const gateResultado = {
-        valido: validationResult.passed && itensPendentesGranular.length === 0,
-        itens_validados: itensValidadosGranular,
-        itens_pendentes: itensPendentesGranular,
-        sugestoes: [...allSuggestions, ...validationResult.recommendations]
-    };
-
-    const estruturaResult = {
-        valido: validationResult.passed,
-        score: qualityScore,
-        secoes_encontradas: itensValidadosGranular,
-        secoes_faltando: itensPendentesGranular.map(p => p.replace(/^❌\s*/, '')),
-        tamanho_ok: tamanhoScoreCalc === 100,
-        feedback: [...validationResult.recommendations, ...allSuggestions]
-    };
-
-    // v6.6: Log detalhado para debug
-    console.log(`[proximo] v6.6 FIX #2: Score granular — overallScore=${validationResult.overallScore}, checklistScore=${checklistScoreGranular.toFixed(0)}%, tamanhoScore=${tamanhoScoreCalc}, qualityScore=${qualityScore}, itens=${itensValidadosGranular.length}✅/${itensPendentesGranular.length}❌`);
-
-    console.log(`[proximo] validateDeliverable completo — Score: ${qualityScore}/100, Passou: ${validationResult.passed}`);
+    const { qualityScore, gateResultado, estruturaResult } = gateValidation;
+    console.log(`[proximo] validateDeliverable completo — Score: ${qualityScore}/100`);
 
     // v6.6 MELHORIA #6: Calcular delta de score para feedback incremental
     const scoreAnteriorDelta = estado.score_bloqueado;
@@ -977,31 +878,7 @@ O projeto foi **bloqueado** aguardando decisão do usuário:
     estado.motivo_bloqueio = undefined;
     estado.score_bloqueado = undefined;
 
-    // V6 Sprint 6: PHASE_TYPE_MAP — classifica o tipo da PROXIMA fase para Smart Auto-Flow
-    // Nomes canônicos extraídos de flows/types.ts (FLUXO_SIMPLES, FLUXO_MEDIO, FLUXO_COMPLEXO, FASE_STITCH)
-    const PHASE_TYPE_MAP: Record<string, EstadoProjeto['flow_phase_type']> = {
-        // --- input_required: fase de coleta com o usuário ---
-        'Produto': 'input_required',
-        // --- derived: fases que derivam de fases anteriores, sem dúvidas do usuário ---
-        'Requisitos': 'derived',
-        'UX Design': 'derived',
-        'Modelo de Domínio': 'derived',
-        'Arquitetura': 'derived',
-        'Arquitetura Avançada': 'derived',
-        'Backlog': 'derived',
-        'Contrato API': 'derived',
-        'Prototipagem': 'derived',  // Sprint Stitch: deriva do Design Doc
-        // --- technical: implementação pura, sem perguntas conceituais ---
-        'Banco de Dados': 'technical',
-        'Segurança': 'technical',
-        'Testes': 'technical',
-        'Performance': 'technical',
-        'Observabilidade': 'technical',
-        'Frontend': 'technical',
-        'Backend': 'technical',
-        'Integração': 'technical',
-        'Deploy Final': 'technical',
-    };
+    // v9.0: PHASE_TYPE_MAP agora importado de flows/types.ts (fonte única de verdade)
 
     // Preparar/atualizar resumo
     let resumo: ProjectSummary;
@@ -1166,10 +1043,10 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
         classificacaoInfo += `\n> ✅ **Classificação DEFINITIVA** confirmada na fase de Arquitetura.\n`;
     }
 
-    // v8.0: Decompor em tasks ao entrar em fase de código — usa Backlog como fonte primária
+    // v9.0: Decompor em tasks ao entrar em fase de código — usa Backlog como fonte primária
+    // FIX: Antes usava ['Backend','Frontend','Integração','Testes'] — 'Testes' é fase de documento, não de código
     const proximaFaseInfo2 = getFaseComStitch(estado.nivel, estado.fase_atual + 1, estado.usar_stitch);
-    const isCodePhaseNext = proximaFaseInfo2?.nome &&
-        ['Backend', 'Frontend', 'Integração', 'Testes'].some(k => proximaFaseInfo2.nome.includes(k));
+    const isCodePhaseNext = isCodePhaseName(proximaFaseInfo2?.nome);
 
     if (isCodePhaseNext) {
         try {

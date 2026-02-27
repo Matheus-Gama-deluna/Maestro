@@ -1,4 +1,54 @@
 import type { Fase, Fluxo } from "../types/index.js";
+import type { EstadoProjeto } from "../types/index.js";
+
+/**
+ * Nomes canônicos das fases de desenvolvimento de código.
+ * FONTE ÚNICA DE VERDADE — todos os arquivos devem importar daqui.
+ * 
+ * Nota: "Testes" é fase de DOCUMENTO (plano-testes.md), não de código.
+ * "Deploy Final" é fase de código (release.md + CI/CD).
+ * 
+ * @since v9.0
+ */
+export const CODE_PHASE_NAMES = ['Frontend', 'Backend', 'Integração', 'Deploy Final'] as const;
+
+/**
+ * Verifica se uma fase é de código (desenvolvimento).
+ * Usa CODE_PHASE_NAMES como fonte única.
+ * 
+ * @since v9.0
+ */
+export function isCodePhaseName(faseNome: string | undefined): boolean {
+    if (!faseNome) return false;
+    return CODE_PHASE_NAMES.some(k => faseNome.includes(k));
+}
+
+/**
+ * Classificação de tipo de fase para Smart Auto-Flow.
+ * Usado por proximo.ts para decidir se a próxima fase precisa de input do usuário.
+ * 
+ * @since v9.0 — movido de proximo.ts (era local)
+ */
+export const PHASE_TYPE_MAP: Record<string, EstadoProjeto['flow_phase_type']> = {
+    'Produto': 'input_required',
+    'Requisitos': 'derived',
+    'UX Design': 'derived',
+    'Modelo de Domínio': 'derived',
+    'Arquitetura': 'derived',
+    'Arquitetura Avançada': 'derived',
+    'Backlog': 'derived',
+    'Contrato API': 'derived',
+    'Prototipagem': 'derived',
+    'Banco de Dados': 'technical',
+    'Segurança': 'technical',
+    'Testes': 'technical',
+    'Performance': 'technical',
+    'Observabilidade': 'technical',
+    'Frontend': 'technical',
+    'Backend': 'technical',
+    'Integração': 'technical',
+    'Deploy Final': 'technical',
+};
 
 // Fluxo para projetos simples (7 fases)
 export const FLUXO_SIMPLES: Fluxo = {

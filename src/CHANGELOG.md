@@ -6,6 +6,35 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.
 
 ---
 
+## [5.7.0] - 2026-02-27
+
+### 🏗️ Governança e Consistência
+- **Versão unificada:** Alinhamento de package.json, constants.ts, README, CHANGELOG e testes para 5.7.0
+- **Fonte única de fases técnicas:** `CODE_PHASE_NAMES` centralizado em `flows/types.ts`, eliminando listas hardcoded divergentes em `avancar.ts`, `proximo.ts` e `code-phase-handler.ts`
+- **Fix divergência crítica:** `proximo.ts` incluía "Testes" (fase de documento) e excluía "Deploy Final" (fase de código) na lista de fases técnicas
+
+### 🔍 Validação Orientada a Artefatos
+- **CodeValidator:** Novo validador para fases de código baseado em manifest.json + existência de arquivos no disco, substituindo validação por keywords em texto
+- **Scoring por artefatos:** 50% existência de arquivos, 30% progresso de tasks/US, 20% manifest gerado corretamente
+- **Fallback textual:** Mantido como contingência quando manifest não existe
+
+### 📊 Rastreabilidade Ponta-a-Ponta
+- **manifest.user_stories:** Populado com status real por US (antes era sempre vazio)
+- **manifest.stack:** Preenchido a partir do documento de Arquitetura (antes era `{ framework: '', language: 'TypeScript' }`)
+- **Resumo rastreável:** Cada fase de código gera tabela `US → arquivos → status`
+
+### 🧪 Testes e Robustez
+- Testes para `decomposeBacklogToTasks` (filtro por Frontend/Backend/Integração/Deploy)
+- Testes de state machine do `code-phase-handler` (setup→working→gate→completed)
+- Testes de consistência das listas de fases técnicas
+- Testes do CodeValidator (validação por artefatos)
+
+### 🔧 Modularização
+- Extração de responsabilidades do `proximo.ts` para serviços dedicados
+- `PHASE_TYPE_MAP` movido para `flows/types.ts` como constante compartilhada
+
+---
+
 ## [5.5.0] - 2026-02-20
 
 ### 🚀 V6 "Fat MCP" - Zero API Architecture (Sprint 5)

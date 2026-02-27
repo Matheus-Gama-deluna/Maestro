@@ -24,7 +24,7 @@ import { proximo } from "../proximo.js";
 import { onboardingOrchestrator } from "../../flows/onboarding-orchestrator.js";
 import { brainstorm } from "../brainstorm.js";
 import { resolveProjectPath } from "../../utils/files.js";
-import { getFluxoComStitch, getFaseComStitch } from "../../flows/types.js";
+import { getFluxoComStitch, getFaseComStitch, isCodePhaseName } from "../../flows/types.js";
 import { determinarTierGate, descreverTier } from "../../gates/tiers.js";
 import { getSpecialistPersona } from "../../services/specialist.service.js";
 import { existsSync, readFileSync } from "fs";
@@ -248,12 +248,12 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
         } as any);
     }
 
-    // v8.0: Detectar fase de código e delegar para code-phase-handler
+    // v9.0: Detectar fase de código e delegar para code-phase-handler
+    // Usa isCodePhaseName de flows/types.ts (fonte única de verdade)
     const faseAtualInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
-    const isCodePhaseName = faseAtualInfo?.nome &&
-        ['Frontend', 'Backend', 'Integração', 'Deploy Final'].some(k => faseAtualInfo.nome.includes(k));
+    const isCodePhaseDetected = isCodePhaseName(faseAtualInfo?.nome);
 
-    if (isCodePhaseName) {
+    if (isCodePhaseDetected) {
         try {
             const { handleCodePhase } = await import("../../handlers/code-phase-handler.js");
             return handleCodePhase({

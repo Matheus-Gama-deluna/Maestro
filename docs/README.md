@@ -1,6 +1,6 @@
 # Documentacao do MCP Maestro
 
-**Ultima Atualizacao:** 06/02/2026
+**Ultima Atualizacao:** 27/02/2026 (v5.7.0)
 
 ---
 
