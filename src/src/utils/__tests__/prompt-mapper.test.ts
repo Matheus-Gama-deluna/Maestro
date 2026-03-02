@@ -8,33 +8,30 @@ import {
   getSkillResourcePath
 } from '../prompt-mapper.js';
 
-describe('Mapeamento de Skills', () => {
+describe('Mapeamento de Skills v10', () => {
   describe('FASE_SKILL_MAP', () => {
-    it('deve ter mapeamento para todas as fases principais (fluxo simples)', () => {
-      const fasesObrigatorias = [
-        'Produto',
-        'Requisitos',
-        'UX Design',
+    it('deve ter mapeamento para fases do fluxo simples v10 (5 fases)', () => {
+      const fasesSimples = [
+        'Discovery',
+        'Design',
         'Arquitetura',
-        'Backlog',
         'Frontend',
         'Backend'
       ];
       
-      fasesObrigatorias.forEach(fase => {
+      fasesSimples.forEach(fase => {
         expect(FASE_SKILL_MAP[fase]).toBeDefined();
         expect(FASE_SKILL_MAP[fase]).toMatch(/^specialist-/);
       });
     });
     
-    it('deve ter mapeamento para fases médias', () => {
+    it('deve ter mapeamento para fases adicionais do fluxo médio v10', () => {
       const fasesMedias = [
-        'Modelo de Domínio',
-        'Banco de Dados',
-        'Segurança',
-        'Testes',
-        'Contrato API',
-        'Integração'
+        'Produto',
+        'Requisitos',
+        'Design Técnico',
+        'Planejamento',
+        'Integração & Deploy'
       ];
       
       fasesMedias.forEach(fase => {
@@ -43,11 +40,12 @@ describe('Mapeamento de Skills', () => {
       });
     });
     
-    it('deve ter mapeamento para fases complexas', () => {
+    it('deve ter mapeamento para fases adicionais do fluxo complexo v10', () => {
       const fasesComplexas = [
-        'Arquitetura Avançada',
-        'Performance',
-        'Observabilidade'
+        'Modelo de Domínio',
+        'Contrato API',
+        'Integração',
+        'Deploy & Operação'
       ];
       
       fasesComplexas.forEach(fase => {
@@ -60,36 +58,38 @@ describe('Mapeamento de Skills', () => {
       expect(FASE_SKILL_MAP['Prototipagem']).toBe('specialist-prototipagem-stitch');
     });
     
-    it('deve ter mapeamento para fases complementares', () => {
-      const fasesComplementares = [
-        'Dados e Analytics',
-        'Acessibilidade',
+    it('deve ter mapeamento para skills utilitárias', () => {
+      const utilitarias = [
         'Debugging',
-        'Documentação',
-        'Exploração',
-        'Migração',
-        'Mobile',
-        'Mobile Design'
+        'Exploração'
       ];
       
-      fasesComplementares.forEach(fase => {
+      utilitarias.forEach(fase => {
         expect(FASE_SKILL_MAP[fase]).toBeDefined();
         expect(FASE_SKILL_MAP[fase]).toMatch(/^specialist-/);
       });
     });
     
-    it('deve ter total de 25 mapeamentos', () => {
-      const totalMapeamentos = Object.keys(FASE_SKILL_MAP).length;
-      expect(totalMapeamentos).toBe(25);
+    it('deve mapear skills corretas para nomes v10', () => {
+      expect(FASE_SKILL_MAP['Discovery']).toBe('specialist-discovery');
+      expect(FASE_SKILL_MAP['Design']).toBe('specialist-design');
+      expect(FASE_SKILL_MAP['Arquitetura']).toBe('specialist-architect');
+      expect(FASE_SKILL_MAP['Produto']).toBe('specialist-product');
+      expect(FASE_SKILL_MAP['Design Técnico']).toBe('specialist-technical-design');
+      expect(FASE_SKILL_MAP['Planejamento']).toBe('specialist-planning');
+      expect(FASE_SKILL_MAP['Modelo de Domínio']).toBe('specialist-domain');
+      expect(FASE_SKILL_MAP['Contrato API']).toBe('specialist-api-contract');
+      expect(FASE_SKILL_MAP['Deploy & Operação']).toBe('specialist-operations');
     });
   });
   
   describe('getSkillParaFase', () => {
-    it('deve retornar skill correta para fase conhecida', () => {
-      expect(getSkillParaFase('Produto')).toBe('specialist-gestao-produto');
-      expect(getSkillParaFase('Requisitos')).toBe('specialist-engenharia-requisitos-ia');
-      expect(getSkillParaFase('Arquitetura Avançada')).toBe('specialist-arquitetura-avancada');
-      expect(getSkillParaFase('UX Design')).toBe('specialist-ux-design');
+    it('deve retornar skill correta para fases v10', () => {
+      expect(getSkillParaFase('Discovery')).toBe('specialist-discovery');
+      expect(getSkillParaFase('Produto')).toBe('specialist-product');
+      expect(getSkillParaFase('Requisitos')).toBe('specialist-requirements');
+      expect(getSkillParaFase('Design')).toBe('specialist-design');
+      expect(getSkillParaFase('Design Técnico')).toBe('specialist-technical-design');
     });
     
     it('deve retornar null para fase desconhecida', () => {
@@ -98,16 +98,24 @@ describe('Mapeamento de Skills', () => {
     });
     
     it('deve ser case-sensitive', () => {
-      expect(getSkillParaFase('produto')).toBeNull(); // minúsculo
-      expect(getSkillParaFase('Produto')).toBe('specialist-gestao-produto'); // correto
+      expect(getSkillParaFase('discovery')).toBeNull();
+      expect(getSkillParaFase('Discovery')).toBe('specialist-discovery');
+    });
+
+    it('deve retornar null para fases removidas v9', () => {
+      expect(getSkillParaFase('UX Design')).toBeNull();
+      expect(getSkillParaFase('Banco de Dados')).toBeNull();
+      expect(getSkillParaFase('Segurança')).toBeNull();
+      expect(getSkillParaFase('Backlog')).toBeNull();
     });
   });
   
   describe('temSkillParaFase', () => {
-    it('deve retornar true para fase com skill', () => {
+    it('deve retornar true para fases v10 com skill', () => {
+      expect(temSkillParaFase('Discovery')).toBe(true);
       expect(temSkillParaFase('Produto')).toBe(true);
-      expect(temSkillParaFase('Requisitos')).toBe(true);
-      expect(temSkillParaFase('Observabilidade')).toBe(true);
+      expect(temSkillParaFase('Design Técnico')).toBe(true);
+      expect(temSkillParaFase('Deploy & Operação')).toBe(true);
     });
     
     it('deve retornar false para fase sem skill', () => {
@@ -118,24 +126,26 @@ describe('Mapeamento de Skills', () => {
   
   describe('getSkillPath', () => {
     it('deve retornar caminho correto no Windows', () => {
-      const path = getSkillPath('specialist-gestao-produto', 'C:\\projeto');
-      expect(path).toContain('specialist-gestao-produto');
+      const path = getSkillPath('specialist-discovery', 'C:\\projeto');
+      expect(path).toContain('specialist-discovery');
       expect(path).toContain('.agent');
       expect(path).toContain('skills');
     });
     
     it('deve retornar caminho correto no Unix', () => {
-      const path = getSkillPath('specialist-gestao-produto', '/projeto');
-      expect(path).toContain('specialist-gestao-produto');
+      const path = getSkillPath('specialist-discovery', '/projeto');
+      expect(path).toContain('specialist-discovery');
       expect(path).toContain('.agent');
       expect(path).toContain('skills');
     });
     
-    it('deve funcionar com diferentes nomes de skills', () => {
+    it('deve funcionar com skills v10', () => {
       const skills = [
-        'specialist-gestao-produto',
-        'specialist-arquitetura-avancada',
-        'specialist-desenvolvimento-frontend'
+        'specialist-discovery',
+        'specialist-technical-design',
+        'specialist-frontend',
+        'specialist-domain',
+        'specialist-operations'
       ];
       
       skills.forEach(skill => {
@@ -147,8 +157,8 @@ describe('Mapeamento de Skills', () => {
   
   describe('getSkillFilePath', () => {
     it('deve retornar caminho de arquivo correto', () => {
-      const path = getSkillFilePath('specialist-gestao-produto', '/projeto', 'SKILL.md');
-      expect(path).toContain('specialist-gestao-produto');
+      const path = getSkillFilePath('specialist-discovery', '/projeto', 'SKILL.md');
+      expect(path).toContain('specialist-discovery');
       expect(path).toContain('SKILL.md');
     });
     
@@ -156,7 +166,7 @@ describe('Mapeamento de Skills', () => {
       const arquivos = ['SKILL.md', 'README.md', 'MCP_INTEGRATION.md'];
       
       arquivos.forEach(arquivo => {
-        const path = getSkillFilePath('specialist-gestao-produto', '/projeto', arquivo);
+        const path = getSkillFilePath('specialist-discovery', '/projeto', arquivo);
         expect(path).toContain(arquivo);
       });
     });
@@ -164,8 +174,8 @@ describe('Mapeamento de Skills', () => {
   
   describe('getSkillResourcePath', () => {
     it('deve retornar caminho de resource correto para templates', () => {
-      const path = getSkillResourcePath('specialist-gestao-produto', '/projeto', 'templates');
-      expect(path).toContain('specialist-gestao-produto');
+      const path = getSkillResourcePath('specialist-discovery', '/projeto', 'templates');
+      expect(path).toContain('specialist-discovery');
       expect(path).toContain('resources');
       expect(path).toContain('templates');
     });
@@ -179,7 +189,7 @@ describe('Mapeamento de Skills', () => {
       ];
       
       tipos.forEach(tipo => {
-        const path = getSkillResourcePath('specialist-gestao-produto', '/projeto', tipo);
+        const path = getSkillResourcePath('specialist-discovery', '/projeto', tipo);
         expect(path).toContain(tipo);
         expect(path).toContain('resources');
       });
@@ -188,7 +198,7 @@ describe('Mapeamento de Skills', () => {
   
   describe('Integração entre funções', () => {
     it('deve mapear fase → skill → caminho completo', () => {
-      const fase = 'Produto';
+      const fase = 'Discovery';
       const skill = getSkillParaFase(fase);
       
       expect(skill).not.toBeNull();

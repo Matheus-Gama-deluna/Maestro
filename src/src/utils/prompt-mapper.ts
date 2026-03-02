@@ -9,56 +9,52 @@ export interface PromptRef {
 }
 
 /**
- * Mapeamento de fases para skills locais
+ * Mapeamento de fases para skills locais (v10.0)
  * Skills estão em {IDE_SPECIFIC}/skills/{nome}/
  * Use ide-paths.ts para obter caminhos corretos por IDE
- * @since 2.0.0 - Skills v2.0 Migration
+ * 
+ * v10.0: Fluxos enxutos — Simples(5), Médio(8), Complexo(11)
+ * Inclui aliases de nomes antigos (v9) para backward compatibility.
+ * 
+ * @since 10.0.0
  */
 export const FASE_SKILL_MAP: Record<string, string> = {
     // ========================================
-    // FLUXO SIMPLES (7 fases)
+    // FLUXO SIMPLES v10 (5 fases)
     // ========================================
-    "Produto": "specialist-gestao-produto",
-    "Requisitos": "specialist-engenharia-requisitos-ia",
-    "UX Design": "specialist-ux-design",
-    "Arquitetura": "specialist-arquitetura-software",
-    "Backlog": "specialist-plano-execucao-ia",
-    "Frontend": "specialist-desenvolvimento-frontend",
-    "Backend": "specialist-desenvolvimento-backend",
-    
+    "Discovery": "specialist-discovery",
+    "Design": "specialist-design",
+    "Arquitetura": "specialist-architect",
+    "Frontend": "specialist-frontend",
+    "Backend": "specialist-backend",
+
     // ========================================
-    // FLUXO MÉDIO (13 fases) - Adiciona:
+    // FLUXO MÉDIO v10 (8 fases) — adiciona:
     // ========================================
-    "Modelo de Domínio": "specialist-modelagem-dominio",
-    "Banco de Dados": "specialist-banco-dados",
-    "Segurança": "specialist-seguranca-informacao",
-    "Testes": "specialist-analise-testes",
-    "Contrato API": "specialist-contrato-api",
-    "Integração": "specialist-devops-infra",
-    
+    "Produto": "specialist-product",
+    "Requisitos": "specialist-requirements",
+    "Design Técnico": "specialist-technical-design",
+    "Planejamento": "specialist-planning",
+    "Integração & Deploy": "specialist-devops",
+
     // ========================================
-    // FLUXO COMPLEXO (17 fases) - Adiciona:
+    // FLUXO COMPLEXO v10 (11 fases) — adiciona:
     // ========================================
-    "Arquitetura Avançada": "specialist-arquitetura-avancada",
-    "Performance": "specialist-performance-escalabilidade",
-    "Observabilidade": "specialist-observabilidade",
-    
+    "Modelo de Domínio": "specialist-domain",
+    "Contrato API": "specialist-api-contract",
+    "Integração": "specialist-devops",
+    "Deploy & Operação": "specialist-operations",
+
     // ========================================
     // OPCIONAL
     // ========================================
     "Prototipagem": "specialist-prototipagem-stitch",
-    
+
     // ========================================
-    // COMPLEMENTARES
+    // UTILITÁRIAS (on-demand, sem fase)
     // ========================================
-    "Dados e Analytics": "specialist-dados-analytics-ia",
-    "Acessibilidade": "specialist-acessibilidade",
     "Debugging": "specialist-debugging-troubleshooting",
-    "Documentação": "specialist-documentacao-tecnica",
     "Exploração": "specialist-exploracao-codebase",
-    "Migração": "specialist-migracao-modernizacao",
-    "Mobile": "specialist-desenvolvimento-mobile",
-    "Mobile Design": "specialist-mobile-design-avancado"
 };
 
 /**
@@ -135,89 +131,77 @@ export function getSkillResourcePath(
  * Os prompts são carregados de .maestro/content/prompts/ ou fallback do servidor
  */
 const FASE_PROMPTS_MAP: Record<string, PromptRef[]> = {
-    // Fase 1
-    "Produto": [
+    // v10 Fluxo Simples
+    "Discovery": [
         { categoria: "produto", nome: "prd-completo" },
-        { categoria: "produto", nome: "north-star" }
+        { categoria: "produto", nome: "north-star" },
+        { categoria: "requisitos", nome: "analise-requisitos" }
     ],
-    // Fase 2
-    "Requisitos": [
-        { categoria: "requisitos", nome: "analise-requisitos" },
-        { categoria: "requisitos", nome: "gherkin" }
-    ],
-    // Fase 3
-    "UX Design": [
+    "Design": [
         { categoria: "ux", nome: "design-system" }
     ],
-    // Fase 4 (Stitch - opcional)
-    "Prototipagem": [
-        { categoria: "prototipagem", nome: "prompt-stitch" },
-        { categoria: "prototipagem", nome: "prototipo-stitch" }
-    ],
-    // Fase 4/5 
-    "Modelo de Domínio": [
-        { categoria: "arquitetura", nome: "modelo-dominio" },
-        { categoria: "arquitetura", nome: "ddd-bounded-contexts" }
-    ],
-    // Fase 5/6
-    "Banco de Dados": [
-        { categoria: "database", nome: "modelagem-postgres" },
-        { categoria: "database", nome: "otimizacao-queries" }
-    ],
-    // Fase 6/7
     "Arquitetura": [
         { categoria: "arquitetura", nome: "clean-architecture" },
         { categoria: "arquitetura", nome: "arquitetura-c4-completo" }
     ],
-    // Fase 7 (complexo)
-    "Arquitetura Avançada": [
-        { categoria: "arquitetura", nome: "ddd-cqrs" },
-        { categoria: "arquitetura", nome: "multi-tenancy" }
-    ],
-    // Fase 7/8
-    "Segurança": [
-        { categoria: "seguranca", nome: "security-review" },
-        { categoria: "seguranca", nome: "auth-patterns" },
-        { categoria: "seguranca", nome: "lgpd-compliance" }
-    ],
-    // Fase 8/9
-    "Testes": [
-        { categoria: "testes", nome: "plano-testes" },
-        { categoria: "testes", nome: "tdd-workflow" },
-        { categoria: "testes", nome: "testes-integracao" }
-    ],
-    // Fase 9 (complexo)
-    "Performance": [
-        { categoria: "escalabilidade", nome: "escalabilidade-horizontal" },
-        { categoria: "escalabilidade", nome: "caching-strategies" }
-    ],
-    // Fase 10 (complexo)
-    "Observabilidade": [
-        { categoria: "observabilidade", nome: "logging-estruturado" },
-        { categoria: "observabilidade", nome: "metricas-alertas" },
-        { categoria: "observabilidade", nome: "tracing-distribuido" }
-    ],
-    // Fase Backlog
-    "Plano de Execução": [],
-    // Fase Contrato API
-    "Contrato API": [
-        { categoria: "apis", nome: "openapi-design" },
-        { categoria: "apis", nome: "rest-best-practices" }
-    ],
-    // Fase Frontend
     "Frontend": [
         { categoria: "desenvolvimento", nome: "code-review" },
         { categoria: "acessibilidade", nome: "wcag-checklist" }
     ],
-    // Fase Backend
     "Backend": [
         { categoria: "desenvolvimento", nome: "code-review" }
     ],
-    // Fase Integração/DevOps
-    "Integração": [
+
+    // v10 Fluxo Médio — adiciona:
+    "Produto": [
+        { categoria: "produto", nome: "prd-completo" },
+        { categoria: "produto", nome: "north-star" }
+    ],
+    "Requisitos": [
+        { categoria: "requisitos", nome: "analise-requisitos" },
+        { categoria: "requisitos", nome: "gherkin" }
+    ],
+    "Design Técnico": [
+        { categoria: "arquitetura", nome: "clean-architecture" },
+        { categoria: "arquitetura", nome: "arquitetura-c4-completo" },
+        { categoria: "arquitetura", nome: "modelo-dominio" },
+        { categoria: "database", nome: "modelagem-postgres" },
+        { categoria: "seguranca", nome: "security-review" }
+    ],
+    "Planejamento": [
+        { categoria: "apis", nome: "openapi-design" },
+        { categoria: "apis", nome: "rest-best-practices" },
+        { categoria: "testes", nome: "plano-testes" }
+    ],
+    "Integração & Deploy": [
         { categoria: "devops", nome: "ci-cd-pipeline" },
         { categoria: "devops", nome: "docker-kubernetes" }
-    ]
+    ],
+
+    // v10 Fluxo Complexo — adiciona:
+    "Modelo de Domínio": [
+        { categoria: "arquitetura", nome: "modelo-dominio" },
+        { categoria: "arquitetura", nome: "ddd-bounded-contexts" },
+        { categoria: "arquitetura", nome: "ddd-cqrs" }
+    ],
+    "Contrato API": [
+        { categoria: "apis", nome: "openapi-design" },
+        { categoria: "apis", nome: "rest-best-practices" }
+    ],
+    "Integração": [
+        { categoria: "devops", nome: "ci-cd-pipeline" }
+    ],
+    "Deploy & Operação": [
+        { categoria: "observabilidade", nome: "logging-estruturado" },
+        { categoria: "observabilidade", nome: "metricas-alertas" },
+        { categoria: "devops", nome: "ci-cd-pipeline" }
+    ],
+
+    // Opcional
+    "Prototipagem": [
+        { categoria: "prototipagem", nome: "prompt-stitch" },
+        { categoria: "prototipagem", nome: "prototipo-stitch" }
+    ],
 };
 
 /**

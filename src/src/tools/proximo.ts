@@ -47,6 +47,7 @@ interface ProximoArgs {
     nome_arquivo?: string;
     diretorio: string;           // Diretório do projeto (obrigatório)
     auto_flow?: boolean;         // Modo fluxo automático: auto-confirma classificação e avança sem bloqueios
+    skip_validation?: boolean;   // v10.0: Pular validação textual quando code-validator já aprovou
 }
 
 /**
@@ -694,24 +695,38 @@ Carregue e leia a skill antes de gerar o entregável:
         }
     }
 
-    // v9.0: Validação de gate delegada ao deliverable-gate.service.ts (extraído para modularização)
-    const tier = estado.tier_gate || "base";
-    console.log(`[proximo] Iniciando validateDeliverable (fase: ${faseAtual.nome}, tier: ${tier})`);
+    // v10.0: skip_validation — quando code-validator já aprovou, pular validação textual
+    // Isso evita a delegação duplicada: code-validator (artefatos) → proximo (keywords)
+    let qualityScore: number;
+    let gateResultado: { valido: boolean; itens_validados: string[]; itens_pendentes: string[]; sugestoes: string[] };
+    let estruturaResult: { score: number; tamanho_ok: boolean; secoes_faltando: string[] };
 
-    let gateValidation;
-    try {
-        gateValidation = await validateDeliverableForGate({
-            entregavel: entregavelValidado,
-            faseNome: faseAtual.nome,
-            tier,
-            gateChecklist: faseAtual.gate_checklist || [],
-        });
-    } catch (error) {
-        console.error('[proximo] Erro ao executar validateDeliverable:', error);
-        return {
-            content: [{
-                type: "text",
-                text: `# ❌ Erro na Validação do Entregável
+    if (args.skip_validation) {
+        console.log(`[proximo] v10.0: skip_validation=true — code-validator já aprovou, pulando validateDeliverable`);
+        qualityScore = 100;
+        gateResultado = { valido: true, itens_validados: faseAtual.gate_checklist || [], itens_pendentes: [], sugestoes: [] };
+        estruturaResult = { score: 100, tamanho_ok: true, secoes_faltando: [] };
+    } else {
+        // v9.0: Validação de gate delegada ao deliverable-gate.service.ts
+        const tier = estado.tier_gate || "base";
+        console.log(`[proximo] Iniciando validateDeliverable (fase: ${faseAtual.nome}, tier: ${tier})`);
+
+        try {
+            const validation = await validateDeliverableForGate({
+                entregavel: entregavelValidado,
+                faseNome: faseAtual.nome,
+                tier,
+                gateChecklist: faseAtual.gate_checklist || [],
+            });
+            qualityScore = validation.qualityScore;
+            gateResultado = validation.gateResultado;
+            estruturaResult = validation.estruturaResult;
+        } catch (error) {
+            console.error('[proximo] Erro ao executar validateDeliverable:', error);
+            return {
+                content: [{
+                    type: "text",
+                    text: `# ❌ Erro na Validação do Entregável
 
 Ocorreu um erro ao validar o entregável da fase **${faseAtual.nome}**.
 
@@ -723,12 +738,12 @@ Por favor, verifique:
 3. Todos os itens do gate checklist estão evidenciados?
 
 Se o erro persistir, contate o suporte técnico.`,
-            }],
-            isError: true,
-        };
+                }],
+                isError: true,
+            };
+        }
     }
 
-    const { qualityScore, gateResultado, estruturaResult } = gateValidation;
     console.log(`[proximo] validateDeliverable completo — Score: ${qualityScore}/100`);
 
     // v6.6 MELHORIA #6: Calcular delta de score para feedback incremental

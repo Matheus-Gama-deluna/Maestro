@@ -5,12 +5,13 @@ import type { EstadoProjeto } from "../types/index.js";
  * Nomes canônicos das fases de desenvolvimento de código.
  * FONTE ÚNICA DE VERDADE — todos os arquivos devem importar daqui.
  * 
- * Nota: "Testes" é fase de DOCUMENTO (plano-testes.md), não de código.
- * "Deploy Final" é fase de código (release.md + CI/CD).
+ * v10.0: Atualizado para fluxos enxutos.
+ * "Integração & Deploy" é fase de código (deploy.md + CI/CD + E2E).
+ * "Deploy & Operação" é fase de código (release.md + SLOs + runbooks).
  * 
- * @since v9.0
+ * @since v10.0
  */
-export const CODE_PHASE_NAMES = ['Frontend', 'Backend', 'Integração', 'Deploy Final'] as const;
+export const CODE_PHASE_NAMES = ['Frontend', 'Backend', 'Integração & Deploy', 'Integração', 'Deploy & Operação'] as const;
 
 /**
  * Verifica se uma fase é de código (desenvolvimento).
@@ -27,447 +28,375 @@ export function isCodePhaseName(faseNome: string | undefined): boolean {
  * Classificação de tipo de fase para Smart Auto-Flow.
  * Usado por proximo.ts para decidir se a próxima fase precisa de input do usuário.
  * 
- * @since v9.0 — movido de proximo.ts (era local)
+ * v10.0: Atualizado com nomes de fases consolidadas.
+ * 
+ * @since v10.0
  */
 export const PHASE_TYPE_MAP: Record<string, EstadoProjeto['flow_phase_type']> = {
+    // Fases que requerem input do usuário (coleta conversacional)
+    'Discovery': 'input_required',
     'Produto': 'input_required',
+    // Fases derivadas (IA gera a partir de docs anteriores + coleta complementar)
     'Requisitos': 'derived',
-    'UX Design': 'derived',
-    'Modelo de Domínio': 'derived',
+    'Design': 'derived',
     'Arquitetura': 'derived',
-    'Arquitetura Avançada': 'derived',
-    'Backlog': 'derived',
+    'Design Técnico': 'derived',
+    'Modelo de Domínio': 'derived',
     'Contrato API': 'derived',
+    'Planejamento': 'derived',
     'Prototipagem': 'derived',
-    'Banco de Dados': 'technical',
-    'Segurança': 'technical',
-    'Testes': 'technical',
-    'Performance': 'technical',
-    'Observabilidade': 'technical',
+    // Fases técnicas (código e infra)
     'Frontend': 'technical',
     'Backend': 'technical',
+    'Integração & Deploy': 'technical',
     'Integração': 'technical',
-    'Deploy Final': 'technical',
+    'Deploy & Operação': 'technical',
 };
 
-// Fluxo para projetos simples (7 fases)
+// ============================================================
+// GATE CHECKLISTS COMPARTILHADOS (reutilizados entre fluxos)
+// ============================================================
+
+const GATE_FRONTEND = [
+    "Componentes implementados conforme design doc e user stories",
+    "Pages com rotas configuradas para cada fluxo",
+    "State management conectado (hooks/stores)",
+    "Integração com mocks ou API real",
+    "Testes unitários para componentes críticos",
+    "Responsivo mobile-first e acessível",
+    "Loading, empty e error states em todas as telas",
+];
+
+const GATE_BACKEND = [
+    "Endpoints implementados conforme modelo de dados da arquitetura",
+    "DTOs com validação de input para cada endpoint",
+    "Services com regras de negócio do modelo de domínio",
+    "Testes unitários para services e controllers",
+    "Migrações de banco executáveis",
+    "Error handling padronizado conforme schema de erros",
+    "Autenticação implementada conforme arquitetura",
+];
+
+const GATE_INTEGRACAO_DEPLOY = [
+    "Frontend conectado ao Backend real (mocks removidos)",
+    "Todos os endpoints funcionando end-to-end",
+    "Testes E2E para fluxos críticos",
+    "CORS e variáveis de ambiente configurados",
+    "Pipeline CI/CD verde com testes automatizados",
+    "Health check respondendo corretamente",
+    "Monitoramento ativo (error tracking)",
+];
+
+// ============================================================
+// FLUXO SIMPLES — 5 fases (v10.0, antes: 7)
+// Discovery (PRD+Requisitos), Design, Arquitetura, Frontend, Backend
+// ============================================================
+
 export const FLUXO_SIMPLES: Fluxo = {
     nivel: "simples",
-    total_fases: 7,
+    total_fases: 5,
+    fases: [
+        {
+            numero: 1,
+            nome: "Discovery",
+            especialista: "Product Discovery Lead",
+            template: "discovery",
+            skill: "specialist-discovery",
+            gate_checklist: [
+                "Problema definido com impacto quantificado",
+                "Mínimo 2 personas com JTBD",
+                "MVP com 3-5 funcionalidades priorizadas",
+                "Requisitos funcionais com IDs únicos",
+                "Requisitos não-funcionais definidos",
+                "North Star Metric definida e mensurável",
+                "Riscos identificados com mitigação",
+            ],
+            entregavel_esperado: "discovery.md",
+        },
+        {
+            numero: 2,
+            nome: "Design",
+            especialista: "UX Designer Lead",
+            template: "design-doc",
+            skill: "specialist-design",
+            gate_checklist: [
+                "Jornada do usuário principal mapeada completa",
+                "Wireframes cobrem todas as telas do MVP",
+                "Design system definido (cores, tipografia, componentes)",
+                "Navegação e arquitetura de informação clara",
+                "Estados de UI (loading, empty, error) documentados",
+                "Acessibilidade WCAG 2.1 AA considerada",
+                "Responsividade mobile-first planejada",
+            ],
+            entregavel_esperado: "design-doc.md",
+        },
+        {
+            numero: 3,
+            nome: "Arquitetura",
+            especialista: "Arquiteto de Soluções",
+            template: "arquitetura",
+            skill: "specialist-architect",
+            gate_checklist: [
+                "Stack tecnológica justificada com ADRs",
+                "Diagrama C4 nível 1 e 2 presentes",
+                "Modelo de dados com entidades e relacionamentos",
+                "Schema de banco com PKs, FKs e índices",
+                "Autenticação e autorização definidas",
+                "NFRs mensuráveis (tempo de resposta, disponibilidade)",
+                "Mínimo 2 ADRs documentados",
+            ],
+            entregavel_esperado: "arquitetura.md",
+        },
+        {
+            numero: 4,
+            nome: "Frontend",
+            especialista: "Frontend Developer Lead",
+            template: "historia-usuario",
+            skill: "specialist-frontend",
+            gate_checklist: GATE_FRONTEND,
+            entregavel_esperado: "frontend-code",
+        },
+        {
+            numero: 5,
+            nome: "Backend",
+            especialista: "Backend Developer Lead",
+            template: "historia-usuario",
+            skill: "specialist-backend",
+            gate_checklist: GATE_BACKEND,
+            entregavel_esperado: "backend-code",
+        },
+    ],
+};
+
+// ============================================================
+// FLUXO MÉDIO — 8 fases (v10.0, antes: 13)
+// Produto, Requisitos, Design, Design Técnico, Planejamento,
+// Frontend, Backend, Integração & Deploy
+// ============================================================
+
+export const FLUXO_MEDIO: Fluxo = {
+    nivel: "medio",
+    total_fases: 8,
     fases: [
         {
             numero: 1,
             nome: "Produto",
-            especialista: "Gestão de Produto",
+            especialista: "Product Manager",
             template: "PRD",
-            skill: "specialist-gestao-produto",
+            skill: "specialist-product",
             gate_checklist: [
-                "Problema claramente definido",
-                "MVP com funcionalidades listadas",
-                "Personas identificadas",
+                "Problema definido com impacto quantificado",
+                "Mínimo 2 personas detalhadas com JTBD",
+                "MVP com 3-7 funcionalidades priorizadas (RICE ou MoSCoW)",
+                "Escopo negativo definido (o que NÃO está no MVP)",
+                "North Star Metric com metas de 3 e 6 meses",
+                "Top 5 riscos com mitigação",
+                "Modelo de negócio claro",
             ],
             entregavel_esperado: "PRD.md",
         },
         {
             numero: 2,
             nome: "Requisitos",
-            especialista: "Engenharia de Requisitos",
+            especialista: "Engenheiro de Requisitos",
             template: "requisitos",
-            skill: "specialist-engenharia-requisitos-ia",
+            skill: "specialist-requirements",
             gate_checklist: [
-                "Requisitos funcionais com IDs únicos",
-                "Requisitos não-funcionais definidos",
-                "Critérios de aceite especificados",
+                "Requisitos funcionais com IDs únicos e descrição clara",
+                "Critérios de aceite em Gherkin para RFs de prioridade Alta",
+                "Requisitos não-funcionais mensuráveis",
+                "Regras de negócio documentadas",
+                "Matriz de rastreabilidade RF ↔ PRD",
             ],
             entregavel_esperado: "requisitos.md",
         },
         {
             numero: 3,
-            nome: "UX Design",
-            especialista: "UX Design",
+            nome: "Design",
+            especialista: "UX Designer Lead",
             template: "design-doc",
-            skill: "specialist-ux-design",
+            skill: "specialist-design",
             gate_checklist: [
-                "Wireframes ou protótipos criados",
-                "Jornadas do usuário mapeadas",
-                "Fluxos de navegação definidos",
+                "Jornada do usuário principal mapeada completa",
+                "Wireframes cobrem todas as telas do MVP",
+                "Design system definido (cores, tipografia, componentes)",
+                "Navegação e arquitetura de informação clara",
+                "Estados de UI (loading, empty, error) documentados",
+                "Acessibilidade WCAG 2.1 AA considerada",
+                "Responsividade mobile-first planejada",
             ],
             entregavel_esperado: "design-doc.md",
         },
         {
             numero: 4,
-            nome: "Arquitetura",
-            especialista: "Arquitetura de Software",
-            template: "arquitetura",
-            skill: "specialist-arquitetura-software",
+            nome: "Design Técnico",
+            especialista: "Arquiteto de Soluções",
+            template: "technical-design",
+            skill: "specialist-technical-design",
             gate_checklist: [
-                "Stack tecnológica definida",
-                "Diagrama C4 básico",
-                "ADRs documentados",
+                "Entidades do domínio com atributos e relacionamentos completos",
+                "Schema de banco com tipos reais, PKs/FKs e índices planejados",
+                "Stack tecnológica justificada com mínimo 3 ADRs",
+                "Diagrama C4 nível 1 e 2",
+                "Autenticação e autorização definidas",
+                "OWASP Top 5 mitigado",
+                "NFRs mensuráveis (tempo resposta, disponibilidade, escala)",
+                "Estratégia de deploy com ambientes",
             ],
-            entregavel_esperado: "arquitetura.md",
+            entregavel_esperado: "technical-design.md",
         },
         {
             numero: 5,
-            nome: "Backlog",
-            especialista: "Plano de Execução",
+            nome: "Planejamento",
+            especialista: "Tech Lead",
             template: "backlog",
-            skill: "specialist-plano-execucao-ia",
+            skill: "specialist-planning",
             gate_checklist: [
-                "Épicos definidos",
-                "Histórias de usuário criadas",
-                "Definition of Done estabelecido",
+                "Épicos mapeiam funcionalidades do MVP",
+                "User Stories com IDs, tipo FE/BE e story points",
+                "Top 10 US com critérios de aceite detalhados",
+                "Endpoints de API derivados do modelo de dados",
+                "Sprints planejados com objetivo e US incluídas",
+                "Estratégia de testes com ferramentas e cobertura",
+                "Definition of Done definido",
             ],
             entregavel_esperado: "backlog.md",
         },
         {
             numero: 6,
             nome: "Frontend",
-            especialista: "Desenvolvimento Frontend",
+            especialista: "Frontend Developer Lead",
             template: "historia-usuario",
-            skill: "specialist-desenvolvimento-frontend",
-            gate_checklist: [
-                "Componentes implementados conforme design doc e user stories do backlog",
-                "Pages com rotas configuradas para cada fluxo",
-                "State management conectado (hooks/stores)",
-                "Integração com mocks do contrato API",
-                "Testes unitários para componentes críticos",
-                "Responsivo mobile-first e acessível",
-                "Loading, empty e error states em todas as telas",
-            ],
+            skill: "specialist-frontend",
+            gate_checklist: GATE_FRONTEND,
             entregavel_esperado: "frontend-code",
         },
         {
             numero: 7,
             nome: "Backend",
-            especialista: "Desenvolvimento",
+            especialista: "Backend Developer Lead",
             template: "historia-usuario",
-            skill: "specialist-desenvolvimento-backend",
-            gate_checklist: [
-                "Endpoints implementados conforme contrato OpenAPI",
-                "DTOs com validação de input para cada endpoint",
-                "Services com regras de negócio do modelo de domínio",
-                "Testes unitários para services e controllers",
-                "Migrações de banco executáveis",
-                "Error handling padronizado conforme schema de erros",
-                "Autenticação implementada conforme arquitetura",
-            ],
+            skill: "specialist-backend",
+            gate_checklist: GATE_BACKEND,
             entregavel_esperado: "backend-code",
+        },
+        {
+            numero: 8,
+            nome: "Integração & Deploy",
+            especialista: "DevOps / SRE Engineer",
+            template: "deploy",
+            skill: "specialist-devops",
+            gate_checklist: GATE_INTEGRACAO_DEPLOY,
+            entregavel_esperado: "deploy.md",
         },
     ],
 };
 
-// Fluxo para projetos médios (13 fases)
-export const FLUXO_MEDIO: Fluxo = {
-    nivel: "medio",
-    total_fases: 13,
+// ============================================================
+// FLUXO COMPLEXO — 11 fases (v10.0, antes: 17)
+// Produto, Requisitos, Design, Modelo de Domínio, Design Técnico,
+// Contrato API, Planejamento, Frontend, Backend, Integração, Deploy & Operação
+// ============================================================
+
+export const FLUXO_COMPLEXO: Fluxo = {
+    nivel: "complexo",
+    total_fases: 11,
     fases: [
-        {
-            numero: 1,
-            nome: "Produto",
-            especialista: "Gestão de Produto",
-            template: "PRD",
-            gate_checklist: [
-                "Problema claramente definido",
-                "Personas identificadas",
-                "MVP com funcionalidades listadas",
-                "North Star Metric definida",
-                "Cronograma estimado",
-            ],
-            entregavel_esperado: "PRD.md",
-        },
-        {
-            numero: 2,
-            nome: "Requisitos",
-            especialista: "Engenharia de Requisitos",
-            template: "requisitos",
-            gate_checklist: [
-                "Requisitos funcionais com IDs únicos",
-                "Requisitos não-funcionais definidos",
-                "Critérios de aceite em Gherkin",
-                "Matriz de rastreabilidade iniciada",
-            ],
-            entregavel_esperado: "requisitos.md",
-        },
-        {
-            numero: 3,
-            nome: "UX Design",
-            especialista: "UX Design",
-            template: "design-doc",
-            gate_checklist: [
-                "Jornadas do usuário mapeadas",
-                "Wireframes criados",
-                "Acessibilidade considerada",
-                "Mapa de navegação definido",
-            ],
-            entregavel_esperado: "design-doc.md",
-        },
+        // Fases 1-3: iguais ao médio (Produto, Requisitos, Design)
+        ...FLUXO_MEDIO.fases.slice(0, 3),
         {
             numero: 4,
             nome: "Modelo de Domínio",
-            especialista: "Modelagem e Arquitetura de Domínio com IA",
+            especialista: "Domain Expert / DDD Strategist",
             template: "modelo-dominio",
+            skill: "specialist-domain",
             gate_checklist: [
-                "Entidades identificadas",
-                "Relacionamentos definidos",
-                "Regras de negócio documentadas",
+                "Bounded contexts identificados com responsabilidades claras",
+                "Linguagem ubíqua documentada (glossário com 10+ termos)",
+                "Aggregates com aggregate roots identificados",
+                "Entidades com atributos e identidade definida",
+                "Value Objects identificados (imutáveis, sem identidade)",
+                "Invariantes/regras de negócio por aggregate",
+                "Domain events mapeados (mínimo 5)",
+                "Context map com relações entre bounded contexts",
             ],
             entregavel_esperado: "modelo-dominio.md",
         },
         {
+            // Design Técnico no complexo: sem seção de domínio (já coberta na fase 4)
             numero: 5,
-            nome: "Banco de Dados",
-            especialista: "Banco de Dados",
-            template: "design-banco",
+            nome: "Design Técnico",
+            especialista: "Arquiteto de Soluções",
+            template: "technical-design",
+            skill: "specialist-technical-design",
             gate_checklist: [
-                "Modelo relacional definido",
-                "Índices planejados",
-                "Scripts de migração criados",
+                "Schema de banco com tipos reais, PKs/FKs e índices planejados",
+                "Stack tecnológica justificada com mínimo 3 ADRs",
+                "Diagrama C4 nível 1 e 2",
+                "Autenticação e autorização definidas",
+                "OWASP Top 5 mitigado",
+                "NFRs mensuráveis (tempo resposta, disponibilidade, escala)",
+                "Estratégia de deploy com ambientes",
             ],
-            entregavel_esperado: "design-banco.md",
+            entregavel_esperado: "technical-design.md",
         },
         {
             numero: 6,
-            nome: "Arquitetura",
-            especialista: "Arquitetura de Software",
-            template: "arquitetura",
-            gate_checklist: [
-                "Diagrama C4 completo",
-                "Stack justificada",
-                "ADRs documentados",
-                "Pontos de integração definidos",
-            ],
-            entregavel_esperado: "arquitetura.md",
-        },
-        {
-            numero: 7,
-            nome: "Segurança",
-            especialista: "Segurança da Informação",
-            template: "checklist-seguranca",
-            gate_checklist: [
-                "OWASP Top 10 avaliado",
-                "Autenticação definida",
-                "Dados sensíveis mapeados",
-            ],
-            entregavel_esperado: "checklist-seguranca.md",
-        },
-        {
-            numero: 8,
-            nome: "Testes",
-            especialista: "Análise de Testes",
-            template: "plano-testes",
-            gate_checklist: [
-                "Estratégia definida",
-                "Casos de teste mapeados",
-                "Ferramentas selecionadas",
-            ],
-            entregavel_esperado: "plano-testes.md",
-        },
-        {
-            numero: 9,
-            nome: "Backlog",
-            especialista: "Plano de Execução com IA",
-            template: "backlog",
-            gate_checklist: [
-                "Épicos definidos",
-                "Features priorizadas",
-                "Histórias detalhadas",
-                "Definition of Done estabelecido",
-            ],
-            entregavel_esperado: "backlog.md",
-        },
-        {
-            numero: 10,
             nome: "Contrato API",
-            especialista: "Contrato de API",
+            especialista: "API Designer",
             template: "contrato-api",
+            skill: "specialist-api-contract",
             gate_checklist: [
-                "Esquema OpenAPI definido",
-                "Tipos gerados para FE e BE",
-                "Mocks disponíveis",
+                "OpenAPI 3.0+ válido (parseable por ferramentas)",
+                "CRUD completo para cada entidade principal",
+                "Schemas de request e response com tipos reais",
+                "Autenticação definida (security schemes)",
+                "Paginação em endpoints que retornam listas",
+                "Error responses padronizadas",
+                "Pelo menos 1 exemplo por endpoint",
             ],
             entregavel_esperado: "openapi.yaml",
         },
         {
-            numero: 11,
-            nome: "Frontend",
-            especialista: "Desenvolvimento Frontend",
-            template: "historia-usuario",
-            gate_checklist: [
-                "Componentes implementados conforme design doc e user stories do backlog",
-                "Pages com rotas configuradas para cada fluxo",
-                "State management conectado (hooks/stores)",
-                "Integração com mocks do contrato API",
-                "Testes unitários para componentes críticos",
-                "Responsivo mobile-first e acessível",
-                "Loading, empty e error states em todas as telas",
-            ],
-            entregavel_esperado: "frontend-code",
-        },
-        {
-            numero: 12,
-            nome: "Backend",
-            especialista: "Desenvolvimento e Vibe Coding Estruturado",
-            template: "historia-usuario",
-            gate_checklist: [
-                "Endpoints implementados conforme contrato OpenAPI",
-                "DTOs com validação de input para cada endpoint",
-                "Services com regras de negócio do modelo de domínio",
-                "Testes unitários para services e controllers",
-                "Migrações de banco executáveis",
-                "Error handling padronizado conforme schema de erros",
-                "Autenticação implementada conforme arquitetura",
-            ],
-            entregavel_esperado: "backend-code",
-        },
-        {
-            numero: 13,
-            nome: "Integração",
-            especialista: "DevOps e Infraestrutura",
-            template: "arquitetura",
-            gate_checklist: [
-                "Frontend conectado ao Backend real (mocks removidos)",
-                "Todos os endpoints do OpenAPI funcionando end-to-end",
-                "Testes E2E para fluxos críticos",
-                "CORS e variáveis de ambiente configurados",
-                "Pipeline CI/CD verde com testes automatizados",
-            ],
-            entregavel_esperado: "deploy.md",
-        },
-    ],
-};
-
-// Fluxo para projetos complexos (17 fases)
-export const FLUXO_COMPLEXO: Fluxo = {
-    nivel: "complexo",
-    total_fases: 17,
-    fases: [
-        ...FLUXO_MEDIO.fases.slice(0, 6), // Produto até Arquitetura
-        {
             numero: 7,
-            nome: "Arquitetura Avançada",
-            especialista: "Arquitetura Avançada",
-            template: "arquitetura",
-            gate_checklist: [
-                "Bounded Contexts definidos",
-                "CQRS avaliado",
-                "Event Sourcing planejado",
-                "Microserviços mapeados",
-            ],
-            entregavel_esperado: "arquitetura-avancada.md",
-        },
-        {
-            numero: 8,
-            nome: "Segurança",
-            especialista: "Segurança da Informação",
-            template: "checklist-seguranca",
-            gate_checklist: [
-                "OWASP Top 10 avaliado",
-                "Threat modeling realizado",
-                "Pentest planejado",
-                "Compliance verificado",
-            ],
-            entregavel_esperado: "checklist-seguranca.md",
-        },
-        {
-            numero: 9,
-            nome: "Performance",
-            especialista: "Performance e Escalabilidade",
-            template: "plano-testes",
-            gate_checklist: [
-                "Load testing planejado",
-                "Caching strategy definida",
-                "Métricas de performance definidas",
-            ],
-            entregavel_esperado: "plano-performance.md",
-        },
-        {
-            numero: 10,
-            nome: "Observabilidade",
-            especialista: "Observabilidade",
-            template: "arquitetura",
-            gate_checklist: [
-                "Estratégia de logs definida",
-                "Métricas configuradas",
-                "Tracing distribuído planejado",
-                "Dashboards definidos",
-            ],
-            entregavel_esperado: "observabilidade.md",
-        },
-        {
-            numero: 11,
-            nome: "Testes",
-            especialista: "Análise de Testes",
-            template: "plano-testes",
-            gate_checklist: [
-                "Pirâmide de testes definida",
-                "Contract testing planejado",
-                "E2E strategy definida",
-            ],
-            entregavel_esperado: "plano-testes.md",
-        },
-        {
-            numero: 12,
-            nome: "Backlog",
-            especialista: "Plano de Execução com IA",
+            nome: "Planejamento",
+            especialista: "Tech Lead",
             template: "backlog",
+            skill: "specialist-planning",
             gate_checklist: [
-                "Épicos definidos",
-                "Features priorizadas",
-                "Histórias com dependências",
-                "Sprints planejadas",
+                "Épicos mapeiam funcionalidades do MVP",
+                "User Stories com IDs, tipo FE/BE e story points",
+                "Top 10 US com critérios de aceite detalhados",
+                "Sprints planejados com objetivo e US incluídas",
+                "Estratégia de testes com ferramentas e cobertura",
+                "Definition of Done definido",
             ],
             entregavel_esperado: "backlog.md",
         },
         {
-            numero: 13,
-            nome: "Contrato API",
-            especialista: "Contrato de API",
-            template: "contrato-api",
-            gate_checklist: [
-                "OpenAPI completo",
-                "Versionamento definido",
-                "Breaking changes documentados",
-            ],
-            entregavel_esperado: "openapi.yaml",
-        },
-        {
-            numero: 14,
+            numero: 8,
             nome: "Frontend",
-            especialista: "Desenvolvimento Frontend",
+            especialista: "Frontend Developer Lead",
             template: "historia-usuario",
-            gate_checklist: [
-                "Componentes implementados conforme design doc e user stories do backlog",
-                "Pages com rotas configuradas para cada fluxo",
-                "State management conectado (hooks/stores)",
-                "Integração com mocks do contrato API",
-                "Testes unitários para componentes críticos",
-                "Responsivo mobile-first e acessível",
-                "Loading, empty e error states em todas as telas",
-            ],
+            skill: "specialist-frontend",
+            gate_checklist: GATE_FRONTEND,
             entregavel_esperado: "frontend-code",
         },
         {
-            numero: 15,
+            numero: 9,
             nome: "Backend",
-            especialista: "Desenvolvimento e Vibe Coding Estruturado",
+            especialista: "Backend Developer Lead",
             template: "historia-usuario",
-            gate_checklist: [
-                "Endpoints implementados conforme contrato OpenAPI",
-                "DTOs com validação de input para cada endpoint",
-                "Services com regras de negócio do modelo de domínio",
-                "Testes unitários para services e controllers",
-                "Migrações de banco executáveis",
-                "Error handling padronizado conforme schema de erros",
-                "Autenticação implementada conforme arquitetura",
-            ],
+            skill: "specialist-backend",
+            gate_checklist: GATE_BACKEND,
             entregavel_esperado: "backend-code",
         },
         {
-            numero: 16,
+            numero: 10,
             nome: "Integração",
-            especialista: "DevOps e Infraestrutura",
-            template: "arquitetura",
+            especialista: "DevOps / SRE Engineer",
+            template: "deploy",
+            skill: "specialist-devops",
             gate_checklist: [
                 "Frontend conectado ao Backend real (mocks removidos)",
                 "Todos os endpoints do OpenAPI funcionando end-to-end",
@@ -478,15 +407,17 @@ export const FLUXO_COMPLEXO: Fluxo = {
             entregavel_esperado: "deploy.md",
         },
         {
-            numero: 17,
-            nome: "Deploy Final",
-            especialista: "DevOps e Infraestrutura",
-            template: "arquitetura",
+            numero: 11,
+            nome: "Deploy & Operação",
+            especialista: "SRE Senior / Platform Engineer",
+            template: "release",
+            skill: "specialist-operations",
             gate_checklist: [
                 "Deploy em produção realizado com sucesso",
                 "Monitoramento ativo com métricas e alertas",
-                "Health checks respondendo corretamente",
-                "Runbook de operações documentado",
+                "Health checks respondendo corretamente (liveness + readiness)",
+                "SLOs definidos com SLIs mensuráveis",
+                "Runbook de operações documentado (mínimo 3 cenários)",
                 "Rollback testado e funcional",
             ],
             entregavel_esperado: "release.md",
@@ -534,9 +465,11 @@ const FASE_STITCH: Fase = {
 };
 
 /**
- * Obtém fluxo com fase de Stitch opcional
- * Se usarStitch=true, insere fase de prototipagem após UX Design (fase 3)
- * Isso garante que o Design Doc com estilo visual esteja pronto antes de prototipar
+ * Obtém fluxo com fase de Stitch opcional.
+ * Se usarStitch=true, insere fase de prototipagem APÓS a fase "Design".
+ * 
+ * v10.0: Busca dinamicamente a fase "Design" em vez de hardcoded na posição 3,
+ * porque no fluxo simples Design é fase 2, e no médio/complexo é fase 3.
  */
 export function getFluxoComStitch(nivel: "simples" | "medio" | "complexo", usarStitch: boolean): Fluxo {
     const base = getFluxo(nivel);
@@ -545,12 +478,20 @@ export function getFluxoComStitch(nivel: "simples" | "medio" | "complexo", usarS
         return base;
     }
 
-    // Insere Stitch como fase 4 (após UX Design)
-    // Fluxo: Produto(1) -> Requisitos(2) -> UX Design(3) -> Stitch(4) -> ...
+    // Encontrar a fase "Design" dinamicamente
+    const designIndex = base.fases.findIndex(f => f.nome === 'Design');
+    if (designIndex === -1) {
+        // Sem fase de Design, retorna fluxo base sem Stitch
+        return base;
+    }
+
+    const insertAfter = designIndex + 1; // Inserir APÓS Design
+    const stitchNumero = base.fases[designIndex].numero + 1;
+
     const fasesComStitch: Fase[] = [
-        ...base.fases.slice(0, 3), // Fases 1-3: Produto + Requisitos + UX Design
-        { ...FASE_STITCH, numero: 4 }, // Stitch como fase 4
-        ...base.fases.slice(3).map(f => ({ ...f, numero: f.numero + 1 })) // Renumera restante
+        ...base.fases.slice(0, insertAfter),
+        { ...FASE_STITCH, numero: stitchNumero },
+        ...base.fases.slice(insertAfter).map(f => ({ ...f, numero: f.numero + 1 }))
     ];
 
     return {

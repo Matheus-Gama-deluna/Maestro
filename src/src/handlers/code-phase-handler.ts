@@ -802,24 +802,32 @@ function getExpertiseForPhase(faseNome: string): string[] {
 }
 
 /**
- * Delega para proximo.ts para validar gate e avançar fase.
- * Gera um entregável textual resumido a partir do manifest.
+ * Delega para proximo.ts para avançar fase.
+ * 
+ * v10.0 FIX: Quando code-validator já aprovou (codeState.status === 'completed'),
+ * passa skip_validation=true para pular a re-validação textual redundante
+ * em proximo.ts (validateDeliverableForGate). Antes, o code-validator fazia
+ * validação por artefatos reais e depois proximo.ts re-validava por keywords,
+ * potencialmente contradizendo o score.
  */
 async function delegateToProximo(args: CodePhaseArgs): Promise<ToolResult> {
     const { estado, diretorio } = args;
     const codeState = (estado as any).codePhaseState as CodePhaseState | undefined;
     const manifest = codeState?.manifest;
 
-    // Gerar entregável textual a partir do manifest para o proximo.ts validar
+    // Gerar entregável textual a partir do manifest (usado para resumo, não validação)
     const entregavelTexto = manifest
         ? generateSummaryMarkdown(manifest, { nome: codeState?.faseNome || '' }, getTaskProgress(estado.tasks || [], estado.fase_atual))
         : 'Fase de código concluída. Manifest não gerado.';
 
-    // Importar proximo.ts e delegar
+    // v10.0: Se code-validator já aprovou, pular validação textual redundante
+    const skipValidation = codeState?.status === 'completed';
+
     const { proximo } = await import("../tools/proximo.js");
     return proximo({
         diretorio,
         estado_json: serializarEstado(estado).content,
         entregavel: entregavelTexto,
+        skip_validation: skipValidation,
     });
 }

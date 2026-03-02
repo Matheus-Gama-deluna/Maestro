@@ -1,21 +1,20 @@
 /**
- * Specialist Phase Handler (v6.1)
+ * Specialist Phase Handler (v10.0)
  * 
- * Handler central do novo fluxo de onboarding unificado.
+ * Handler central do fluxo de fases de documento.
  * Gerencia o ciclo: specialist_active → collecting → generating → validating → approved
  * 
- * v6.1 Fixes:
- * - FIX: PRD validation score (was always 15/100 due to regex/escape bug)
- * - FIX: prazo_mvp alias mapping
- * - FIX: Infinite retry loop (max 3 attempts)
- * - FIX: File-based PRD validation (eliminates JSON escape issues)
- * - FIX: Reduced template repetition in context
- * - FIX: Standardized output with AI instruction markers
- * - FIX: Resource loading instructions in output
+ * v10.0: Generalizado para aceitar PhaseConfig dinâmico (qualquer fase, não apenas PRD).
+ * Quando phaseConfig é fornecido, usa dados da skill. Sem config, mantém comportamento v9 (PRD).
+ * 
+ * v6.1 Fixes mantidos:
+ * - FIX: PRD validation score, prazo_mvp alias, retry limit
+ * - FIX: File-based validation, reduced template repetition
  */
 
 import type { ToolResult, EstadoProjeto } from "../types/index.js";
 import type { OnboardingState, SpecialistPhaseState } from "../types/onboarding.js";
+import type { PhaseConfig } from "../types/phase-config.js";
 import { formatResponse, formatError } from "../utils/response-formatter.js";
 import { serializarEstado } from "../state/storage.js";
 import { saveFile } from "../utils/persistence.js";
@@ -27,10 +26,10 @@ import { normalizeFieldKey, getRequiredFields } from "./field-normalizer.js";
 import { calculatePrdScore, calculatePrdScoreDetailed, identifyPrdGaps, normalizePrdContent } from "./prd-scorer.js";
 import { loadCollectingContext, formatMissingFieldsByBlock, truncateValue, buildCollectionPrompt } from "./specialist-formatters.js";
 
-/** Maximum number of automatic PRD validation retries before requiring user approval */
-const MAX_PRD_VALIDATION_RETRIES = 3;
+/** Maximum number of automatic validation retries before requiring user approval */
+const MAX_VALIDATION_RETRIES = 3;
 
-/** Paths padrão para saída de documentos — a IA DEVE usar estes paths */
+/** Paths padrão para saída de documentos — fallback para PRD (v9 compat) */
 const PRD_OUTPUT_PATHS = {
     primary: 'docs/01-produto/PRD.md',
     draft: '.maestro/entregaveis/prd-draft.md',
@@ -80,6 +79,8 @@ interface SpecialistPhaseArgs {
     diretorio: string;
     respostas?: Record<string, unknown>;
     entregavel?: string;
+    /** v10.0: Config dinâmico da fase. Se presente, usa dados da skill em vez de hardcodes PRD. */
+    phaseConfig?: PhaseConfig;
 }
 
 
@@ -104,14 +105,23 @@ export async function handleSpecialistPhase(args: SpecialistPhaseArgs): Promise<
 
     const sp = onboarding.specialistPhase;
 
+    // v10.0: Resolver output path dinâmico (PhaseConfig ou fallback PRD)
+    const outputPath = args.phaseConfig
+        ? `${diretorio}/${args.phaseConfig.outputPath}`
+        : getPrdOutputPath(diretorio);
+    const draftPath = args.phaseConfig
+        ? `${diretorio}/.maestro/entregaveis/${args.phaseConfig.outputFilename}`
+        : getPrdDraftPath(diretorio);
+    const specialistName = args.phaseConfig?.specialistName || 'Gestão de Produto';
+
     switch (sp.status) {
         case 'active':
         case 'collecting':
             return handleCollecting(args, onboarding, sp);
         case 'generating': {
             // v7.1: File-first — verificar disco OU param entregavel
-            const hasPrdOnDisk = existsSync(getPrdOutputPath(diretorio)) || existsSync(getPrdDraftPath(diretorio));
-            if (args.entregavel || hasPrdOnDisk) {
+            const hasDocOnDisk = existsSync(outputPath) || existsSync(draftPath);
+            if (args.entregavel || hasDocOnDisk) {
                 sp.status = 'validating';
                 return handleValidating(args, onboarding, sp);
             }
@@ -135,6 +145,7 @@ export async function handleSpecialistPhase(args: SpecialistPhaseArgs): Promise<
 
 /**
  * Handler: collecting — Recebe respostas do usuário e acumula dados
+ * v10.0: Usa PhaseConfig.collectFields quando disponível, fallback para getRequiredFields(mode).
  */
 async function handleCollecting(
     args: SpecialistPhaseArgs,
@@ -143,9 +154,15 @@ async function handleCollecting(
 ): Promise<ToolResult> {
     const { estado, diretorio, respostas } = args;
     const mode = onboarding.mode || 'balanced';
+    const config = args.phaseConfig;
+    const specialistLabel = config?.specialistName || 'Gestão de Produto';
 
     // Se não há respostas, mostrar o que falta
     if (!respostas || Object.keys(respostas).length === 0) {
+        // v10.0: Se temos PhaseConfig com collectFields, usar diretamente
+        if (config && config.collectFields.length > 0) {
+            return buildDynamicCollectionPrompt(estado, diretorio, sp, config, resolveIDEForProject);
+        }
         return buildCollectionPrompt(estado, diretorio, sp, mode, resolveIDEForProject);
     }
 
@@ -161,20 +178,20 @@ async function handleCollecting(
     onboarding.totalInteractions++;
     onboarding.lastInteractionAt = new Date().toISOString();
 
-    // Verificar se tem dados suficientes para gerar PRD
-    const required = getRequiredFields(mode);
+    // v10.0: Usar campos da PhaseConfig se disponíveis, senão fallback PRD
+    const required = (config && config.collectFields.length > 0)
+        ? config.collectFields.filter(f => f.required).map(f => ({ id: f.id, label: f.label, block: f.block as any, hint: f.hint, example: f.example || '', required: f.required, modes: ['economy', 'balanced', 'quality'] }))
+        : getRequiredFields(mode);
     const missing = required.filter(f => !sp.collectedData[f.id]);
     const collected = required.filter(f => sp.collectedData[f.id]);
 
     if (missing.length === 0) {
         // Todos os campos obrigatórios preenchidos
         if (args.entregavel) {
-            // Entregável já presente → skip generating, ir direto para validating
             sp.status = 'validating';
             await persistState(estado, onboarding, diretorio);
             return handleValidating(args, onboarding, sp);
         }
-        // Sem entregável → gerar PRD
         sp.status = 'generating';
         await persistState(estado, onboarding, diretorio);
         return handleGenerating(args, onboarding, sp);
@@ -184,16 +201,22 @@ async function handleCollecting(
     await persistState(estado, onboarding, diretorio);
 
     const progressPct = Math.round((collected.length / required.length) * 100);
-
-    // v6.0 (P11): next_action com parâmetros COMPLETOS e EXATOS
     const missingTemplate: Record<string, string> = {};
     for (const f of missing) {
         missingTemplate[f.id] = `<${f.label}>`;
     }
 
+    // v10.0: Persona dinâmica da config ou fallback
+    const persona = config?.persona || {
+        name: 'Gestão de Produto',
+        tone: 'Estratégico e orientado ao usuário',
+        expertise: ['product discovery', 'lean startup', 'user stories', 'MVP definition'],
+        instructions: 'Conduza a coleta de forma conversacional. PERGUNTE — NÃO invente.',
+    };
+
     return {
         content: formatResponse({
-            titulo: "🧠 Especialista: Gestão de Produto",
+            titulo: `🧠 Especialista: ${specialistLabel}`,
             resumo: `Dados recebidos! ${collected.length}/${required.length} campos preenchidos (${progressPct}%).`,
             dados: {
                 "Campos preenchidos": `${collected.length}/${required.length}`,
@@ -210,16 +233,12 @@ ${collected.map(f => `✅ **${f.label}**: ${truncateValue(sp.collectedData[f.id]
 ${formatMissingFieldsByBlock(missing, mode)}
 
 ⚠️ REGRA CRÍTICA: Os dados devem vir DIRETAMENTE do usuário.
-Se o usuário pedir "crie os dados", "invente para teste" ou "preencha para mim":
-→ Responda: "Preciso que VOCÊ me conte sobre o seu produto. Mesmo que seja simples, suas respostas reais vão gerar um PRD muito melhor do que dados inventados."
-→ Reformule as perguntas de forma mais simples se o usuário parecer travado.
-→ Ofereça exemplos para inspirar, mas NÃO use os exemplos como resposta.
+NÃO invente dados. Se o usuário não souber, marque como "A definir".
 
 ## 📍 Onde Estamos
-✅ Setup → 🔄 Coleta (${progressPct}%) → ⏳ Geração PRD → ⏳ Validação → ⏳ Aprovação
+✅ Setup → 🔄 Coleta (${progressPct}%) → ⏳ Geração → ⏳ Validação → ⏳ Aprovação
 
-⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\`
-⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar`,
+⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\``,
             proximo_passo: {
                 tool: "executar",
                 descricao: `Enviar respostas dos campos faltantes`,
@@ -231,19 +250,15 @@ Se o usuário pedir "crie os dados", "invente para teste" ou "preencha para mim"
         next_action: {
             tool: "executar",
             description: `Enviar respostas: ${missing.map(f => f.label).join(', ')}`,
-            args_template: {
-                diretorio,
-                acao: "avancar",
-                respostas: missingTemplate,
-            },
+            args_template: { diretorio, acao: "avancar", respostas: missingTemplate },
             requires_user_input: true,
             user_prompt: `Responda: ${missing.map(f => f.label).join(', ')}`,
         },
         specialist_persona: {
-            name: "Gestão de Produto",
-            tone: "Estratégico e orientado ao usuário",
-            expertise: ["product discovery", "lean startup", "user stories", "MVP definition"],
-            instructions: "Conduza a coleta de forma conversacional focada em PRODUTO. PERGUNTE — NÃO invente. Faça follow-up quando respostas forem vagas (< 20 palavras).",
+            name: persona.name,
+            tone: persona.tone,
+            expertise: persona.expertise,
+            instructions: persona.instructions,
         },
         progress: {
             current_phase: "specialist_collecting",
@@ -255,7 +270,100 @@ Se o usuário pedir "crie os dados", "invente para teste" ou "preencha para mim"
 }
 
 /**
- * Handler: generating — Gera PRD draft a partir dos dados coletados
+ * v10.0: Prompt de coleta dinâmico usando PhaseConfig.collectFields.
+ * Usado quando a skill tem campos de coleta definidos.
+ */
+async function buildDynamicCollectionPrompt(
+    estado: EstadoProjeto,
+    diretorio: string,
+    sp: SpecialistPhaseState,
+    config: PhaseConfig,
+    resolveIDE: (estado: EstadoProjeto, diretorio: string) => IDEType
+): Promise<ToolResult> {
+    const allFields = config.collectFields;
+    const requiredFields = allFields.filter(f => f.required);
+    const missing = requiredFields.filter(f => !sp.collectedData[f.id]);
+    const collected = requiredFields.filter(f => sp.collectedData[f.id]);
+
+    const missingTemplate: Record<string, string> = {};
+    for (const f of missing) {
+        missingTemplate[f.id] = `<${f.label}>`;
+    }
+
+    const collectedInfo = collected.length > 0
+        ? `\nCampos já coletados:\n${collected.map(f => `✅ **${f.label}**: ${truncateValue(sp.collectedData[f.id])}`).join('\n')}`
+        : '';
+
+    // Agrupar campos faltantes por bloco
+    const blockMap: Record<string, typeof missing> = {};
+    for (const f of missing) {
+        if (!blockMap[f.block]) blockMap[f.block] = [];
+        blockMap[f.block].push(f);
+    }
+    let missingMd = '## Campos que FALTAM (pergunte ao usuário):\n\n';
+    for (const [block, fields] of Object.entries(blockMap)) {
+        missingMd += `### ${block}\n\n`;
+        for (const f of fields) {
+            missingMd += `❌ **${f.label}**\n   _${f.hint}_\n\n`;
+        }
+    }
+
+    const persona = config.persona || { name: config.specialistName, tone: 'Profissional', expertise: [], instructions: '' };
+
+    return {
+        content: formatResponse({
+            titulo: `🧠 Especialista: ${config.specialistName}`,
+            resumo: `Coleta de informações. ${collected.length}/${requiredFields.length} campos preenchidos.`,
+            instrucoes: `⚠️ OBRIGATÓRIO: Pergunte ao usuário os campos abaixo. NÃO invente dados.
+
+${loadCollectingContext(sp.skillName, resolveIDE(estado, diretorio), diretorio)}
+${collectedInfo}
+
+${missingMd}
+
+⚠️ REGRA CRÍTICA: Os dados devem vir DIRETAMENTE do usuário.
+
+Após coletar as respostas, EXECUTE:
+\`\`\`json
+executar({
+    "diretorio": "${diretorio}",
+    "acao": "avancar",
+    "respostas": ${JSON.stringify(missingTemplate, null, 4)}
+})
+\`\`\``,
+            proximo_passo: {
+                tool: "executar",
+                descricao: "Enviar respostas coletadas do usuário",
+                args: `{ "diretorio": "${diretorio}", "acao": "avancar", "respostas": ${JSON.stringify(missingTemplate)} }`,
+                requer_input_usuario: true,
+                prompt_usuario: `Responda: ${missing.map(f => f.label).join(', ')}`,
+            },
+        }),
+        next_action: {
+            tool: "executar",
+            description: `Coletar e enviar: ${missing.map(f => f.label).join(', ')}`,
+            args_template: { diretorio, acao: "avancar", respostas: missingTemplate },
+            requires_user_input: true,
+            user_prompt: `Pergunte ao usuário: ${missing.map(f => f.label).join(', ')}`,
+        },
+        specialist_persona: {
+            name: persona.name,
+            tone: persona.tone,
+            expertise: persona.expertise,
+            instructions: persona.instructions,
+        },
+        progress: {
+            current_phase: "specialist_active",
+            total_phases: 5,
+            completed_phases: 1,
+            percentage: 20,
+        },
+    };
+}
+
+/**
+ * Handler: generating — Gera entregável a partir dos dados coletados
+ * v10.0: Usa PhaseConfig para outputPath e specialistName dinâmicos.
  */
 async function handleGenerating(
     args: SpecialistPhaseArgs,
@@ -263,25 +371,33 @@ async function handleGenerating(
     sp: SpecialistPhaseState
 ): Promise<ToolResult> {
     const { estado, diretorio } = args;
-    const mode = onboarding.mode || 'balanced';
+    const config = args.phaseConfig;
 
-    // Montar contexto para geração do PRD
     const collectedSummary = Object.entries(sp.collectedData)
         .map(([key, value]) => `- **${key}**: ${value}`)
         .join('\n');
 
-    // v7.0: Resolver paths de skills adaptados para a IDE do projeto
-    const skillPaths = getSkillPathForIDE(sp.skillName, estado, diretorio);
+    // v10.0: Output path dinâmico
+    const outputRelPath = config?.outputPath || PRD_OUTPUT_PATHS.primary;
+    const docLabel = config?.faseName || 'PRD';
+    const specialistLabel = config?.specialistName || 'Gestão de Produto';
 
     sp.status = 'generating';
     await persistState(estado, onboarding, diretorio);
 
+    const persona = config?.persona || {
+        name: 'Gestão de Produto',
+        tone: 'Completo e estruturado',
+        expertise: ['PRDs', 'especificações', 'escopo', 'métricas de sucesso'],
+        instructions: 'Gere o documento usando EXATAMENTE o template fornecido. Preencha com dados REAIS coletados. Marque gaps como "A definir".',
+    };
+
     return {
         content: formatResponse({
-            titulo: "📝 Geração do PRD",
-            resumo: "Todos os dados foram coletados. Gerando PRD draft usando o template do especialista.",
+            titulo: `📝 Geração: ${docLabel}`,
+            resumo: `Todos os dados foram coletados. Gerando ${docLabel} usando o template do especialista.`,
             instrucoes: `🤖 **AÇÃO AUTOMÁTICA REQUERIDA:**
-Você DEVE gerar o PRD e salvá-lo no disco IMEDIATAMENTE, sem esperar comando do usuário.
+Você DEVE gerar o documento e salvá-lo no disco IMEDIATAMENTE, sem esperar comando do usuário.
 
 ## Dados Coletados do Usuário
 
@@ -295,7 +411,7 @@ ${formatSkillHydrationCommand(sp.skillName, resolveIDEForProject(estado, diretor
 1. Preencha CADA seção do template com os dados coletados
 2. Se um dado não foi coletado, marque como "A definir com o usuário"
 3. NÃO invente números, métricas ou dados que o usuário não forneceu
-4. **SALVE O PRD** no arquivo \`${PRD_OUTPUT_PATHS.primary}\`
+4. **SALVE** no arquivo \`${outputRelPath}\`
 5. Após salvar, avance usando:
 
 \`\`\`json
@@ -310,13 +426,12 @@ executar({
 🤖 **NÃO ESPERE** o usuário dizer "pode seguir" ou "avançar". Salve o arquivo e execute a tool AGORA.
 
 ## 📍 Onde Estamos
-✅ Setup → ✅ Coleta → 🔄 Geração PRD → ⏳ Validação → ⏳ Aprovação
+✅ Setup → ✅ Coleta → 🔄 Geração → ⏳ Validação → ⏳ Aprovação
 
-⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\`
-⚠️ NUNCA use: \`maestro({acao: "status"})\` para tentar avançar`,
+⚠️ Para avançar, SEMPRE use: \`executar({acao: "avancar"})\``,
             proximo_passo: {
                 tool: "executar",
-                descricao: "Salvar PRD no disco e avançar para validação",
+                descricao: `Salvar ${docLabel} no disco e avançar para validação`,
                 args: `{ "diretorio": "${diretorio}", "acao": "avancar" }`,
                 requer_input_usuario: false,
                 auto_execute: true,
@@ -324,19 +439,16 @@ executar({
         }),
         next_action: {
             tool: "executar",
-            description: "Salvar PRD em docs/01-produto/PRD.md e avançar",
-            args_template: {
-                diretorio,
-                acao: "avancar",
-            },
+            description: `Salvar ${docLabel} em ${outputRelPath} e avançar`,
+            args_template: { diretorio, acao: "avancar" },
             requires_user_input: false,
             auto_execute: true,
         },
         specialist_persona: {
-            name: "Gestão de Produto",
-            tone: "Completo e estruturado",
-            expertise: ["PRDs", "especificações", "escopo", "métricas de sucesso"],
-            instructions: "Gere o PRD usando EXATAMENTE o template fornecido. Preencha com dados REAIS coletados. Marque gaps como 'A definir'.",
+            name: persona.name,
+            tone: persona.tone,
+            expertise: persona.expertise,
+            instructions: persona.instructions,
         },
         progress: {
             current_phase: "specialist_generating",
@@ -458,7 +570,7 @@ executar({
     }
 
     // v6.1 (Bug #3): Check retry limit
-    const retriesExhausted = sp.validationAttempts >= MAX_PRD_VALIDATION_RETRIES;
+    const retriesExhausted = sp.validationAttempts >= MAX_VALIDATION_RETRIES;
 
     // PRD precisa de melhorias
     const { details } = calculatePrdScoreDetailed(entregavel);
@@ -477,7 +589,7 @@ executar({
                 resumo: `PRD validado com score ${score}/100 após ${sp.validationAttempts} tentativas. Requer decisão do usuário.`,
                 dados: {
                     "Score": `${score}/100`,
-                    "Tentativas": `${sp.validationAttempts}/${MAX_PRD_VALIDATION_RETRIES}`,
+                    "Tentativas": `${sp.validationAttempts}/${MAX_VALIDATION_RETRIES}`,
                     "Status": "⚠️ Limite de tentativas atingido",
                     "Mínimo": "70/100",
                 },
@@ -510,14 +622,14 @@ executar({
     return {
         content: formatResponse({
             titulo: "📊 Validação do PRD",
-            resumo: `PRD recebido. Score: ${score}/100. Tentativa ${sp.validationAttempts}/${MAX_PRD_VALIDATION_RETRIES}.`,
+            resumo: `PRD recebido. Score: ${score}/100. Tentativa ${sp.validationAttempts}/${MAX_VALIDATION_RETRIES}.`,
             dados: {
                 "Score": `${score}/100`,
-                "Tentativa": `${sp.validationAttempts}/${MAX_PRD_VALIDATION_RETRIES}`,
+                "Tentativa": `${sp.validationAttempts}/${MAX_VALIDATION_RETRIES}`,
                 "Status": "⚠️ Precisa de melhorias",
                 "Mínimo": "70/100",
             },
-            instrucoes: `## 📊 Detalhamento do Score\n\n${scoreBreakdown}\n\n${gaps.length > 0 ? `## Gaps Identificados\n\n${gaps.map(g => `- ${g}`).join('\n')}\n\n` : ''}🤖 **AÇÃO REQUERIDA (tentativa ${sp.validationAttempts + 1}/${MAX_PRD_VALIDATION_RETRIES}):**\nMelhore o PRD nos pontos acima.\n\n1. **Edite o arquivo** \`${PRD_OUTPUT_PATHS.primary}\` com as melhorias\n2. Após salvar, avance:\n\n\`\`\`json\nexecutar({\n    "diretorio": "${diretorio}",\n    "acao": "avancar"\n})\n\`\`\`\n\n⚠️ **NÃO passe o conteúdo via entregavel.** O MCP lê direto do arquivo.\n\n## 📍 Onde Estamos\n✅ Setup → ✅ Coleta → ✅ Geração PRD → 🔄 Validação → ⏳ Aprovação`,
+            instrucoes: `## 📊 Detalhamento do Score\n\n${scoreBreakdown}\n\n${gaps.length > 0 ? `## Gaps Identificados\n\n${gaps.map(g => `- ${g}`).join('\n')}\n\n` : ''}🤖 **AÇÃO REQUERIDA (tentativa ${sp.validationAttempts + 1}/${MAX_VALIDATION_RETRIES}):**\nMelhore o PRD nos pontos acima.\n\n1. **Edite o arquivo** \`${PRD_OUTPUT_PATHS.primary}\` com as melhorias\n2. Após salvar, avance:\n\n\`\`\`json\nexecutar({\n    "diretorio": "${diretorio}",\n    "acao": "avancar"\n})\n\`\`\`\n\n⚠️ **NÃO passe o conteúdo via entregavel.** O MCP lê direto do arquivo.\n\n## 📍 Onde Estamos\n✅ Setup → ✅ Coleta → ✅ Geração PRD → 🔄 Validação → ⏳ Aprovação`,
             proximo_passo: {
                 tool: "executar",
                 descricao: "Salvar PRD melhorado no disco e avançar",

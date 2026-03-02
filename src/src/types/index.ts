@@ -128,6 +128,10 @@ export interface EstadoProjeto {
     // v3.0: Onboarding otimizado
     onboarding?: import("./onboarding.js").OnboardingState;
 
+    // v10.0: Readiness Gate — checkpoint consolidado antes de fases de código
+    readiness_score?: number;       // Score do readiness check (0-100)
+    readiness_approved?: boolean;   // Se readiness gate já foi aprovado
+
     criado_em: string;
     atualizado_em: string;
 }

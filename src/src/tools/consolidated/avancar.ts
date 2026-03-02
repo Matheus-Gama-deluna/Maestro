@@ -248,12 +248,58 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
         } as any);
     }
 
-    // v9.0: Detectar fase de código e delegar para code-phase-handler
-    // Usa isCodePhaseName de flows/types.ts (fonte única de verdade)
+    // v10.0: Detectar fase de código e aplicar Readiness Gate + code-phase-handler
     const faseAtualInfo = getFaseComStitch(estado.nivel, estado.fase_atual, estado.usar_stitch);
     const isCodePhaseDetected = isCodePhaseName(faseAtualInfo?.nome);
 
     if (isCodePhaseDetected) {
+        // v10.0: Readiness Gate — checkpoint consolidado antes de fases de código
+        // Verifica se é a PRIMEIRA vez entrando em código (gates_validados não contém fases de código)
+        const isFirstCodePhase = !estado.readiness_approved && !estado.gates_validados?.some(g => {
+            const fInfo = getFaseComStitch(estado.nivel, g, estado.usar_stitch);
+            return isCodePhaseName(fInfo?.nome);
+        });
+
+        if (isFirstCodePhase) {
+            try {
+                const { readinessCheck, formatReadinessResult } = await import("../../gates/readiness-gate.js");
+                const readiness = await readinessCheck(estado, diretorio);
+
+                if (readiness.score < 60) {
+                    // Bloqueio total — artefatos críticos faltando
+                    return {
+                        content: [{ type: "text" as const, text: formatReadinessResult(readiness) }],
+                        isError: true,
+                    };
+                }
+
+                if (readiness.score < 80) {
+                    // Aprovação manual necessária
+                    // Verificar se usuário está aprovando manualmente via respostas
+                    const isManualApproval = args.respostas?.approve_readiness === true ||
+                        args.respostas?.approve_readiness === 'true';
+
+                    if (!isManualApproval) {
+                        estado.readiness_score = readiness.score;
+                        const estadoFile = serializarEstado(estado);
+                        try { await saveFile(`${diretorio}/${estadoFile.path}`, estadoFile.content); } catch { /* ignore */ }
+
+                        return {
+                            content: [{ type: "text" as const, text: formatReadinessResult(readiness) }],
+                        };
+                    }
+                }
+
+                // Score >= 80 ou aprovação manual: marcar como aprovado
+                estado.readiness_approved = true;
+                estado.readiness_score = readiness.score;
+                console.log(`[avancar] v10.0: Readiness Gate aprovado (score: ${readiness.score})`);
+            } catch (err) {
+                // Best-effort — não bloqueia o fluxo se readiness gate falhar
+                console.warn('[avancar] v10.0: Readiness Gate falhou (non-blocking):', err);
+            }
+        }
+
         try {
             const { handleCodePhase } = await import("../../handlers/code-phase-handler.js");
             return handleCodePhase({
@@ -268,14 +314,57 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
         }
     }
 
-    // Desenvolvimento (fases não-código): delegar para proximo
-    // v5.5.0: proximo.ts agora é autossuficiente - lê do disco automaticamente
+    // v10.0: Fases de DOCUMENTO — tentar specialist handler com PhaseConfig
+    // Se a skill tem collectFields, usa coleta conversacional dinâmica.
+    // Senão, fallback para proximo.ts (comportamento v9).
+    if (faseAtualInfo && !isCodePhaseDetected) {
+        try {
+            const { loadPhaseConfig } = await import("../../services/phase-config-loader.js");
+            const configResult = await loadPhaseConfig(diretorio, faseAtualInfo, estado.ide);
+
+            // Se PhaseConfig carregou com collectFields, usar specialist handler
+            if (configResult.loaded && configResult.config.collectFields.length > 0) {
+                // Inicializar specialistPhase se não existir para esta fase
+                if (!estado.onboarding) {
+                    const { criarEstadoOnboardingComEspecialista } = await import("../../services/onboarding.service.js");
+                    estado.onboarding = criarEstadoOnboardingComEspecialista(
+                        estado.projeto_id,
+                        estado.config?.mode || 'balanced',
+                        configResult.config.skillName
+                    );
+                } else if (!estado.onboarding.specialistPhase || estado.onboarding.specialistPhase.skillName !== configResult.config.skillName) {
+                    // Fase mudou — criar novo specialistPhase para a fase atual
+                    estado.onboarding.specialistPhase = {
+                        skillName: configResult.config.skillName,
+                        status: 'active',
+                        collectedData: {},
+                        interactionCount: 0,
+                        activatedAt: new Date().toISOString(),
+                    };
+                    estado.onboarding.phase = 'specialist_active';
+                }
+
+                const { handleSpecialistPhase } = await import("../../handlers/specialist-phase-handler.js");
+                return handleSpecialistPhase({
+                    estado,
+                    diretorio,
+                    respostas: args.respostas,
+                    entregavel: args.entregavel,
+                    phaseConfig: configResult.config,
+                });
+            }
+        } catch (err) {
+            console.warn('[avancar] v10.0: PhaseConfig/specialist handler falhou, fallback para proximo.ts:', err);
+        }
+    }
+
+    // Fallback: delegar para proximo.ts (comportamento v9)
     const estadoJson = args.estado_json || serializarEstado(estado).content;
 
     return proximo({
         diretorio: args.diretorio,
         estado_json: estadoJson,
-        entregavel: args.entregavel,  // Pode ser undefined - proximo.ts lê do disco
+        entregavel: args.entregavel,
         resumo_json: args.resumo_json,
         nome_arquivo: args.nome_arquivo,
         auto_flow: args.auto_flow,

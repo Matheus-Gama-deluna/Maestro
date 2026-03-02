@@ -331,6 +331,49 @@ confirmar_projeto({
 }
 
 /**
+ * v10.0: Gera documento de plano de orquestração com lista de fases do fluxo.
+ * Gerado automaticamente ao criar projeto — sempre atualizado via flows/types.ts.
+ */
+function gerarPlanoOrquestracao(
+    fluxo: { nivel: string; total_fases: number; fases: Array<{ numero: number; nome: string; especialista: string; entregavel_esperado: string; gate_checklist: string[] }> },
+    nivel: string,
+    nomeProjeto: string
+): string {
+    const lines: string[] = [];
+    lines.push(`# Plano de Orquestração — ${nomeProjeto}\n`);
+    lines.push(`> **Gerado automaticamente pelo Maestro v10.0**`);
+    lines.push(`> **Nível:** ${nivel.toUpperCase()} | **Total de fases:** ${fluxo.total_fases}\n`);
+    lines.push(`---\n`);
+    lines.push(`## Fases do Fluxo\n`);
+    lines.push(`| # | Fase | Especialista | Entregável |`);
+    lines.push(`|---|------|-------------|------------|`);
+
+    for (const fase of fluxo.fases) {
+        lines.push(`| ${fase.numero} | **${fase.nome}** | ${fase.especialista} | \`${fase.entregavel_esperado}\` |`);
+    }
+
+    lines.push(`\n---\n`);
+    lines.push(`## Detalhamento por Fase\n`);
+
+    for (const fase of fluxo.fases) {
+        lines.push(`### Fase ${fase.numero}: ${fase.nome}\n`);
+        lines.push(`- **Especialista:** ${fase.especialista}`);
+        lines.push(`- **Entregável:** \`${fase.entregavel_esperado}\`\n`);
+        lines.push(`**Gate Checklist:**`);
+        for (const item of fase.gate_checklist) {
+            lines.push(`- [ ] ${item}`);
+        }
+        lines.push('');
+    }
+
+    lines.push(`---\n`);
+    lines.push(`> Este documento é gerado automaticamente e reflete o fluxo atual definido em \`flows/types.ts\`.`);
+    lines.push(`> Para avançar entre fases, use: \`executar({ acao: "avancar" })\``);
+
+    return lines.join('\n');
+}
+
+/**
  * Tool: confirmar_projeto
  * Cria efetivamente os arquivos do projeto com os tipos confirmados
  */
@@ -515,6 +558,19 @@ ${stitchNote}
         for (const f of resumoFiles) {
             await saveFile(`${diretorio}/${f.path}`, f.content);
             savedPaths.push(`${diretorio}/${f.path}`);
+        }
+
+        // v10.0: Gerar plano de orquestração automático
+        try {
+            const { getFluxoComStitch } = await import("../flows/types.js");
+            const fluxo = getFluxoComStitch(nivelFinal, estado.usar_stitch);
+            const planDoc = gerarPlanoOrquestracao(fluxo, nivelFinal, args.nome);
+            const planPath = `${diretorio}/docs/00-setup/plano-orquestracao.md`;
+            await saveFile(planPath, planDoc);
+            savedPaths.push(planPath);
+            console.log(`[iniciar-projeto] v10.0: Plano de orquestração gerado: ${planPath}`);
+        } catch (planErr) {
+            console.warn('[iniciar-projeto] v10.0: Falha ao gerar plano de orquestração:', planErr);
         }
     } catch (err) {
         console.error('[iniciar-projeto] Erro ao salvar arquivos:', err);

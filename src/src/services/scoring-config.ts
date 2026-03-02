@@ -34,26 +34,27 @@ export const SCORE_WEIGHTS: Record<PhaseCategory, ScoreWeights> = {
  * Se a fase não for encontrada, usa 'documento' como default.
  */
 const PHASE_CATEGORY_MAP: Record<string, PhaseCategory> = {
-    // Documentos
+    // Documentos (produto e requisitos)
+    'Discovery': 'documento',
     'Produto': 'documento',
     'PRD': 'documento',
     'Requisitos': 'documento',
-    'Requisitos Técnicos': 'documento',
 
-    // Design
-    'UX/UI': 'design',
+    // Design (visual e técnico)
     'Design': 'design',
+    'Design Técnico': 'design',
     'Arquitetura': 'design',
-    'Arquitetura Técnica': 'design',
+    'Modelo de Domínio': 'design',
+    'Contrato API': 'design',
+    'Planejamento': 'documento',
     'Prototipagem': 'design',
 
-    // Código
-    'Backend': 'codigo',
+    // Código (implementação e deploy)
     'Frontend': 'codigo',
+    'Backend': 'codigo',
     'Integração': 'codigo',
-    'Testes': 'codigo',
-    'Deploy': 'codigo',
-    'Implementação': 'codigo',
+    'Integração & Deploy': 'codigo',
+    'Deploy & Operação': 'codigo',
 };
 
 /**
