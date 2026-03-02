@@ -40,8 +40,10 @@ const PHASE_CATEGORY_MAP: Record<string, PhaseCategory> = {
     'PRD': 'documento',
     'Requisitos': 'documento',
 
-    // Design (visual e técnico)
+    // Design (visual e técnico) — inclui aliases de nomes v9
     'Design': 'design',
+    'UX/UI': 'design',
+    'UX Design': 'design',
     'Design Técnico': 'design',
     'Arquitetura': 'design',
     'Modelo de Domínio': 'design',

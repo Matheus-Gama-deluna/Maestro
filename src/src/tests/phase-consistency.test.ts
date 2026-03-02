@@ -19,12 +19,13 @@ import {
 
 describe('Phase Consistency (v9.0)', () => {
     describe('CODE_PHASE_NAMES', () => {
-        it('contém exatamente Frontend, Backend, Integração, Deploy Final', () => {
+        it('contém exatamente Frontend, Backend, Integração & Deploy, Integração, Deploy & Operação (v10)', () => {
             expect(CODE_PHASE_NAMES).toContain('Frontend');
             expect(CODE_PHASE_NAMES).toContain('Backend');
+            expect(CODE_PHASE_NAMES).toContain('Integração & Deploy');
             expect(CODE_PHASE_NAMES).toContain('Integração');
-            expect(CODE_PHASE_NAMES).toContain('Deploy Final');
-            expect(CODE_PHASE_NAMES).toHaveLength(4);
+            expect(CODE_PHASE_NAMES).toContain('Deploy & Operação');
+            expect(CODE_PHASE_NAMES).toHaveLength(5);
         });
 
         it('NÃO contém fases de documento', () => {
@@ -43,17 +44,19 @@ describe('Phase Consistency (v9.0)', () => {
             expect(CODE_PHASE_NAMES).not.toContain('Testes');
         });
 
-        it('Deploy Final é fase de código', () => {
-            expect(CODE_PHASE_NAMES).toContain('Deploy Final');
+        it('Deploy & Operação é fase de código (v10)', () => {
+            expect(CODE_PHASE_NAMES).toContain('Deploy & Operação');
+            expect(CODE_PHASE_NAMES).not.toContain('Deploy Final');
         });
     });
 
     describe('isCodePhaseName', () => {
-        it('retorna true para fases de código', () => {
+        it('retorna true para fases de código (v10)', () => {
             expect(isCodePhaseName('Frontend')).toBe(true);
             expect(isCodePhaseName('Backend')).toBe(true);
             expect(isCodePhaseName('Integração')).toBe(true);
-            expect(isCodePhaseName('Deploy Final')).toBe(true);
+            expect(isCodePhaseName('Integração & Deploy')).toBe(true);
+            expect(isCodePhaseName('Deploy & Operação')).toBe(true);
         });
 
         it('retorna true para nomes parciais (includes)', () => {
@@ -101,11 +104,15 @@ describe('Phase Consistency (v9.0)', () => {
             expect(PHASE_TYPE_MAP['Produto']).toBe('input_required');
         });
 
-        it('fases derivadas são derived', () => {
+        it('fases derivadas são derived (v10)', () => {
             expect(PHASE_TYPE_MAP['Requisitos']).toBe('derived');
-            expect(PHASE_TYPE_MAP['UX Design']).toBe('derived');
             expect(PHASE_TYPE_MAP['Arquitetura']).toBe('derived');
-            expect(PHASE_TYPE_MAP['Backlog']).toBe('derived');
+            expect(PHASE_TYPE_MAP['Design']).toBe('derived');
+            expect(PHASE_TYPE_MAP['Design Técnico']).toBe('derived');
+            expect(PHASE_TYPE_MAP['Planejamento']).toBe('derived');
+            // Fases removidas na v10
+            expect(PHASE_TYPE_MAP['UX Design']).toBeUndefined();
+            expect(PHASE_TYPE_MAP['Backlog']).toBeUndefined();
         });
 
         it('valores são apenas input_required, derived ou technical', () => {

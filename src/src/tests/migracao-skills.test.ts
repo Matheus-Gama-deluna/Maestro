@@ -73,24 +73,24 @@ describe("Migração de maestro:// para Skills", () => {
 
     describe("Mapeamento de fases para skills", () => {
         
-        it("deve mapear fase 'Produto' para skill", () => {
+        it("deve mapear fase 'Produto' para skill (v10)", () => {
             const skill = getSkillParaFase("Produto");
-            expect(skill).toBe("specialist-gestao-produto");
+            expect(skill).toBe("specialist-product");
         });
 
-        it("deve mapear fase 'Requisitos' para skill", () => {
+        it("deve mapear fase 'Requisitos' para skill (v10)", () => {
             const skill = getSkillParaFase("Requisitos");
-            expect(skill).toBe("specialist-engenharia-requisitos-ia");
+            expect(skill).toBe("specialist-requirements");
         });
 
-        it("deve mapear fase 'UX Design' para skill", () => {
+        it("fase 'UX Design' foi removida na v10 — retorna null", () => {
             const skill = getSkillParaFase("UX Design");
-            expect(skill).toBe("specialist-ux-design");
+            expect(skill).toBeNull();
         });
 
-        it("deve mapear fase 'Arquitetura' para skill", () => {
+        it("deve mapear fase 'Arquitetura' para skill (v10)", () => {
             const skill = getSkillParaFase("Arquitetura");
-            expect(skill).toBe("specialist-arquitetura-software");
+            expect(skill).toBe("specialist-architect");
         });
 
         it("deve verificar se fase tem skill associada", () => {
@@ -107,10 +107,10 @@ describe("Migração de maestro:// para Skills", () => {
 
     describe("Geração de instruções com skills", () => {
         
-        it("deve gerar instrução de recursos para fase com skill", () => {
+        it("deve gerar instrução de recursos para fase com skill (v10)", () => {
             const instrucao = gerarInstrucaoRecursos("Produto", "AÇÃO OBRIGATÓRIA", "windsurf");
             
-            expect(instrucao).toContain("specialist-gestao-produto");
+            expect(instrucao).toContain("specialist-product");
             expect(instrucao).toContain("SKILL.md");
             expect(instrucao).toContain("Templates");
             expect(instrucao).toContain("Checklists");
@@ -118,21 +118,21 @@ describe("Migração de maestro:// para Skills", () => {
             expect(instrucao).not.toContain("maestro://");
         });
 
-        it("deve gerar instrução compacta para fase com skill", () => {
+        it("deve gerar instrução compacta para fase com skill (v10)", () => {
             const instrucao = gerarInstrucaoRecursosCompacta("Requisitos", "windsurf");
             
-            expect(instrucao).toContain("specialist-engenharia-requisitos-ia");
+            expect(instrucao).toContain("specialist-requirements");
             expect(instrucao).toContain("SKILL.md");
             expect(instrucao).toContain("Templates");
             expect(instrucao).not.toContain("maestro://");
         });
 
-        it("deve gerar instrução para próxima fase", () => {
-            const instrucao = gerarInstrucaoProximaFase("UX Design", "windsurf");
+        it("deve gerar instrução para próxima fase com Design (v10)", () => {
+            const instrucao = gerarInstrucaoProximaFase("Design", "windsurf");
             
-            expect(instrucao).toContain("specialist-ux-design");
+            expect(instrucao).toContain("specialist-design");
             expect(instrucao).toContain("PRÓXIMA FASE");
-            expect(instrucao).toContain("UX Design");
+            expect(instrucao).toContain("Design");
             expect(instrucao).not.toContain("maestro://");
         });
 

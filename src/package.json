@@ -1,7 +1,7 @@
 {
   "name": "@maestro-ai/mcp-server",
-  "version": "5.7.0",
-  "description": "MCP Server do Maestro v2.0 com otimizações, frontend-first e gerenciamento de tarefas",
+  "version": "6.0.0",
+  "description": "MCP Server do Maestro v6.0 com fluxos enxutos, especialistas dedicados e gates consolidados",
   "type": "module",
   "main": "dist/stdio.js",
   "bin": {

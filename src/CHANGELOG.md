@@ -6,6 +6,25 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.
 
 ---
 
+## [6.0.0] - 2026-03-02
+
+### 🎯 Fluxos Enxutos e Especialistas Dedicados (v10 → v6 Consolidada)
+- **Consolidação de Fases:** Redução de 17 fases para 11 fases no fluxo complexo, 8 no médio e 5 no simples
+- **Novas Fases:** Discovery, Design, Design Técnico, Planejamento — mais focadas e objetivas
+- **Fases Unificadas:** "Integração & Deploy" e "Deploy & Operação" consolidam etapas técnicas finais
+- **Fases Removidas:** UX Design (agora parte de Design), Backlog (parte de Planejamento), Testes/Segurança/Performance (especialistas on-demand)
+
+### 🧠 Especialistas como Skills (v2.0 → v6)
+- **9 Novas Skills:** `specialist-discovery`, `specialist-design`, `specialist-technical-design`, `specialist-planning`, `specialist-product`, `specialist-requirements`, `specialist-domain`, `specialist-api-contract`, `specialist-operations`
+- **Estrutura Padronizada:** Cada skill com `SKILL.md`, `resources/templates/`, `resources/checklists/`, `resources/reference/`
+- **Mapeamento Centralizado:** `FASE_SKILL_MAP` em `prompt-mapper.ts` conecta fases a skills
+
+### 🏗️ Governança de Versão
+- **Versão Unificada:** Alinhamento de todos os artefatos para 6.0.0
+- **Testes Atualizados:** 13 testes corrigidos para refletir estrutura v6.0.0
+
+---
+
 ## [5.7.0] - 2026-02-27
 
 ### 🏗️ Governança e Consistência

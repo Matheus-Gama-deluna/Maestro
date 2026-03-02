@@ -1,13 +1,13 @@
-# MCP Maestro v5.7.0
+# MCP Maestro v6.0.0
 
 Servidor **MCP (Model Context Protocol)** autônomo. Uma orquestração "Fat MCP" para desenvolvimento assistido por IA com **Zero-API approach**, auto-correção, TDD Invertido e pipelines nativos.
 
 [![Status](https://img.shields.io/badge/status-online-success)](https://maestro.deluna.dev.br/health)
 [![npm](https://img.shields.io/npm/v/@maestro-ai/mcp-server)](https://www.npmjs.com/package/@maestro-ai/mcp-server)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-5.7.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.0.0-blue)](CHANGELOG.md)
 
-## 🆕 Novidades v5.5 (V6)
+## 🆕 Novidades v6.0.0
 
 ### 🚀 Watcher Nativo Event-Driven (Sprint 5)
 - Ao invés de paradas bloqueantes a cada arquivo salvo, a `ValidationPipeline` agora corre local em background acionada por eventos `chokidar` do sistema operacional.
