@@ -24,7 +24,7 @@ export class StranglerOrchestrator {
         this.migrations.set(migrationId, fullMigration);
         await this.save(fullMigration);
 
-        console.log('[StranglerOrchestrator] Migração planejada:', migrationId);
+        console.error('[StranglerOrchestrator] Migração planejada:', migrationId);
 
         return fullMigration;
     }
@@ -46,7 +46,7 @@ export class StranglerOrchestrator {
 
         await this.save(migration);
 
-        console.log('[StranglerOrchestrator] Fase iniciada:', phaseId);
+        console.error('[StranglerOrchestrator] Fase iniciada:', phaseId);
 
         // Simular execução
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -56,7 +56,7 @@ export class StranglerOrchestrator {
 
         await this.save(migration);
 
-        console.log('[StranglerOrchestrator] Fase completada:', phaseId);
+        console.error('[StranglerOrchestrator] Fase completada:', phaseId);
     }
 
     async monitorMetrics(migrationId: string): Promise<CutoverMetrics> {
@@ -87,18 +87,18 @@ export class StranglerOrchestrator {
             throw new Error(`Migração não encontrada: ${migrationId}`);
         }
 
-        console.log('[StranglerOrchestrator] Iniciando rollback:', reason);
+        console.error('[StranglerOrchestrator] Iniciando rollback:', reason);
 
         migration.status = 'rolled-back';
 
         for (const step of migration.rollbackPlan.steps) {
-            console.log(`[StranglerOrchestrator] Executando rollback step ${step.order}: ${step.description}`);
+            console.error(`[StranglerOrchestrator] Executando rollback step ${step.order}: ${step.description}`);
             await new Promise(resolve => setTimeout(resolve, 50));
         }
 
         await this.save(migration);
 
-        console.log('[StranglerOrchestrator] Rollback completado');
+        console.error('[StranglerOrchestrator] Rollback completado');
     }
 
     private async save(migration: StranglerMigration): Promise<void> {

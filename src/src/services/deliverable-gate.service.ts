@@ -116,7 +116,7 @@ export async function validateDeliverableForGate(
     );
     const qualityScore = scoreContextual.score;
 
-    console.log(`[deliverable-gate] Score granular — overallScore=${validationResult.overallScore}, checklistScore=${checklistScore.toFixed(0)}%, tamanhoScore=${tamanhoScore}, qualityScore=${qualityScore}, itens=${itensValidadosGranular.length}✅/${itensPendentesGranular.length}❌`);
+    console.error(`[deliverable-gate] Score granular — overallScore=${validationResult.overallScore}, checklistScore=${checklistScore.toFixed(0)}%, tamanhoScore=${tamanhoScore}, qualityScore=${qualityScore}, itens=${itensValidadosGranular.length}✅/${itensPendentesGranular.length}❌`);
 
     return {
         qualityScore,

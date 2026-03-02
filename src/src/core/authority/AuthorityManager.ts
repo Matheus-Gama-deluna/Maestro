@@ -21,9 +21,9 @@ export class AuthorityManager {
             const configPath = path.join(process.cwd(), '.maestro', 'authority', 'preferences.json');
             const content = await fs.readFile(configPath, 'utf-8');
             this.config = JSON.parse(content);
-            console.log('[AuthorityManager] Preferências carregadas');
+            console.error('[AuthorityManager] Preferências carregadas');
         } catch {
-            console.log('[AuthorityManager] Usando configuração padrão');
+            console.error('[AuthorityManager] Usando configuração padrão');
         }
     }
 
@@ -34,7 +34,7 @@ export class AuthorityManager {
             
             const configPath = path.join(configDir, 'preferences.json');
             await fs.writeFile(configPath, JSON.stringify(this.config, null, 2));
-            console.log('[AuthorityManager] Preferências salvas');
+            console.error('[AuthorityManager] Preferências salvas');
         } catch (error) {
             console.error('[AuthorityManager] Erro ao salvar preferências:', error);
         }

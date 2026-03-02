@@ -78,7 +78,7 @@ export async function deploySkillsToProject(
         }
     }
     
-    console.log(`[skill-deployer] ${deployedSkills.length}/${requiredSkills.size} skills deployadas para ${ide} em ${projectDir}`);
+    console.error(`[skill-deployer] ${deployedSkills.length}/${requiredSkills.size} skills deployadas para ${ide} em ${projectDir}`);
     return deployedSkills;
 }
 

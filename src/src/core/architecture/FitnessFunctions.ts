@@ -52,12 +52,12 @@ export class FitnessFunctions {
      * Valida todas as regras arquiteturais
      */
     async validateAll(project: ProjectStructure): Promise<FitnessResult> {
-        console.log('[FitnessFunctions] Validando arquitetura do projeto');
+        console.error('[FitnessFunctions] Validando arquitetura do projeto');
 
         const results: RuleResult[] = [];
 
         for (const rule of this.rules) {
-            console.log(`[FitnessFunctions] Executando regra: ${rule.name}`);
+            console.error(`[FitnessFunctions] Executando regra: ${rule.name}`);
             
             try {
                 const result = await rule.validate(project);

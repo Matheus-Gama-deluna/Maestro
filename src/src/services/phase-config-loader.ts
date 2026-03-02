@@ -64,7 +64,7 @@ export async function loadPhaseConfig(
     }
 
     if (!skillContent) {
-        console.log(`[phase-config-loader] Skill ${skillName} não encontrada no disco — usando fallback`);
+        console.error(`[phase-config-loader] Skill ${skillName} não encontrada no disco — usando fallback`);
         return createFallbackConfig(faseInfo, diretorio);
     }
 

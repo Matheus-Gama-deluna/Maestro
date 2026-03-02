@@ -5,7 +5,7 @@ import type { BoundedContext, Entity } from './types.js';
  */
 export class ContextDetector {
     async detectContexts(projectPath: string): Promise<BoundedContext[]> {
-        console.log('[ContextDetector] Detectando contextos em:', projectPath);
+        console.error('[ContextDetector] Detectando contextos em:', projectPath);
 
         const contexts: BoundedContext[] = [];
 
@@ -17,7 +17,7 @@ export class ContextDetector {
         const aggregateContexts = await this.analyzeAggregates(projectPath);
         contexts.push(...aggregateContexts);
 
-        console.log('[ContextDetector] Contextos detectados:', contexts.length);
+        console.error('[ContextDetector] Contextos detectados:', contexts.length);
 
         return contexts;
     }

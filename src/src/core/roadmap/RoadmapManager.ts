@@ -30,7 +30,7 @@ export class RoadmapManager {
         this.roadmaps.set(roadmapId, roadmap);
         await this.save(roadmap);
 
-        console.log('[RoadmapManager] Roadmap criado:', roadmapId);
+        console.error('[RoadmapManager] Roadmap criado:', roadmapId);
 
         return roadmap;
     }
@@ -52,7 +52,7 @@ export class RoadmapManager {
 
         await this.save(roadmap);
 
-        console.log('[RoadmapManager] Milestone atualizado:', milestoneId);
+        console.error('[RoadmapManager] Milestone atualizado:', milestoneId);
     }
 
     getProgress(roadmapId: string): RoadmapMetrics {
@@ -92,7 +92,7 @@ export class RoadmapManager {
             const filepath = path.join(roadmapDir, `${roadmap.id}.json`);
             await fs.writeFile(filepath, JSON.stringify(roadmap, null, 2));
 
-            console.log('[RoadmapManager] Roadmap salvo:', filepath);
+            console.error('[RoadmapManager] Roadmap salvo:', filepath);
         } catch (error) {
             console.error('[RoadmapManager] Erro ao salvar:', error);
         }

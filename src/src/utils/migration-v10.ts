@@ -116,7 +116,7 @@ export function migrateStateV9toV10(estado: EstadoProjeto): EstadoProjeto {
     (migrated as any)._migrated_from = `v9_${estado.total_fases}fases`;
     (migrated as any)._migrated_at = new Date().toISOString();
     
-    console.log(`[migration-v10] Migrado: ${estado.total_fases} fases → ${migrated.total_fases} fases, fase_atual: ${estado.fase_atual} → ${migrated.fase_atual}`);
+    console.error(`[migration-v10] Migrado: ${estado.total_fases} fases → ${migrated.total_fases} fases, fase_atual: ${estado.fase_atual} → ${migrated.fase_atual}`);
     
     return migrated;
 }

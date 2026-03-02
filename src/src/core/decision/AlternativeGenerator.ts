@@ -13,7 +13,7 @@ export class AlternativeGenerator {
      * Gera alternativas para uma situação
      */
     async generate(situation: Situation): Promise<Alternative[]> {
-        console.log('[AlternativeGenerator] Gerando alternativas para:', situation.operation);
+        console.error('[AlternativeGenerator] Gerando alternativas para:', situation.operation);
 
         const alternatives: Alternative[] = [];
 

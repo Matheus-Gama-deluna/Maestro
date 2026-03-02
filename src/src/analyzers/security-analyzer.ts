@@ -124,7 +124,7 @@ const SECURITY_RULES: SecurityRule[] = [
         description: "Console.log pode expor informações sensíveis",
         severity: "low",
         pattern: /console\.(log|debug|info)\s*\(/i,
-        suggestion: "Remova console.log ou use logger com níveis",
+        suggestion: "Remova console.error ou use logger com níveis",
         references: [],
     },
     {

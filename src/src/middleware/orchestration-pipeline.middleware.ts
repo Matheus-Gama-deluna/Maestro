@@ -42,8 +42,6 @@ export function applyOrchestrationPipeline(
     toolName: string,
     handler: ToolHandler
 ): ToolHandler {
-    console.log(`[OrchestrationPipeline] Registering tool: ${toolName}`);
-
     // V6 Sprint 2: withCompulsoryStateGuard é o PRIMEIRO middleware da cadeia.
     // Bloqueia tools não-permitidas quando `em_estado_compulsorio = true`,
     // antes de qualquer outra lógica ser executada.
@@ -77,11 +75,6 @@ export function applyLightOrchestrationPipeline(
     toolName: string,
     handler: ToolHandler
 ): ToolHandler {
-    console.warn(
-        `[OrchestrationPipeline] DEPRECATED: applyLightOrchestrationPipeline used for ${toolName}. ` +
-        `Use applyOrchestrationPipeline instead.`
-    );
-
     // Mesmo comportamento — não há mais "light" vs "full"
     return applyOrchestrationPipeline(toolName, handler);
 }

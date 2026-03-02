@@ -1,7 +1,8 @@
-# Roadmap de Implementação — Maestro v10
+# Roadmap de Implementação — Maestro v6.0.0
 
-> **Data:** 2026-03-01  
-> **Base:** `ANALISE_CRITICA_FASES_E_SKILLS_v9.md`, `ROADMAP_NOVAS_SKILLS_ESPECIALISTAS_v10.md`, `ANALISE_CRITICA_PROPOSTAS_ORQUESTRACAO_V9.md`  
+> **Data:** 2026-03-02  
+> **Versão:** 6.0.0  
+> **Base:** Skills especialistas implementados, fluxos enxutos em `flows/types.ts`  
 > **Princípio:** Skills primeiro → Fases depois → Integração por último
 
 ---
@@ -20,9 +21,9 @@ Atualizar o código do Maestro para usar os novos fluxos, corrigir gaps identifi
 
 | Parte | Sprints | Esforço | Resultado |
 |-------|---------|---------|-----------|
-| Parte 1 — Skills | 1-6 | ~72h | 14 skills completas com recursos |
+| Parte 1 — Skills | 1-6 | ~72h | 9 skills completas com recursos |
 | Parte 2 — Sistema | 7-10 | ~45h | Código integrado e testado |
-| **TOTAL** | **10 sprints** | **~117h** | **v10 funcional** |
+| **TOTAL** | **10 sprints** | **~117h** | **v6.0.0 funcional** |
 
 ---
 

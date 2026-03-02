@@ -1,7 +1,8 @@
-# Roadmap de Refatoração do Sistema — Maestro v10
+# Roadmap de Refatoração do Sistema — Maestro v6.0.0
 
-> **Data:** 2026-03-01  
-> **Pré-requisito:** Sprints 1-7 concluídos (13 skills criadas, `flows/types.ts` reescrito)  
+> **Data:** 2026-03-02  
+> **Versão:** 6.0.0  
+> **Pré-requisito:** Skills criadas, `flows/types.ts` reescrito com fluxos enxutos  
 > **Escopo:** 3 sprints de refatoração de código + 1 sprint de deploy/migração  
 > **Risco:** ALTO — toca em arquivos core do sistema
 
@@ -11,10 +12,10 @@
 
 | Sprint | Foco | Esforço | Risco | Arquivos Afetados |
 |--------|------|---------|-------|-------------------|
-| **Sprint 8** | Atualizar `prompt-mapper.ts` + Readiness Gate | ~6h | Médio | 3 arquivos |
-| **Sprint 9** | Generalizar Specialist Handler para todas as fases | ~12h | Alto | 4 arquivos |
-| **Sprint 10** | Refatorar `proximo.ts` + Fix delegação duplicada | ~10h | Alto | 5 arquivos |
-| **Sprint 11** | Deploy de skills + Migração + Testes | ~8h | Médio | 3 arquivos + scripts |
+| **Sprint 1** | Atualizar `prompt-mapper.ts` + Readiness Gate | ~6h | Médio | 3 arquivos |
+| **Sprint 2** | Generalizar Specialist Handler para todas as fases | ~12h | Alto | 4 arquivos |
+| **Sprint 3** | Refatorar `proximo.ts` + Fix delegação duplicada | ~10h | Alto | 5 arquivos |
+| **Sprint 4** | Deploy de skills + Migração + Testes | ~8h | Médio | 3 arquivos + scripts |
 | **TOTAL** | | **~36h** | | |
 
 ---

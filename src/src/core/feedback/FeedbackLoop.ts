@@ -7,7 +7,7 @@ import * as path from 'path';
  */
 export class FeedbackLoop {
     async recordOutcome(outcome: Outcome): Promise<void> {
-        console.log('[FeedbackLoop] Registrando resultado:', outcome.operation);
+        console.error('[FeedbackLoop] Registrando resultado:', outcome.operation);
 
         try {
             const loopsDir = path.join(process.cwd(), '.maestro', 'feedback', 'loops');

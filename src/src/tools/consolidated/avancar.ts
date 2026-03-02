@@ -293,7 +293,7 @@ export async function avancar(args: AvancarArgs): Promise<ToolResult> {
                 // Score >= 80 ou aprovação manual: marcar como aprovado
                 estado.readiness_approved = true;
                 estado.readiness_score = readiness.score;
-                console.log(`[avancar] v10.0: Readiness Gate aprovado (score: ${readiness.score})`);
+                console.error(`[avancar] v10.0: Readiness Gate aprovado (score: ${readiness.score})`);
             } catch (err) {
                 // Best-effort — não bloqueia o fluxo se readiness gate falhar
                 console.warn('[avancar] v10.0: Readiness Gate falhou (non-blocking):', err);

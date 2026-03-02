@@ -164,7 +164,7 @@ ${decision.reasoning}
         }
 
         // Para outros níveis, apenas loga (não bloqueia)
-        console.log(`[Autonomia v6.3] fase=${estado.fase_atual} nome=${nomeFase} confianca=${Math.round(decision.confidence * 100)}% risco=${riskInfo.level} acao=${decision.action}`);
+        console.error(`[Autonomia v6.3] fase=${estado.fase_atual} nome=${nomeFase} confianca=${Math.round(decision.confidence * 100)}% risco=${riskInfo.level} acao=${decision.action}`);
 
     } catch (err) {
         // Best-effort — nunca bloqueia o fluxo
@@ -309,7 +309,7 @@ proximo(
                             entregavel = conteudoDisco;
                             entregavelLidoDoDisco = true;
                             caminhoResolvido = pathDoDisco;
-                            console.log(`[proximo] v6.6 FIX #4: Entregável lido do disco (${conteudoDisco.length} chars): ${pathDoDisco}`);
+                            console.error(`[proximo] v6.6 FIX #4: Entregável lido do disco (${conteudoDisco.length} chars): ${pathDoDisco}`);
                         }
                     } catch (err) {
                         // Arquivo não encontrado ou erro de leitura — usar args.entregavel como fallback
@@ -491,7 +491,7 @@ ${instrucoesSkill}
             estado.em_estado_compulsorio = false;
             estado.motivo_bloqueio = undefined;
             // Manter score_bloqueado para calcular delta depois
-            console.log(`[proximo] v6.6 FIX #1: Re-validando entregável (score anterior: ${scoreAnterior}). Flag aguardando_aprovacao resetado.`);
+            console.error(`[proximo] v6.6 FIX #1: Re-validando entregável (score anterior: ${scoreAnterior}). Flag aguardando_aprovacao resetado.`);
             // Continua para o fluxo de validação abaixo ↓
         } else {
             // Sem novo entregável — manter bloqueio e mostrar instruções
@@ -702,14 +702,14 @@ Carregue e leia a skill antes de gerar o entregável:
     let estruturaResult: { score: number; tamanho_ok: boolean; secoes_faltando: string[] };
 
     if (args.skip_validation) {
-        console.log(`[proximo] v10.0: skip_validation=true — code-validator já aprovou, pulando validateDeliverable`);
+        console.error(`[proximo] v10.0: skip_validation=true — code-validator já aprovou, pulando validateDeliverable`);
         qualityScore = 100;
         gateResultado = { valido: true, itens_validados: faseAtual.gate_checklist || [], itens_pendentes: [], sugestoes: [] };
         estruturaResult = { score: 100, tamanho_ok: true, secoes_faltando: [] };
     } else {
         // v9.0: Validação de gate delegada ao deliverable-gate.service.ts
         const tier = estado.tier_gate || "base";
-        console.log(`[proximo] Iniciando validateDeliverable (fase: ${faseAtual.nome}, tier: ${tier})`);
+        console.error(`[proximo] Iniciando validateDeliverable (fase: ${faseAtual.nome}, tier: ${tier})`);
 
         try {
             const validation = await validateDeliverableForGate({
@@ -744,7 +744,7 @@ Se o erro persistir, contate o suporte técnico.`,
         }
     }
 
-    console.log(`[proximo] validateDeliverable completo — Score: ${qualityScore}/100`);
+    console.error(`[proximo] validateDeliverable completo — Score: ${qualityScore}/100`);
 
     // v6.6 MELHORIA #6: Calcular delta de score para feedback incremental
     const scoreAnteriorDelta = estado.score_bloqueado;
@@ -1094,14 +1094,14 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
                         ...(estado.tasks || []).filter(t => t.phase !== estado.fase_atual + 1),
                         ...newTasks,
                     ];
-                    console.log(`[proximo] v8.0: ${newTasks.length} tasks geradas do BACKLOG para fase ${estado.fase_atual + 1} (${proximaFaseInfo2?.nome})`);
+                    console.error(`[proximo] v8.0: ${newTasks.length} tasks geradas do BACKLOG para fase ${estado.fase_atual + 1} (${proximaFaseInfo2?.nome})`);
                 }
             } else if (entregavelValidado) {
                 // Fallback: usar decomposição por H2/H3 do entregável anterior
                 const newTasks = decomposeArchitectureToTasks(entregavelValidado, estado.fase_atual + 1);
                 if (newTasks.length > 0) {
                     estado.tasks = [...(estado.tasks || []), ...newTasks];
-                    console.log(`[proximo] v6.5 fallback: ${newTasks.length} tasks geradas da arquitetura para fase ${estado.fase_atual + 1}`);
+                    console.error(`[proximo] v6.5 fallback: ${newTasks.length} tasks geradas da arquitetura para fase ${estado.fase_atual + 1}`);
                 }
             }
         } catch (err) {
@@ -1184,7 +1184,7 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
             // Atualizar flow_phase_type da próxima fase no estado (Sprint 6)
             estado.flow_phase_type = PHASE_TYPE_MAP[proximaFase.nome] ?? 'derived';
             if (gateOrientationPath) {
-                console.log(`[proximo] Guia de Gate gerado: ${gateOrientationPath}`);
+                console.error(`[proximo] Guia de Gate gerado: ${gateOrientationPath}`);
             }
         } catch (error) {
             console.warn('[proximo] Falha ao gerar orientação de gate (não crítico):', error);
@@ -1206,8 +1206,8 @@ ${criterios.slice(0, 5).map(c => `- ${c}`).join("\n")}
             gateChecklist: proximaFase.gate_checklist || [],
             onValidationResult: (score, feedback, filePath) => {
                 // Log no console — o usuário será notificado via IDE ao chamar executar
-                console.log(`\n==========================================\n[watcher] ${proximaFase.nome} | Score: ${score} | ${filePath}`);
-                if (score >= 0) console.log(`[watcher] Feedback:\n${feedback}\n==========================================\n`);
+                console.error(`\n==========================================\n[watcher] ${proximaFase.nome} | Score: ${score} | ${filePath}`);
+                if (score >= 0) console.error(`[watcher] Feedback:\n${feedback}\n==========================================\n`);
             }
         }).catch(err => console.warn('[watcher] Não foi possível iniciar o watcher:', err));
     }

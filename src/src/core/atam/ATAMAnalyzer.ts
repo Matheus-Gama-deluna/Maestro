@@ -44,7 +44,7 @@ export class ATAMAnalyzer {
         };
 
         this.sessions.set(sessionId, session);
-        console.log('[ATAMAnalyzer] Sessão criada:', sessionId);
+        console.error('[ATAMAnalyzer] Sessão criada:', sessionId);
 
         return session;
     }
@@ -69,7 +69,7 @@ export class ATAMAnalyzer {
         }
 
         session.tradeoffs = tradeoffs;
-        console.log('[ATAMAnalyzer] Trade-offs identificados:', tradeoffs.length);
+        console.error('[ATAMAnalyzer] Trade-offs identificados:', tradeoffs.length);
 
         return tradeoffs;
     }
@@ -159,7 +159,7 @@ export class ATAMAnalyzer {
             this.riskRegistry.registerRisk(risk);
         }
 
-        console.log('[ATAMAnalyzer] Riscos identificados:', risks.length);
+        console.error('[ATAMAnalyzer] Riscos identificados:', risks.length);
 
         return risks;
     }
@@ -206,7 +206,7 @@ export class ATAMAnalyzer {
 
         session.recommendations = recommendations.map(r => r.description);
 
-        console.log('[ATAMAnalyzer] Recomendações geradas:', recommendations.length);
+        console.error('[ATAMAnalyzer] Recomendações geradas:', recommendations.length);
 
         return recommendations;
     }
@@ -220,7 +220,7 @@ export class ATAMAnalyzer {
         session.status = 'completed';
         await this.saveSession(session);
         
-        console.log('[ATAMAnalyzer] Sessão completada:', sessionId);
+        console.error('[ATAMAnalyzer] Sessão completada:', sessionId);
     }
 
     private async saveSession(session: ATAMSession): Promise<void> {
@@ -231,7 +231,7 @@ export class ATAMAnalyzer {
             const filepath = path.join(sessionsDir, `${session.id}.json`);
             await fs.writeFile(filepath, JSON.stringify(session, null, 2));
             
-            console.log('[ATAMAnalyzer] Sessão salva:', filepath);
+            console.error('[ATAMAnalyzer] Sessão salva:', filepath);
         } catch (error) {
             console.error('[ATAMAnalyzer] Erro ao salvar sessão:', error);
         }

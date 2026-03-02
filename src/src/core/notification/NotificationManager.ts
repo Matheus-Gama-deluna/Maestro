@@ -4,13 +4,13 @@
  */
 export class NotificationManager {
     async notify(notification: Notification): Promise<void> {
-        console.log(`[NotificationManager] ${notification.type.toUpperCase()}: ${notification.message}`);
+        console.error(`[NotificationManager] ${notification.type.toUpperCase()}: ${notification.message}`);
         
         // Em produção, poderia enviar para UI, email, etc.
     }
 
     async requestApproval(request: ApprovalRequest): Promise<boolean> {
-        console.log('[NotificationManager] Solicitando aprovação:', request.operation);
+        console.error('[NotificationManager] Solicitando aprovação:', request.operation);
         
         // Em produção, aguardaria resposta do usuário
         return false;

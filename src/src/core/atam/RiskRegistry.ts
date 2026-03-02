@@ -16,7 +16,7 @@ export class RiskRegistry {
 
     registerRisk(risk: Risk): void {
         this.risks.set(risk.id, risk);
-        console.log('[RiskRegistry] Risco registrado:', risk.id);
+        console.error('[RiskRegistry] Risco registrado:', risk.id);
     }
 
     registerMitigation(mitigation: Mitigation): void {
@@ -24,7 +24,7 @@ export class RiskRegistry {
             this.mitigations.set(mitigation.riskId, []);
         }
         this.mitigations.get(mitigation.riskId)!.push(mitigation);
-        console.log('[RiskRegistry] Mitigação registrada:', mitigation.id);
+        console.error('[RiskRegistry] Mitigação registrada:', mitigation.id);
     }
 
     getRisk(riskId: string): Risk | undefined {
@@ -73,7 +73,7 @@ export class RiskRegistry {
 
             const filepath = path.join(registryDir, 'registry.json');
             await fs.writeFile(filepath, JSON.stringify(data, null, 2));
-            console.log('[RiskRegistry] Registro salvo:', filepath);
+            console.error('[RiskRegistry] Registro salvo:', filepath);
         } catch (error) {
             console.error('[RiskRegistry] Erro ao salvar:', error);
         }
@@ -96,9 +96,9 @@ export class RiskRegistry {
                 this.mitigations.set(riskId, mits as Mitigation[]);
             }
 
-            console.log('[RiskRegistry] Registro carregado');
+            console.error('[RiskRegistry] Registro carregado');
         } catch {
-            console.log('[RiskRegistry] Nenhum registro anterior encontrado');
+            console.error('[RiskRegistry] Nenhum registro anterior encontrado');
         }
     }
 }

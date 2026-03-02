@@ -68,7 +68,7 @@ export async function startFileWatcher(config: WatcherConfig): Promise<void> {
         });
 
         activeWatchers.set(config.diretorio, { close: () => watcher.close() });
-        console.log(`[watcher] Monitorando: ${config.filePath}`);
+        console.error(`[watcher] Monitorando: ${config.filePath}`);
     } catch {
         // Fallback para fs.watch nativo se chokidar não estiver disponível
         console.warn('[watcher] chokidar não disponível, usando fs.watch nativo como fallback');
@@ -93,7 +93,7 @@ export function stopFileWatcher(diretorio: string): void {
     if (watcher) {
         watcher.close();
         activeWatchers.delete(diretorio);
-        console.log(`[watcher] Monitoramento encerrado para: ${diretorio}`);
+        console.error(`[watcher] Monitoramento encerrado para: ${diretorio}`);
     }
 }
 
@@ -113,7 +113,7 @@ async function runValidation(config: WatcherConfig): Promise<void> {
         const { readFile } = await import('fs/promises');
         const content = await readFile(config.filePath, 'utf-8');
 
-        console.log(`[watcher] Arquivo salvo, executando validação: ${config.filePath} (${content.length} chars)`);
+        console.error(`[watcher] Arquivo salvo, executando validação: ${config.filePath} (${content.length} chars)`);
 
         const { ValidationPipeline } = await import('../core/validation/ValidationPipeline.js');
         const pipeline = new ValidationPipeline();

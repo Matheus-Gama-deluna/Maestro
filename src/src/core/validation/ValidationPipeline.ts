@@ -96,7 +96,7 @@ export class ValidationPipeline {
         gateChecklist: string[] = []
     ): Promise<PipelineResult> {
         const startTime = new Date().toISOString();
-        console.log(`[ValidationPipeline] Validando entregável (fase: ${nomeFase}, tier: ${tier})`);
+        console.error(`[ValidationPipeline] Validando entregável (fase: ${nomeFase}, tier: ${tier})`);
 
         const deliverableContext: DeliverableContext = {
             projectPath: '',
@@ -132,11 +132,11 @@ export class ValidationPipeline {
         const results: LayerValidationResult[] = [];
         const startTime = new Date().toISOString();
 
-        console.log(`[ValidationPipeline] Iniciando validação (tier: ${tier})`);
+        console.error(`[ValidationPipeline] Iniciando validação (tier: ${tier})`);
 
         // Executar camadas sequencialmente
         for (const layer of this.layers) {
-            console.log(`[ValidationPipeline] Executando camada: ${layer.name}`);
+            console.error(`[ValidationPipeline] Executando camada: ${layer.name}`);
             
             try {
                 const result = await layer.validator.validate(code, context);
@@ -144,7 +144,7 @@ export class ValidationPipeline {
 
                 // Verificar se deve parar
                 if (!result.passed && layer.stopOnFailure) {
-                    console.log(`[ValidationPipeline] Parando pipeline - ${layer.name} falhou (crítico)`);
+                    console.error(`[ValidationPipeline] Parando pipeline - ${layer.name} falhou (crítico)`);
                     break;
                 }
             } catch (error) {
@@ -275,7 +275,7 @@ export class ValidationPipeline {
             const filepath = path.join(reportsDir, filename);
 
             await fs.writeFile(filepath, JSON.stringify(result, null, 2));
-            console.log(`[ValidationPipeline] Relatório salvo: ${filepath}`);
+            console.error(`[ValidationPipeline] Relatório salvo: ${filepath}`);
         } catch (error) {
             console.error('[ValidationPipeline] Erro ao salvar relatório:', error);
         }

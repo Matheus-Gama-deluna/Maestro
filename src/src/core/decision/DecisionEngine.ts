@@ -24,15 +24,15 @@ export class DecisionEngine {
      * Avalia situação e decide ação apropriada
      */
     async evaluate(situation: Situation): Promise<ActionDecision> {
-        console.log('[DecisionEngine] Avaliando situação:', situation.operation);
+        console.error('[DecisionEngine] Avaliando situação:', situation.operation);
 
         // 1. Calcular confiança
         const confidence = await this.confidenceCalculator.calculate(situation);
-        console.log(`[DecisionEngine] Confiança calculada: ${(confidence * 100).toFixed(1)}%`);
+        console.error(`[DecisionEngine] Confiança calculada: ${(confidence * 100).toFixed(1)}%`);
 
         // 2. Consultar matriz de decisão
         const action = this.matrix.getAction(situation.riskLevel, confidence);
-        console.log(`[DecisionEngine] Ação determinada: ${action}`);
+        console.error(`[DecisionEngine] Ação determinada: ${action}`);
 
         // 3. Gerar alternativas se necessário
         const alternatives = ['suggest_approve', 'require_approval'].includes(action)
@@ -55,14 +55,14 @@ export class DecisionEngine {
      * Registra decisão tomada para aprendizado
      */
     async recordDecision(decision: Decision): Promise<void> {
-        console.log('[DecisionEngine] Registrando decisão:', decision.operation);
+        console.error('[DecisionEngine] Registrando decisão:', decision.operation);
 
         // Salvar no histórico
         await this.saveDecisionHistory(decision);
 
         // Aprender com decisões do usuário
         if (decision.userOverride) {
-            console.log('[DecisionEngine] Aprendendo com override do usuário');
+            console.error('[DecisionEngine] Aprendendo com override do usuário');
             await this.confidenceCalculator.learn(decision);
         }
     }
@@ -140,7 +140,7 @@ export class DecisionEngine {
             const filepath = path.join(historyDir, filename);
 
             await fs.writeFile(filepath, JSON.stringify(decision, null, 2));
-            console.log(`[DecisionEngine] Decisão salva: ${filepath}`);
+            console.error(`[DecisionEngine] Decisão salva: ${filepath}`);
         } catch (error) {
             console.error('[DecisionEngine] Erro ao salvar decisão:', error);
         }

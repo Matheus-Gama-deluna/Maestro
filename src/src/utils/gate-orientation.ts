@@ -70,7 +70,7 @@ export async function generateGateOrientationDoc(
         await mkdir(dirname(outputPath), { recursive: true });
         await writeFile(outputPath, conteudo, 'utf-8');
 
-        console.log(`[gate-orientation] Guia de Gate criado: ${outputPath}`);
+        console.error(`[gate-orientation] Guia de Gate criado: ${outputPath}`);
         return outputPath;
     } catch (error) {
         console.warn(`[gate-orientation] Falha ao gerar orientação de gate:`, error);

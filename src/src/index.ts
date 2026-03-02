@@ -162,11 +162,11 @@ app.get("/mcp", (req, res) => {
     const endpointUrl = `/mcp?sessionId=${sessionId}`;
     res.write(`event: endpoint\ndata: ${endpointUrl}\n\n`);
 
-    console.log(`[SSE] Session created: ${sessionId}`);
+    console.error(`[SSE] Session created: ${sessionId}`);
 
     // Cleanup quando conexão fechar
     req.on("close", () => {
-        console.log(`[SSE] Session closed: ${sessionId}`);
+        console.error(`[SSE] Session closed: ${sessionId}`);
         clearInterval(heartbeatInterval);
         sessions.delete(sessionId);
     });
@@ -391,7 +391,7 @@ async function getPromptContent(name: string, args?: Record<string, string>) {
 // ============================================
 
 app.listen(PORT, () => {
-    console.log(`
+    console.error(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                    MCP MAESTRO v${MAESTRO_VERSION}                      ║
 ╠═══════════════════════════════════════════════════════════╣

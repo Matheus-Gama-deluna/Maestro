@@ -4,7 +4,7 @@
  */
 export class ImpactAnalyzer {
     async analyze(change: CodeChange): Promise<ImpactAnalysis> {
-        console.log('[ImpactAnalyzer] Analisando impacto:', change.file);
+        console.error('[ImpactAnalyzer] Analisando impacto:', change.file);
 
         const affectedFiles = await this.findAffectedFiles(change);
         const riskLevel = this.assessRisk(affectedFiles.length);

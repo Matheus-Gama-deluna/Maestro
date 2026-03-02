@@ -65,6 +65,6 @@ export class DecisionMatrix {
     updateThresholds(highThreshold: number, mediumThreshold: number): void {
         // Permite ajustar os thresholds dinamicamente
         // Por exemplo, se usuário quer IA mais conservadora, aumentar thresholds
-        console.log(`[DecisionMatrix] Thresholds atualizados: alta=${highThreshold}, média=${mediumThreshold}`);
+        console.error(`[DecisionMatrix] Thresholds atualizados: alta=${highThreshold}, média=${mediumThreshold}`);
     }
 }

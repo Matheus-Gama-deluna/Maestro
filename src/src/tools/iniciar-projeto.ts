@@ -568,7 +568,7 @@ ${stitchNote}
             const planPath = `${diretorio}/docs/00-setup/plano-orquestracao.md`;
             await saveFile(planPath, planDoc);
             savedPaths.push(planPath);
-            console.log(`[iniciar-projeto] v10.0: Plano de orquestração gerado: ${planPath}`);
+            console.error(`[iniciar-projeto] v10.0: Plano de orquestração gerado: ${planPath}`);
         } catch (planErr) {
             console.warn('[iniciar-projeto] v10.0: Falha ao gerar plano de orquestração:', planErr);
         }

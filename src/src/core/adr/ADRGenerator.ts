@@ -7,7 +7,7 @@ import * as path from 'path';
  */
 export class ADRGenerator {
     async generate(decision: ADRInput): Promise<string> {
-        console.log('[ADRGenerator] Gerando ADR:', decision.title);
+        console.error('[ADRGenerator] Gerando ADR:', decision.title);
 
         const adr = this.formatADR(decision);
         await this.save(adr, decision.title);
@@ -61,7 +61,7 @@ ${decision.references?.map(ref => `- ${ref}`).join('\n') || 'N/A'}
             const filepath = path.join(adrDir, filename);
 
             await fs.writeFile(filepath, adr);
-            console.log('[ADRGenerator] ADR salvo:', filepath);
+            console.error('[ADRGenerator] ADR salvo:', filepath);
         } catch (error) {
             console.error('[ADRGenerator] Erro ao salvar ADR:', error);
         }

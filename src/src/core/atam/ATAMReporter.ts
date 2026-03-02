@@ -7,7 +7,7 @@ import * as path from 'path';
  */
 export class ATAMReporter {
     async generateReport(session: ATAMSession): Promise<ATAMReport> {
-        console.log('[ATAMReporter] Gerando relatório para sessão:', session.id);
+        console.error('[ATAMReporter] Gerando relatório para sessão:', session.id);
 
         const qualityAnalysis = this.analyzeQuality(session);
         const tradeoffMatrix = this.buildTradeoffMatrix(session);
@@ -203,7 +203,7 @@ export class ATAMReporter {
             const mdPath = path.join(reportsDir, `${report.sessionId}.md`);
             await fs.writeFile(mdPath, markdown);
 
-            console.log('[ATAMReporter] Relatório salvo:', jsonPath);
+            console.error('[ATAMReporter] Relatório salvo:', jsonPath);
         } catch (error) {
             console.error('[ATAMReporter] Erro ao salvar relatório:', error);
         }

@@ -5,7 +5,7 @@ import type { ConsistencyModel, ConsistencyRequirements, ConsistencyImplementati
  */
 export class ConsistencyAnalyzer {
     analyzeRequirements(requirements: ConsistencyRequirements): ConsistencyModel {
-        console.log('[ConsistencyAnalyzer] Analisando requisitos para:', requirements.contextId);
+        console.error('[ConsistencyAnalyzer] Analisando requisitos para:', requirements.contextId);
 
         const type = this.selectConsistencyType(requirements);
         const implementation = this.selectImplementation(type, requirements);
@@ -19,7 +19,7 @@ export class ConsistencyAnalyzer {
             tests: []
         };
 
-        console.log('[ConsistencyAnalyzer] Modelo selecionado:', type);
+        console.error('[ConsistencyAnalyzer] Modelo selecionado:', type);
 
         return model;
     }

@@ -5,7 +5,7 @@ import type { GrowthProjection, TimeSeriesProjection, CapacityAlert, ScalingReco
  */
 export class GrowthProjector {
     async projectGrowth(metric: string, current: number, period: number = 12): Promise<GrowthProjection> {
-        console.log('[GrowthProjector] Projetando crescimento:', metric);
+        console.error('[GrowthProjector] Projetando crescimento:', metric);
 
         const projections = this.generateProjections(current, period);
         const alerts = this.generateAlerts(metric, current, projections);
@@ -21,7 +21,7 @@ export class GrowthProjector {
             generatedAt: new Date().toISOString()
         };
 
-        console.log('[GrowthProjector] Projeção gerada com', projections.length, 'períodos');
+        console.error('[GrowthProjector] Projeção gerada com', projections.length, 'períodos');
 
         return projection;
     }

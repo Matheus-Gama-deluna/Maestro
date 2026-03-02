@@ -53,7 +53,7 @@ export class ConfidenceCalculator {
      * Aprende com decisões do usuário
      */
     async learn(decision: Decision): Promise<void> {
-        console.log('[ConfidenceCalculator] Aprendendo com decisão:', decision.operation);
+        console.error('[ConfidenceCalculator] Aprendendo com decisão:', decision.operation);
 
         // Se usuário aprovou algo que IA marcou como baixa confiança,
         // aumentar confiança para próximas vezes
@@ -62,7 +62,7 @@ export class ConfidenceCalculator {
             const newConfidence = Math.min(1, currentConfidence + 0.1);
             this.learningData.set(decision.operation, newConfidence);
 
-            console.log(`[ConfidenceCalculator] Confiança ajustada: ${decision.operation} → ${(newConfidence * 100).toFixed(1)}%`);
+            console.error(`[ConfidenceCalculator] Confiança ajustada: ${decision.operation} → ${(newConfidence * 100).toFixed(1)}%`);
         }
 
         // Salvar dados de aprendizado
@@ -92,7 +92,7 @@ export class ConfidenceCalculator {
             const data = Object.fromEntries(this.learningData);
 
             await fs.writeFile(filepath, JSON.stringify(data, null, 2));
-            console.log('[ConfidenceCalculator] Dados de aprendizado salvos');
+            console.error('[ConfidenceCalculator] Dados de aprendizado salvos');
         } catch (error) {
             console.error('[ConfidenceCalculator] Erro ao salvar dados:', error);
         }
@@ -111,10 +111,10 @@ export class ConfidenceCalculator {
             const data = JSON.parse(content);
 
             this.learningData = new Map(Object.entries(data));
-            console.log('[ConfidenceCalculator] Dados de aprendizado carregados');
+            console.error('[ConfidenceCalculator] Dados de aprendizado carregados');
         } catch (error) {
             // Arquivo não existe ainda, tudo bem
-            console.log('[ConfidenceCalculator] Nenhum dado de aprendizado prévio encontrado');
+            console.error('[ConfidenceCalculator] Nenhum dado de aprendizado prévio encontrado');
         }
     }
 

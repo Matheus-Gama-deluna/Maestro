@@ -158,7 +158,7 @@ export class QualityScenarios {
 
     createCustomScenario(scenario: QualityScenario): void {
         this.addScenario(scenario);
-        console.log('[QualityScenarios] Cenário customizado adicionado:', scenario.id);
+        console.error('[QualityScenarios] Cenário customizado adicionado:', scenario.id);
     }
 
     getHighPriorityScenarios(): QualityScenario[] {

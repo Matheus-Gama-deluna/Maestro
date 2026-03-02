@@ -112,7 +112,7 @@ async function handleSetup(
                     ...newTasks,
                 ];
                 codeState.tasksGenerated = true;
-                console.log(`[code-phase] v8.0: ${newTasks.length} tasks geradas do Backlog para fase ${estado.fase_atual} (${faseInfo.nome})`);
+                console.error(`[code-phase] v8.0: ${newTasks.length} tasks geradas do Backlog para fase ${estado.fase_atual} (${faseInfo.nome})`);
             }
         } catch (err) {
             console.warn('[code-phase] v8.0: Falha ao gerar tasks do backlog:', err);
@@ -232,7 +232,7 @@ async function handleWorking(
         if (currentTask) {
             currentTask.status = 'done';
             currentTask.updated_at = new Date().toISOString();
-            console.log(`[code-phase] Task marcada como done: ${currentTask.title}`);
+            console.error(`[code-phase] Task marcada como done: ${currentTask.title}`);
 
             // Verificar se o parent (story) está completo
             if (currentTask.parent_id) {
@@ -382,7 +382,7 @@ async function handleGate(
         estado.fase_atual
     );
 
-    console.log(`[code-phase] v9.0: CodeValidator score=${validationResult.score}/100 approved=${validationResult.approved} (arquivos=${validationResult.breakdown.arquivos}, tasks=${validationResult.breakdown.tasks}, manifest=${validationResult.breakdown.manifest})`);
+    console.error(`[code-phase] v9.0: CodeValidator score=${validationResult.score}/100 approved=${validationResult.approved} (arquivos=${validationResult.breakdown.arquivos}, tasks=${validationResult.breakdown.tasks}, manifest=${validationResult.breakdown.manifest})`);
 
     // Score < 50: BLOQUEAR
     if (validationResult.score < 50) {

@@ -4,7 +4,7 @@
  */
 export class TestRunner {
     async runTests(pattern?: string): Promise<TestResult> {
-        console.log('[TestRunner] Executando testes:', pattern || 'todos');
+        console.error('[TestRunner] Executando testes:', pattern || 'todos');
         
         return {
             total: 0,
@@ -17,7 +17,7 @@ export class TestRunner {
     }
 
     async runTestFile(filepath: string): Promise<TestResult> {
-        console.log('[TestRunner] Executando arquivo:', filepath);
+        console.error('[TestRunner] Executando arquivo:', filepath);
         return this.runTests(filepath);
     }
 }

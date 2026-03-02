@@ -1,6 +1,6 @@
 {
   "name": "@maestro-ai/mcp-server",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "MCP Server do Maestro v6.0 com fluxos enxutos, especialistas dedicados e gates consolidados",
   "type": "module",
   "main": "dist/stdio.js",

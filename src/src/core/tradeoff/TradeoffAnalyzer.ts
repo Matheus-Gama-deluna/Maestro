@@ -4,7 +4,7 @@
  */
 export class TradeoffAnalyzer {
     async analyze(alternatives: Alternative[]): Promise<TradeoffAnalysis> {
-        console.log('[TradeoffAnalyzer] Analisando trade-offs de', alternatives.length, 'alternativas');
+        console.error('[TradeoffAnalyzer] Analisando trade-offs de', alternatives.length, 'alternativas');
 
         const scored = alternatives.map(alt => ({
             ...alt,

@@ -77,7 +77,7 @@ export function withADRGeneration(handler: ToolHandler): ToolHandler {
                 const indice = await fs.readFile(indiceArquivo, 'utf-8');
                 const faseSlug = nomeFaseConcluida.toLowerCase().replace(/\s+/g, '-');
                 if (indice.includes(`fase: ${nomeFaseConcluida}`) || indice.includes(faseSlug)) {
-                    console.log(`[ADRGeneration] Fase "${nomeFaseConcluida}" já processada — ignorando.`);
+                    console.error(`[ADRGeneration] Fase "${nomeFaseConcluida}" já processada — ignorando.`);
                     return result;
                 }
             } catch { /* INDEX.md ainda não existe — pode gerar */ }
@@ -96,7 +96,7 @@ export function withADRGeneration(handler: ToolHandler): ToolHandler {
             // v6.3 S3.2: Persistir ADRs no KnowledgeBase para consulta futura
             await persistirNoKnowledgeBase(diretorio, decisoes, faseConcluidaNum);
 
-            console.log(`[ADRGeneration] ${decisoes.length} ADR(s) gerados para fase: ${nomeFaseConcluida}`);
+            console.error(`[ADRGeneration] ${decisoes.length} ADR(s) gerados para fase: ${nomeFaseConcluida}`);
 
             // Adicionar nota ao resultado sobre ADRs gerados
             if (result.content?.[0]?.text) {

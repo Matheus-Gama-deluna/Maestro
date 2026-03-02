@@ -4,7 +4,7 @@
  */
 export class AutoExecutor {
     async canExecute(operation: Operation): Promise<boolean> {
-        console.log('[AutoExecutor] Verificando se pode executar:', operation.name);
+        console.error('[AutoExecutor] Verificando se pode executar:', operation.name);
 
         // Verificar risco
         if (operation.risk === 'alto' || operation.risk === 'critico') {
@@ -20,7 +20,7 @@ export class AutoExecutor {
     }
 
     async execute(operation: Operation): Promise<ExecutionResult> {
-        console.log('[AutoExecutor] Executando:', operation.name);
+        console.error('[AutoExecutor] Executando:', operation.name);
 
         try {
             // Simular execução
