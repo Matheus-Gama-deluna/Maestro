@@ -24,8 +24,6 @@ docs/
 | Documento | Descricao |
 |-----------|-----------|
 | [Analise do Estado Atual](./analysis/ANALISE_ESTADO_ATUAL_MAESTRO.md) | Diagnostico completo do sistema: score de maturidade, problemas criticos, pontos fortes |
-| [Analise Completa 2026](./analysis/ANALISE_COMPLETA_MAESTRO_2026.md) | Analise detalhada abrangente do ecossistema Maestro |
-| [Analise de Lacunas](./analysis/ANALISE_LACUNAS_PLANO_EVOLUCAO.md) | Lacunas identificadas no plano de evolucao |
 
 ### Roadmap
 
