@@ -193,6 +193,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - [Instruções de Uso](docs/INSTRUCOES_DE_USO.md)
 - [Especificação MCP](docs/MCP_ESPECIFICACAO.md)
 - [Guia de Desenvolvimento MCP](docs/MCP_GUIA_DESENVOLVIMENTO.md)
+- [Documentação Técnica Completa e Atualizada](docs/architecture/DOCUMENTACAO_TECNICA_COMPLETA_MAESTRO_ATUALIZADA.md)
 - [CLI README](packages/cli/README.md)
 
 ---
